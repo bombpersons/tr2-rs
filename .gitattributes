@@ -1,0 +1,2 @@
+# Preserve captured CSV bytes so recorded SHA-256 provenance remains valid.
+game/tests/data/original/*.csv -text whitespace=cr-at-eol

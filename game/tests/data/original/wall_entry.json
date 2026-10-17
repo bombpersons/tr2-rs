@@ -1,0 +1,53 @@
+{
+  "description": "Original Wall entry autonomous fall/slide, no input, samples cropped from wall_load at first initialized camera frame16693; no pokes",
+  "source_run": ".psx/wall_load",
+  "checkpoint": ".psx/wall_load/state_f000175.bin",
+  "checkpoint_start": 16675,
+  "valid_data_start": 16693,
+  "original_run_input": [
+    {
+      "frame": 0,
+      "buttons": []
+    }
+  ],
+  "fields": 207,
+  "initial": {
+    "run_frame": "0",
+    "frame": "16693",
+    "x": "62976",
+    "y": "1536",
+    "z": "23040",
+    "yaw": "0",
+    "animation": "34",
+    "animation_frame": "492",
+    "state": "3",
+    "speed": "0",
+    "fall_speed": "0",
+    "camera_x": "61952",
+    "camera_y": "384",
+    "camera_z": "23040",
+    "target_x": "62976",
+    "target_y": "709",
+    "target_z": "23040"
+  },
+  "final": {
+    "run_frame": "207",
+    "frame": "16900",
+    "x": "64176",
+    "y": "5376",
+    "z": "25790",
+    "yaw": "0",
+    "animation": "71",
+    "animation_frame": "1158",
+    "state": "24",
+    "speed": "30",
+    "fall_speed": "0",
+    "camera_x": "63982",
+    "camera_y": "3617",
+    "camera_z": "24513",
+    "target_x": "64176",
+    "target_y": "4862",
+    "target_z": "25790"
+  },
+  "sha256": "f0e42db1c09c72221e545a67295219d08bb668bffa9ee40a57b9236a044485b4"
+}

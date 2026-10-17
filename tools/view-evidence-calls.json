@@ -1,0 +1,136 @@
+{
+  "note": "PSX-only evidence recipes. Choose new output names when reproducing to preserve retained observations.",
+  "calls": [
+    {
+      "tool": "run",
+      "arguments": {
+        "from_state": ".psx/wall_spawn/state.bin",
+        "frames": 2,
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "watch": [
+          "0x8008aa60:48"
+        ],
+        "max_events": 500,
+        "out": ".psx/view_matrix_probe",
+        "summary": true
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "from_state": ".psx/wall_spawn/state.bin",
+        "frames": 3,
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "gpu_next_draw": true,
+        "gpu_draw_filter": "textured",
+        "out": ".psx/view_projection_draw",
+        "summary": true
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "from_state": ".psx/wall_load/state_f000175.bin",
+        "frames": 20,
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "watch": [
+          "0x8008b26c:4",
+          "0x8019cf44:4",
+          "0x8019cf68:4"
+        ],
+        "max_events": 600,
+        "out": ".psx/view_initial_target_probe",
+        "summary": true
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "from_state": ".psx/camera_initialization/state_f000018.bin",
+        "frames": 1,
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "gpu_frame": 0,
+        "sample": [
+          "0x8019cf64:i32:player_x",
+          "0x8019cf68:i32:player_y",
+          "0x8019cf6c:i32:player_z",
+          "0x8019cf44:i16:animation",
+          "0x8019cf46:i16:animation_frame",
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z"
+        ],
+        "out": ".psx/view_spawn_reference",
+        "summary": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x8001826c",
+        "count": 160,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80065184",
+        "count": 160,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80064f04",
+        "count": 160,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80017d8c",
+        "count": 160,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80043af0",
+        "count": 160,
+        "text": true
+      }
+    }
+  ]
+}

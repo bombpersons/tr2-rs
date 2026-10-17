@@ -1,0 +1,817 @@
+{
+  "description": "PSX-only runtime evidence for view orientation and airborne camera startup",
+  "captures": [
+    {
+      "run": ".psx/view_matrix_probe",
+      "build": {
+        "id": "src-84bc9f72af323b47-release",
+        "profile": "release",
+        "source_sha256": "84bc9f72af323b47e51edeff233af6fd7f639f06f5c37fc20e242b951065d7fa",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "identity": {
+        "backend": "psx-core",
+        "backend_version": "0.1.0",
+        "bios": "bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+        "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+        "from_state": ".psx/wall_spawn/state.bin",
+        "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+        "media_identity": {
+          "kind": "disc",
+          "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+        },
+        "state_format": 8,
+        "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+      },
+      "frames": {
+        "end": 16698,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 2,
+        "requested": 2,
+        "start": 16696,
+        "unit": "vsync"
+      },
+      "input": {
+        "application": {
+          "applied_events": 1,
+          "file": ".psx/view_matrix_probe/input.jsonl",
+          "note": "Actual scheduler applications, including boundary releases; does not prove the game polled the controller.",
+          "observed": true,
+          "pending_events": 0,
+          "scheduled_events": 1
+        },
+        "events": [
+          {
+            "buttons": [],
+            "frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ],
+        "frame_origin": "run_start",
+        "state_semantics": "complete held state from frame until next event; empty buttons releases all; until is exclusive"
+      },
+      "status": "complete",
+      "files": {
+        "writes.jsonl": {
+          "bytes": 3138,
+          "sha256": "df65fdb0d70fd766eb6698d5e9b7ff924aa299e8b26e0152555ac4d71e092814"
+        }
+      },
+      "writes": [
+        {
+          "address": 567940,
+          "address_hex": "0x0008AA84",
+          "cycle": 9434591860,
+          "frame": 16697,
+          "old": 6524,
+          "old_hex": "0x0000197C",
+          "old_signed": 6524,
+          "pc": 413768,
+          "pc_hex": "0x00065048",
+          "run_frame": 1,
+          "value": 7096,
+          "value_hex": "0x00001BB8",
+          "value_signed": 7096,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567908,
+          "address_hex": "0x0008AA64",
+          "cycle": 9434591872,
+          "frame": 16697,
+          "old": 0,
+          "old_hex": "0x00000000",
+          "old_signed": 0,
+          "pc": 413792,
+          "pc_hex": "0x00065060",
+          "run_frame": 1,
+          "value": 0,
+          "value_hex": "0x00000000",
+          "value_signed": 0,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567924,
+          "address_hex": "0x0008AA74",
+          "cycle": 9434591884,
+          "frame": 16697,
+          "old": 15019,
+          "old_hex": "0x00003AAB",
+          "old_signed": 15019,
+          "pc": 413816,
+          "pc_hex": "0x00065078",
+          "run_frame": 1,
+          "value": 14768,
+          "value_hex": "0x000039B0",
+          "value_signed": 14768,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567936,
+          "address_hex": "0x0008AA80",
+          "cycle": 9434591896,
+          "frame": 16697,
+          "old": 15019,
+          "old_hex": "0x00003AAB",
+          "old_signed": 15019,
+          "pc": 413840,
+          "pc_hex": "0x00065090",
+          "run_frame": 1,
+          "value": 14768,
+          "value_hex": "0x000039B0",
+          "value_signed": 14768,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567944,
+          "address_hex": "0x0008AA88",
+          "cycle": 9434591908,
+          "frame": 16697,
+          "old": 0,
+          "old_hex": "0x00000000",
+          "old_signed": 0,
+          "pc": 413864,
+          "pc_hex": "0x000650A8",
+          "run_frame": 1,
+          "value": 0,
+          "value_hex": "0x00000000",
+          "value_signed": 0,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567912,
+          "address_hex": "0x0008AA68",
+          "cycle": 9434591930,
+          "frame": 16697,
+          "old": 4294950912,
+          "old_hex": "0xFFFFC000",
+          "old_signed": -16384,
+          "pc": 413908,
+          "pc_hex": "0x000650D4",
+          "run_frame": 1,
+          "value": 4294950912,
+          "value_hex": "0xFFFFC000",
+          "value_signed": -16384,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567920,
+          "address_hex": "0x0008AA70",
+          "cycle": 9434591944,
+          "frame": 16697,
+          "old": 4294960772,
+          "old_hex": "0xFFFFE684",
+          "old_signed": -6524,
+          "pc": 413936,
+          "pc_hex": "0x000650F0",
+          "run_frame": 1,
+          "value": 4294960200,
+          "value_hex": "0xFFFFE448",
+          "value_signed": -7096,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567928,
+          "address_hex": "0x0008AA78",
+          "cycle": 9434591960,
+          "frame": 16697,
+          "old": 0,
+          "old_hex": "0x00000000",
+          "old_signed": 0,
+          "pc": 413968,
+          "pc_hex": "0x00065110",
+          "run_frame": 1,
+          "value": 0,
+          "value_hex": "0x00000000",
+          "value_signed": 0,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567916,
+          "address_hex": "0x0008AA6C",
+          "cycle": 9434591970,
+          "frame": 16697,
+          "old": 61952,
+          "old_hex": "0x0000F200",
+          "old_signed": 61952,
+          "pc": 413988,
+          "pc_hex": "0x00065124",
+          "run_frame": 1,
+          "value": 61952,
+          "value_hex": "0x0000F200",
+          "value_signed": 61952,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567932,
+          "address_hex": "0x0008AA7C",
+          "cycle": 9434591980,
+          "frame": 16697,
+          "old": 384,
+          "old_hex": "0x00000180",
+          "old_signed": 384,
+          "pc": 414008,
+          "pc_hex": "0x00065138",
+          "run_frame": 1,
+          "value": 384,
+          "value_hex": "0x00000180",
+          "value_signed": 384,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567904,
+          "address_hex": "0x0008AA60",
+          "cycle": 9434591986,
+          "frame": 16697,
+          "old": 0,
+          "old_hex": "0x00000000",
+          "old_signed": 0,
+          "pc": 414020,
+          "pc_hex": "0x00065144",
+          "run_frame": 1,
+          "value": 0,
+          "value_hex": "0x00000000",
+          "value_signed": 0,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 567948,
+          "address_hex": "0x0008AA8C",
+          "cycle": 9434591994,
+          "frame": 16697,
+          "old": 23040,
+          "old_hex": "0x00005A00",
+          "old_signed": 23040,
+          "pc": 414036,
+          "pc_hex": "0x00065154",
+          "run_frame": 1,
+          "value": 23040,
+          "value_hex": "0x00005A00",
+          "value_signed": 23040,
+          "width": 4,
+          "writer": "cpu"
+        }
+      ]
+    },
+    {
+      "run": ".psx/view_projection_draw",
+      "build": {
+        "id": "src-84bc9f72af323b47-release",
+        "profile": "release",
+        "source_sha256": "84bc9f72af323b47e51edeff233af6fd7f639f06f5c37fc20e242b951065d7fa",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "identity": {
+        "backend": "psx-core",
+        "backend_version": "0.1.0",
+        "bios": "bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+        "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+        "from_state": ".psx/wall_spawn/state.bin",
+        "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+        "media_identity": {
+          "kind": "disc",
+          "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+        },
+        "state_format": 8,
+        "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+      },
+      "frames": {
+        "end": 16699,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 3,
+        "requested": 3,
+        "start": 16696,
+        "unit": "vsync"
+      },
+      "input": {
+        "application": {
+          "applied_events": 1,
+          "file": ".psx/view_projection_draw/input.jsonl",
+          "note": "Actual scheduler applications, including boundary releases; does not prove the game polled the controller.",
+          "observed": true,
+          "pending_events": 0,
+          "scheduled_events": 1
+        },
+        "events": [
+          {
+            "buttons": [],
+            "frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ],
+        "frame_origin": "run_start",
+        "state_semantics": "complete held state from frame until next event; empty buttons releases all; until is exclusive"
+      },
+      "status": "complete",
+      "files": {
+        "gpu_frame.json": {
+          "bytes": 626809,
+          "sha256": "7d776ffc34ae8ed78084e6d55cfc16200917080f19b8ec3afb8b66946332ab52"
+        },
+        "gpu_frame_screen.png": {
+          "bytes": 103826,
+          "sha256": "af73d7140693502c0696f00a79e74d0b68811644b4d9b701648e5ca508522616"
+        }
+      }
+    },
+    {
+      "run": ".psx/view_initial_target_probe",
+      "build": {
+        "id": "src-84bc9f72af323b47-release",
+        "profile": "release",
+        "source_sha256": "84bc9f72af323b47e51edeff233af6fd7f639f06f5c37fc20e242b951065d7fa",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "identity": {
+        "backend": "psx-core",
+        "backend_version": "0.1.0",
+        "bios": "bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+        "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+        "from_state": ".psx/wall_load/state_f000175.bin",
+        "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+        "media_identity": {
+          "kind": "disc",
+          "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+        },
+        "state_format": 8,
+        "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+      },
+      "frames": {
+        "end": 16695,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 20,
+        "requested": 20,
+        "start": 16675,
+        "unit": "vsync"
+      },
+      "input": {
+        "application": {
+          "applied_events": 1,
+          "file": ".psx/view_initial_target_probe/input.jsonl",
+          "note": "Actual scheduler applications, including boundary releases; does not prove the game polled the controller.",
+          "observed": true,
+          "pending_events": 0,
+          "scheduled_events": 1
+        },
+        "events": [
+          {
+            "buttons": [],
+            "frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ],
+        "frame_origin": "run_start",
+        "state_semantics": "complete held state from frame until next event; empty buttons releases all; until is exclusive"
+      },
+      "status": "complete",
+      "files": {
+        "writes.jsonl": {
+          "bytes": 5032,
+          "sha256": "8ecd5c46ae9fb7d5ac15450768c4ed0f36b069a2195d6c959795766bd338f39c"
+        }
+      },
+      "writes": [
+        {
+          "address": 1691496,
+          "address_hex": "0x0019CF68",
+          "cycle": 9428421246,
+          "frame": 16686,
+          "old": 67,
+          "old_hex": "0x43",
+          "old_signed": 67,
+          "pc": 408944,
+          "pc_hex": "0x00063D70",
+          "run_frame": 11,
+          "value": 0,
+          "value_hex": "0x00",
+          "value_signed": 0,
+          "width": 1,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691497,
+          "address_hex": "0x0019CF69",
+          "cycle": 9428421258,
+          "frame": 16686,
+          "old": 5,
+          "old_hex": "0x05",
+          "old_signed": 5,
+          "pc": 408944,
+          "pc_hex": "0x00063D70",
+          "run_frame": 11,
+          "value": 6,
+          "value_hex": "0x06",
+          "value_signed": 6,
+          "width": 1,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691498,
+          "address_hex": "0x0019CF6A",
+          "cycle": 9428421270,
+          "frame": 16686,
+          "old": 18,
+          "old_hex": "0x12",
+          "old_signed": 18,
+          "pc": 408944,
+          "pc_hex": "0x00063D70",
+          "run_frame": 11,
+          "value": 0,
+          "value_hex": "0x00",
+          "value_signed": 0,
+          "width": 1,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691499,
+          "address_hex": "0x0019CF6B",
+          "cycle": 9428421282,
+          "frame": 16686,
+          "old": 251,
+          "old_hex": "0xFB",
+          "old_signed": -5,
+          "pc": 408944,
+          "pc_hex": "0x00063D70",
+          "run_frame": 11,
+          "value": 0,
+          "value_hex": "0x00",
+          "value_signed": 0,
+          "width": 1,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691460,
+          "address_hex": "0x0019CF44",
+          "cycle": 9428422098,
+          "frame": 16686,
+          "old": 482,
+          "old_hex": "0x01E2",
+          "old_signed": 482,
+          "pc": 227056,
+          "pc_hex": "0x000376F0",
+          "run_frame": 11,
+          "value": 0,
+          "value_hex": "0x0000",
+          "value_signed": 0,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9428422116,
+          "frame": 16686,
+          "old": 57734,
+          "old_hex": "0xE186",
+          "old_signed": -7802,
+          "pc": 227092,
+          "pc_hex": "0x00037714",
+          "run_frame": 11,
+          "value": 0,
+          "value_hex": "0x0000",
+          "value_signed": 0,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691460,
+          "address_hex": "0x0019CF44",
+          "cycle": 9431731374,
+          "frame": 16692,
+          "old": 0,
+          "old_hex": "0x0000",
+          "old_signed": 0,
+          "pc": 277276,
+          "pc_hex": "0x00043B1C",
+          "run_frame": 17,
+          "value": 11,
+          "value_hex": "0x000B",
+          "value_signed": 11,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9431731380,
+          "frame": 16692,
+          "old": 0,
+          "old_hex": "0x0000",
+          "old_signed": 0,
+          "pc": 277288,
+          "pc_hex": "0x00043B28",
+          "run_frame": 17,
+          "value": 185,
+          "value_hex": "0x00B9",
+          "value_signed": 185,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 569964,
+          "address_hex": "0x0008B26C",
+          "cycle": 9431791240,
+          "frame": 16692,
+          "old": 0,
+          "old_hex": "0x00000000",
+          "old_signed": 0,
+          "pc": 97720,
+          "pc_hex": "0x00017DB8",
+          "run_frame": 17,
+          "value": 512,
+          "value_hex": "0x00000200",
+          "value_signed": 512,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 569964,
+          "address_hex": "0x0008B26C",
+          "cycle": 9431791782,
+          "frame": 16692,
+          "old": 512,
+          "old_hex": "0x00000200",
+          "old_signed": 512,
+          "pc": 106792,
+          "pc_hex": "0x0001A128",
+          "run_frame": 17,
+          "value": 622,
+          "value_hex": "0x0000026E",
+          "value_signed": 622,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9431806042,
+          "frame": 16692,
+          "old": 185,
+          "old_hex": "0x00B9",
+          "old_signed": 185,
+          "pc": 273996,
+          "pc_hex": "0x00042E4C",
+          "run_frame": 17,
+          "value": 186,
+          "value_hex": "0x00BA",
+          "value_signed": 186,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691460,
+          "address_hex": "0x0019CF44",
+          "cycle": 9431806106,
+          "frame": 16692,
+          "old": 11,
+          "old_hex": "0x000B",
+          "old_signed": 11,
+          "pc": 274360,
+          "pc_hex": "0x00042FB8",
+          "run_frame": 17,
+          "value": 103,
+          "value_hex": "0x0067",
+          "value_signed": 103,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9431806116,
+          "frame": 16692,
+          "old": 186,
+          "old_hex": "0x00BA",
+          "old_signed": 186,
+          "pc": 274380,
+          "pc_hex": "0x00042FCC",
+          "run_frame": 17,
+          "value": 1608,
+          "value_hex": "0x0648",
+          "value_signed": 1608,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691460,
+          "address_hex": "0x0019CF44",
+          "cycle": 9431812986,
+          "frame": 16692,
+          "old": 103,
+          "old_hex": "0x0067",
+          "old_signed": 103,
+          "pc": 238900,
+          "pc_hex": "0x0003A534",
+          "run_frame": 17,
+          "value": 34,
+          "value_hex": "0x0022",
+          "value_signed": 34,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9431813006,
+          "frame": 16692,
+          "old": 1608,
+          "old_hex": "0x0648",
+          "old_signed": 1608,
+          "pc": 238940,
+          "pc_hex": "0x0003A55C",
+          "run_frame": 17,
+          "value": 492,
+          "value_hex": "0x01EC",
+          "value_signed": 492,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 569964,
+          "address_hex": "0x0008B26C",
+          "cycle": 9431824262,
+          "frame": 16692,
+          "old": 622,
+          "old_hex": "0x0000026E",
+          "old_signed": 622,
+          "pc": 106792,
+          "pc_hex": "0x0001A128",
+          "run_frame": 17,
+          "value": 709,
+          "value_hex": "0x000002C5",
+          "value_signed": 709,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691462,
+          "address_hex": "0x0019CF46",
+          "cycle": 9432299172,
+          "frame": 16693,
+          "old": 492,
+          "old_hex": "0x01EC",
+          "old_signed": 492,
+          "pc": 273996,
+          "pc_hex": "0x00042E4C",
+          "run_frame": 18,
+          "value": 493,
+          "value_hex": "0x01ED",
+          "value_signed": 493,
+          "width": 2,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691496,
+          "address_hex": "0x0019CF68",
+          "cycle": 9432299300,
+          "frame": 16693,
+          "old": 1536,
+          "old_hex": "0x00000600",
+          "old_signed": 1536,
+          "pc": 275012,
+          "pc_hex": "0x00043244",
+          "run_frame": 18,
+          "value": 1542,
+          "value_hex": "0x00000606",
+          "value_signed": 1542,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 1691496,
+          "address_hex": "0x0019CF68",
+          "cycle": 9432306040,
+          "frame": 16693,
+          "old": 1542,
+          "old_hex": "0x00000606",
+          "old_signed": 1542,
+          "pc": 114880,
+          "pc_hex": "0x0001C0C0",
+          "run_frame": 18,
+          "value": 1542,
+          "value_hex": "0x00000606",
+          "value_signed": 1542,
+          "width": 4,
+          "writer": "cpu"
+        },
+        {
+          "address": 569964,
+          "address_hex": "0x0008B26C",
+          "cycle": 9432327766,
+          "frame": 16693,
+          "old": 709,
+          "old_hex": "0x000002C5",
+          "old_signed": 709,
+          "pc": 106792,
+          "pc_hex": "0x0001A128",
+          "run_frame": 18,
+          "value": 776,
+          "value_hex": "0x00000308",
+          "value_signed": 776,
+          "width": 4,
+          "writer": "cpu"
+        }
+      ]
+    },
+    {
+      "run": ".psx/view_spawn_reference",
+      "build": {
+        "id": "src-84bc9f72af323b47-release",
+        "profile": "release",
+        "source_sha256": "84bc9f72af323b47e51edeff233af6fd7f639f06f5c37fc20e242b951065d7fa",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "identity": {
+        "backend": "psx-core",
+        "backend_version": "0.1.0",
+        "bios": "bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+        "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+        "from_state": ".psx/camera_initialization/state_f000018.bin",
+        "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+        "media_identity": {
+          "kind": "disc",
+          "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+        },
+        "state_format": 8,
+        "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+      },
+      "frames": {
+        "end": 16694,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 1,
+        "requested": 1,
+        "start": 16693,
+        "unit": "vsync"
+      },
+      "input": {
+        "application": {
+          "applied_events": 1,
+          "file": ".psx/view_spawn_reference/input.jsonl",
+          "note": "Actual scheduler applications, including boundary releases; does not prove the game polled the controller.",
+          "observed": true,
+          "pending_events": 0,
+          "scheduled_events": 1
+        },
+        "events": [
+          {
+            "buttons": [],
+            "frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ],
+        "frame_origin": "run_start",
+        "state_semantics": "complete held state from frame until next event; empty buttons releases all; until is exclusive"
+      },
+      "status": "complete",
+      "files": {
+        "samples.csv": {
+          "bytes": 251,
+          "sha256": "1665e2e2b2cab7c2dfd138df468045611788bbfc33d8fa102f9f240791bca36b"
+        },
+        "gpu_frame.json": {
+          "bytes": 615233,
+          "sha256": "fa5f2a77011dc4c276f7f306eb07e97b56c3fc4d2a542675f20c5c1508894656"
+        },
+        "gpu_frame_screen.png": {
+          "bytes": 106371,
+          "sha256": "7d12d7db7a7adaf1c05cd26da0ae1d299ba365df22e368badaa9d4e5915f6912"
+        }
+      }
+    }
+  ]
+}

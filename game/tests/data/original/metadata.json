@@ -1,0 +1,313 @@
+{
+  "schema": 1,
+  "source": "Original supplied Tomb Raider II USA Rev 3 disc executed in psx native build src-84bc9f72af323b47-release",
+  "timing": "NTSC video fields; player state changes every two fields (30 logic ticks/second)",
+  "coordinate_system": "TR2 original x/y/z integer units; y down; 1024 units per sector",
+  "player_pointer": "0x8008c6b8 physical pointer to Lara item",
+  "item_offsets": {
+    "state": "0x0e i16",
+    "animation": "0x14 i16",
+    "animation_frame": "0x16 i16",
+    "speed": "0x1e i16",
+    "fall_speed": "0x20 i16",
+    "health": "0x22 i16",
+    "xyz": "0x34 3*i32",
+    "yaw": "0x42 i16"
+  },
+  "checkpoint_preparation": "From .psx/home_start/state.bin absolute14880: RIGHT [0,52), neutral through field112. No memory pokes.",
+  "tests": [
+    {
+      "case": "run",
+      "csv": "run.csv",
+      "source_run": ".psx/home_clean_run",
+      "checkpoint": ".psx/home_side/state.bin",
+      "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+      "frames": {
+        "end": 15112,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 120,
+        "requested": 120,
+        "start": 14992,
+        "unit": "vsync"
+      },
+      "input": [
+        {
+          "buttons": [
+            "UP"
+          ],
+          "frame": 0,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        }
+      ],
+      "initial": {
+        "run_frame": "0",
+        "frame": "14992",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "103",
+        "animation_frame": "1636",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "final": {
+        "run_frame": "120",
+        "frame": "15112",
+        "x": "17317",
+        "y": "2560",
+        "z": "95910",
+        "yaw": "-15647",
+        "animation": "0",
+        "animation_frame": "20",
+        "state": "1",
+        "speed": "47",
+        "fall_speed": "0"
+      },
+      "sha256": "e3e864a4faeb559ce53a18238a6443f622bc237a7924cd0164d51492e93b3b49"
+    },
+    {
+      "case": "turn",
+      "csv": "turn.csv",
+      "source_run": ".psx/home_clean_turn",
+      "checkpoint": ".psx/home_side/state.bin",
+      "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+      "frames": {
+        "end": 15112,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 120,
+        "requested": 120,
+        "start": 14992,
+        "unit": "vsync"
+      },
+      "input": [
+        {
+          "buttons": [
+            "RIGHT"
+          ],
+          "frame": 0,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        }
+      ],
+      "initial": {
+        "run_frame": "0",
+        "frame": "14992",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "103",
+        "animation_frame": "1636",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "final": {
+        "run_frame": "120",
+        "frame": "15112",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-27939",
+        "animation": "44",
+        "animation_frame": "689",
+        "state": "20",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "sha256": "db45709460fe8b7e78b98937007c542a7ca9e603765cb3437cfb24ef36cba015"
+    },
+    {
+      "case": "jump",
+      "csv": "jump.csv",
+      "source_run": ".psx/home_clean_jump",
+      "checkpoint": ".psx/home_side/state.bin",
+      "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+      "frames": {
+        "end": 15112,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 120,
+        "requested": 120,
+        "start": 14992,
+        "unit": "vsync"
+      },
+      "input": [
+        {
+          "buttons": [
+            "SQUARE"
+          ],
+          "frame": 0,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        },
+        {
+          "buttons": [],
+          "frame": 10,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        }
+      ],
+      "initial": {
+        "run_frame": "0",
+        "frame": "14992",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "103",
+        "animation_frame": "1636",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "final": {
+        "run_frame": "120",
+        "frame": "15112",
+        "x": "19896",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "31",
+        "animation_frame": "469",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "sha256": "3e86987d664572ad7eb5c63f66e4069c63385108230defd45038469fe432a390"
+    },
+    {
+      "case": "heldout_left",
+      "csv": "heldout_left.csv",
+      "held_out": true,
+      "source_run": ".psx/home_heldout_left",
+      "checkpoint": ".psx/home_side/state.bin",
+      "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+      "frames": {
+        "end": 15112,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 120,
+        "requested": 120,
+        "start": 14992,
+        "unit": "vsync"
+      },
+      "input": [
+        {
+          "buttons": [
+            "LEFT"
+          ],
+          "frame": 0,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        }
+      ],
+      "initial": {
+        "run_frame": "0",
+        "frame": "14992",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "103",
+        "animation_frame": "1636",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "final": {
+        "run_frame": "120",
+        "frame": "15112",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-3355",
+        "animation": "69",
+        "animation_frame": "1118",
+        "state": "20",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "sha256": "34069488f3c92fab803d4fe14e91fa1ff9276ab3a6b68e7d0af3e7c571e1c6d5"
+    },
+    {
+      "case": "heldout_walk",
+      "csv": "heldout_walk.csv",
+      "held_out": true,
+      "source_run": ".psx/home_heldout_walk",
+      "checkpoint": ".psx/home_side/state.bin",
+      "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+      "frames": {
+        "end": 15112,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 120,
+        "requested": 120,
+        "start": 14992,
+        "unit": "vsync"
+      },
+      "input": [
+        {
+          "buttons": [
+            "UP",
+            "R1"
+          ],
+          "frame": 0,
+          "sticks": [
+            128,
+            128,
+            128,
+            128
+          ]
+        }
+      ],
+      "initial": {
+        "run_frame": "0",
+        "frame": "14992",
+        "x": "19968",
+        "y": "2560",
+        "z": "95744",
+        "yaw": "-15647",
+        "animation": "103",
+        "animation_frame": "1636",
+        "state": "2",
+        "speed": "0",
+        "fall_speed": "0"
+      },
+      "final": {
+        "run_frame": "120",
+        "frame": "15112",
+        "x": "19266",
+        "y": "2560",
+        "z": "95777",
+        "yaw": "-15647",
+        "animation": "1",
+        "animation_frame": "33",
+        "state": "0",
+        "speed": "15",
+        "fall_speed": "0"
+      },
+      "sha256": "d369707d2700edf210bab7c369859a4b0eaae1e4d53d60e6735ca6a36889dcad"
+    }
+  ]
+}
