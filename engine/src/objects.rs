@@ -123,12 +123,37 @@ pub struct ObjectTypes {
 }
 
 impl ObjectTypes {
+    /// Read just the portable names from a game's type table. Extra per-type
+    /// controller settings are deliberately ignored by authoring tools.
+    pub fn names_from_json(text: &str) -> Result<Self, serde_json::Error> {
+        #[derive(serde::Deserialize)]
+        struct Entry {
+            id: u16,
+            name: String,
+        }
+        #[derive(serde::Deserialize)]
+        struct Table {
+            types: Vec<Entry>,
+        }
+        let table: Table = serde_json::from_str(text)?;
+        let mut types = Self::default();
+        for entry in table.types {
+            types.insert(entry.id, ObjectType::new(entry.name));
+        }
+        Ok(types)
+    }
+
     pub fn insert(&mut self, kind: u16, object_type: ObjectType) {
         self.types.insert(kind, object_type);
     }
 
     pub fn get(&self, kind: u16) -> Option<&ObjectType> {
         self.types.get(&kind)
+    }
+
+    /// Metadata for authoring tools; hooks remain owned by the running game.
+    pub fn iter(&self) -> impl Iterator<Item = (u16, &ObjectType)> {
+        self.types.iter().map(|(&id, info)| (id, info))
     }
 }
 

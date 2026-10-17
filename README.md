@@ -30,6 +30,18 @@ Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/eviden
 what the engine treats as data and what as per-type code is in
 [docs/engine-model.md](docs/engine-model.md).
 
+## Level editor
+
+```sh
+cargo run -p editor   # hand-authored sandbox; no game data needed
+cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
+```
+
+A full-resolution Bevy editor with standard 3D rendering, a field browser for
+the engine's level format, validated edits, undo/redo, and exact untouched
+saves. It depends only on the engine. See [editor controls and workflow](docs/editor.md).
+Keep it in step with engine formats as the port grows.
+
 ## The template workspace
 
 A standalone Rust / **Bevy 0.20.0** workspace for a native port of a
@@ -55,6 +67,7 @@ cargo build --release                    # shipping build; developer MCP is excl
 |---|---|---|
 | `psx-bevy/` | psx template | PS1 look, ticks and input, controls menu, testing, viewers, developer MCP, launcher. Replaced by `psx template update`; don't edit ([README](psx-bevy/README.md)) |
 | `engine/` | this project | This game's engine family: object type and action registries, update-order sets, level and tuning formats, `examples/sandbox.rs`. No names, numbers or assets from this game ([AGENTS.md](engine/AGENTS.md)) |
+| `editor/` | this project | Engine-format authoring, full-resolution UI and standard 3D preview ([guide](docs/editor.md)) |
 | `game/` | this project | This title: per-type controllers, action handlers, HUD, menus, baked assets in `game/assets/`, trajectory tests ([AGENTS.md](game/AGENTS.md)) |
 | `tools/import/` | this project | Offline importers: files extracted with `psx` → engine formats, with provenance |
 | `tools/*.py` | this project | Evidence recording and smoke scripts |

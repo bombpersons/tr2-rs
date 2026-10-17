@@ -35,3 +35,7 @@ the start. Read the guide for the crate you are working in:
 
 The psx toolkit's `guide` tool (topic `port`) has the porting workflow.
 Routine check: `cargo test --workspace --all-features`.
+
+Keep `editor/` current as formats and port features grow (see `editor/AGENTS.md`
+and `docs/editor.md`). It depends only on the engine, uses a full-resolution
+UI and ordinary 3D rendering, and preserves untouched level files byte for byte.

@@ -98,3 +98,11 @@ author wouldn't expect, or the sandbox can't be made without reaching into
 `cargo test -p engine` (registry and trigger tests), then the workspace checks
 in the root README. Every restructuring must keep every game trajectory test
 passing exactly.
+
+## Editor contract
+
+`editor/` opens engine formats without a game dependency. `engine::editor`
+holds document transactions and validation. When a format changes, extend
+validation and save/reopen tests, and exercise it in the editor and sandbox.
+Keep unknown fields and exact no-op saves. Registry metadata supplies type
+names; authoring UI uses normal full-resolution rendering, not the PS1 look.

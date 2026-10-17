@@ -18,6 +18,7 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
             serde_json::from_slice(&fs::read(&path).unwrap()).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
         let label = data.name.clone();
         assert_eq!(data.format, FORMAT_VERSION, "{label}: format version");
+        engine::editor::validate_level(&data).unwrap_or_else(|error| panic!("{label}: editor: {error}"));
         assert!(!data.rooms.is_empty(), "{label}: rooms");
         assert!(!data.textures.is_empty(), "{label}: textures");
         let check_face = |vertices: &[usize], texture: usize, count: usize| {

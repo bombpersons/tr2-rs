@@ -1,0 +1,82 @@
+use engine::editor::{LevelDocument, child_pointer};
+use std::{fs, path::PathBuf};
+
+fn fixture(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("engine-editor-{}-{name}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("level.json");
+    fs::write(&path, include_bytes!("../assets/levels/sandbox/level.json")).unwrap();
+    path
+}
+
+#[test]
+fn unchanged_and_undone_saves_preserve_every_byte_and_unknown_fields() {
+    let path = fixture("exact");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    value["future/field~"] = serde_json::json!({"preserve": [1, 2, 3]});
+    let bytes = format!(" \r\n{}\r\n", serde_json::to_string_pretty(&value).unwrap()).into_bytes();
+    fs::write(&path, &bytes).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    doc.replace("/name", "\"changed\"").unwrap();
+    assert!(doc.is_dirty());
+    assert!(doc.undo());
+    assert!(!doc.is_dirty());
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(doc.redo());
+    doc.save().unwrap();
+    let reopened = LevelDocument::open(&path).unwrap();
+    assert_eq!(reopened.level().unwrap().name, "changed");
+    assert_eq!(reopened.value().pointer(&child_pointer("", "future/field~")), Some(&value["future/field~"]));
+}
+
+#[test]
+fn invalid_edits_are_transactional_and_disk_conflicts_never_overwrite() {
+    let path = fixture("invalid");
+    let bytes = fs::read(&path).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    for (pointer, text) in [
+        ("/format", "999"),
+        ("/placements/0/room", "99999"),
+        ("/rooms/0/z_sectors", "0"),
+        ("/rooms/0/quads/0/0", "999999"),
+        ("/rooms/0/sectors/0/floor_info", "99999"),
+        ("/models/0/joints/0/parent", "0"),
+        ("/name", "123"),
+        ("/name", "invalid json"),
+    ] {
+        assert!(doc.replace(pointer, text).is_err(), "{pointer}");
+        assert!(!doc.is_dirty());
+    }
+    doc.replace("/rooms/0/sectors/18/floor", "-128").unwrap();
+    doc.replace("/placements/1/position/0", "4700").unwrap();
+    let mut external = bytes;
+    external.push(b' ');
+    fs::write(&path, &external).unwrap();
+    assert!(doc.save().unwrap_err().contains("changed on disk"));
+    assert_eq!(fs::read(&path).unwrap(), external);
+    let copy = path.with_file_name("copy.json");
+    let _ = fs::remove_file(&copy);
+    doc.save_to(&copy).unwrap();
+    assert!(!doc.is_dirty());
+    let reopened = LevelDocument::open(&copy).unwrap();
+    assert_eq!(reopened.level().unwrap().placements[1].position[0], 4700);
+    assert_eq!(reopened.level().unwrap().rooms[0].sectors[18].floor, -128);
+    assert!(doc.save_to(&path).is_err());
+}
+
+#[test]
+fn registry_metadata_is_portable_and_never_installs_controller_hooks() {
+    let names = engine::objects::ObjectTypes::names_from_json(
+        r#"{"types":[{"id":7,"name":"walker","controller_specific":{"speed":3}},{"id":9,"name":"pillar"}]}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        names.iter().map(|(id, t)| (id, t.name.as_str())).collect::<Vec<_>>(),
+        vec![(7, "walker"), (9, "pillar")]
+    );
+    assert!(names.get(7).unwrap().spawn_hook().is_none());
+    assert!(names.get(0).is_none());
+}
