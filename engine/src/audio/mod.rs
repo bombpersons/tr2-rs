@@ -12,6 +12,10 @@ use bevy::{
 pub use pcm::{PcmAudio, PcmLoader};
 
 use crate::render::LevelRequest;
+use crate::animation::ObjectAnimationCue;
+use crate::objects::WorldObject;
+use crate::schedule::{WorldSystems, simulation_enabled};
+use crate::shell::GameSystems;
 use crate::world::{Animation, Command, WorldGeometry};
 pub use crate::world::format::SoundEnvironment;
 
@@ -42,6 +46,32 @@ pub fn animation_sounds(clip: &Animation, previous: f32, current: f32) -> Vec<(u
             _ => None,
         })
         .collect()
+}
+
+/// Authored object cues are produced during the item step. Playback is
+/// deferred to the sound phase; no game-specific sound ids live here.
+fn object_animation_sounds(
+    mut cues: MessageReader<ObjectAnimationCue>,
+    world: Option<Res<WorldGeometry>>,
+    objects: Query<&WorldObject>,
+    mut sounds: MessageWriter<SoundRequest>,
+) {
+    for event in cues.read() {
+        let Command::Sound { sound, environment, .. } = event.cue.command else { continue };
+        let water = world
+            .as_ref()
+            .and_then(|w| objects.get(event.entity).ok().and_then(|o| w.data.rooms.get(o.room)))
+            .is_some_and(|r| r.water);
+        let plays = match environment {
+            SoundEnvironment::Anywhere => true,
+            SoundEnvironment::OnLand => !water,
+            SoundEnvironment::InWater => water,
+            SoundEnvironment::Never => false,
+        };
+        if plays {
+            sounds.write(SoundRequest(sound));
+        }
+    }
 }
 
 fn sound_requests(
@@ -91,6 +121,8 @@ impl Plugin for AudioPlugin {
             .init_resource::<LevelRequest>()
             .add_message::<SoundRequest>()
             .add_message::<MusicRequest>()
+            .add_message::<ObjectAnimationCue>()
+            .add_systems(FixedUpdate, object_animation_sounds.in_set(WorldSystems::Effects).in_set(GameSystems::Game).run_if(simulation_enabled))
             .add_systems(Update, (sound_requests, music_requests));
     }
 }

@@ -8,45 +8,60 @@ use bevy::prelude::*;
 
 use crate::shell::GameSystems;
 
-/// One tick, in order:
-///
-/// 1. `Prepare`: camera initialisation after a level load; games publish the
-///    [`Avatar`] here.
-/// 2. `Control`: controllers read input and choose what to do (the player's
-///    state handlers).
-/// 3. `Motion`: integrate movement and collide with the level.
-/// 4. `Interaction`: pickups and switches, floor triggers, object collision,
-///    creatures ([`InteractionSystems`] orders the work inside it).
-/// 5. `Animation`: advance clips for what was decided this tick.
-/// 6. `Camera`: follow the avatar, fixed shots.
-/// 7. `Effects`: work that only reads the settled tick (sounds, hair).
+/// The major phases of one logic tick. Item controllers see the avatar from
+/// the previous tick; floor triggers see the result of this tick's collision.
+/// PSX ControlPhase 0x8001DC54..0x8001DD00 and avatar control at 0x800383E0..0x80038458
+/// establish this order (docs/tick-order-evidence.md).
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WorldSystems {
+    /// Menus, initial avatar publication and camera setup.
     Prepare,
+    /// Per-level reset and object spawn hooks, before any controller runs.
+    Initialize,
+    /// Placed-object controllers and their animation, before the avatar.
+    Items,
+    /// Avatar input and state decisions.
     Control,
+    /// Avatar movement and level collision.
     Motion,
-    Interaction,
+    /// Commit the avatar's authored pose before object collision.
     Animation,
+    /// Nearby objects, weapons and floor triggers.
+    Interaction,
+    /// Hair, cloth and other attached motion, before the camera.
+    SecondaryMotion,
     Camera,
+    /// Sound and other work after the settled camera.
     Effects,
+}
+
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum LifecycleSystems {
+    Reset,
+    Initialize,
+}
+
+/// A controller selects its object's state before the generic clip step.
+/// AnimationGoal opts objects into authored dispatch and links. Legacy
+/// controllers retain their prior clip rules; active-list order is separate.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ItemSystems {
+    Control,
+    Animation,
 }
 
 /// Order inside [`WorldSystems::Interaction`].
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InteractionSystems {
-    /// Forget per-level state when a new level arrives.
-    Reset,
-    /// Give newly spawned objects their type's components (object registry).
-    Initialize,
-    /// The avatar uses things: pickups, switches, keyholes.
+    /// Pickups, switches and keyholes in the avatar's vicinity.
     Use,
-    /// Floor triggers under the avatar fire, then game trigger actions run.
-    Triggers,
-    /// Objects push the avatar and hurt it (doors, traps).
+    /// Object collision: doors, traps and pushes.
     Resolve,
-    /// Creatures and combat.
-    Creatures,
-    /// Copy results into menus and HUD state.
+    /// Publish the final avatar and visual placement after object collision.
+    Publish,
+    /// Avatar weapons resolve after object collision, before triggers.
+    Combat,
+    Triggers,
     Report,
 }
 
@@ -64,8 +79,8 @@ pub fn simulation_enabled(enabled: Option<Res<SimulationEnabled>>) -> bool {
 /// it, floor triggers fire under it and rooms are drawn around it.
 ///
 /// The game owns the real state (its player component) and writes this copy
-/// whenever the engine is about to read it: at the start of the tick, before
-/// [`WorldSystems::Interaction`] and before [`WorldSystems::Camera`].
+/// whenever the engine is about to read it: at the start of the tick, after
+/// object collision ([`InteractionSystems::Publish`]) and before the camera.
 #[derive(Component, Reflect, Debug, Clone, Copy, Default, PartialEq)]
 #[reflect(Component)]
 pub struct Avatar {
@@ -91,14 +106,19 @@ impl Plugin for SchedulePlugin {
         use WorldSystems::*;
         app.configure_sets(
             FixedUpdate,
-            (Prepare, Control, Motion, Interaction, Animation, Camera, Effects).chain().in_set(GameSystems::Game),
+            (Prepare, Initialize, Items, Control, Motion, Animation, Interaction, SecondaryMotion, Camera, Effects)
+                .chain()
+                .in_set(GameSystems::Game),
         );
+        app.configure_sets(
+            FixedUpdate,
+            (LifecycleSystems::Reset, LifecycleSystems::Initialize).chain().in_set(Initialize),
+        );
+        app.configure_sets(FixedUpdate, (ItemSystems::Control, ItemSystems::Animation).chain().in_set(Items));
         use InteractionSystems as I;
         app.configure_sets(
             FixedUpdate,
-            (I::Reset, I::Initialize, I::Use, I::Triggers, I::Resolve, I::Creatures, I::Report)
-                .chain()
-                .in_set(Interaction),
+            (I::Use, I::Resolve, I::Publish, I::Combat, I::Triggers, I::Report).chain().in_set(Interaction),
         );
     }
 }

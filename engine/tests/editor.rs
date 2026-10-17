@@ -80,3 +80,15 @@ fn registry_metadata_is_portable_and_never_installs_controller_hooks() {
     assert!(names.get(7).unwrap().spawn_hook().is_none());
     assert!(names.get(0).is_none());
 }
+
+#[test]
+fn animation_links_are_validated_and_authored_edits_survive_save_reopen() {
+    let path = fixture("animation");
+    let mut doc = LevelDocument::open(&path).unwrap();
+    assert!(doc.replace("/animations/0/next_animation", "999999").is_err());
+    assert!(doc.replace("/animations/0/state_changes/0/animation", "999999").is_err());
+    doc.replace("/animations/1/poses/1/root/1", "-384").unwrap();
+    doc.save().unwrap();
+    let reopened = LevelDocument::open(&path).unwrap();
+    assert_eq!(reopened.level().unwrap().animations[1].poses[1].root[1], -384);
+}

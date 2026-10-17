@@ -1,0 +1,87 @@
+{
+  "source": "Supplied USA Rev 3 disc executed with psx native; animation/state fields never poked",
+  "item": 72,
+  "kind": 107,
+  "item_address": "0x8019DEA0",
+  "samples": [
+    [
+      12,
+      "i16",
+      "kind"
+    ],
+    [
+      14,
+      "i16",
+      "state"
+    ],
+    [
+      16,
+      "i16",
+      "goal"
+    ],
+    [
+      20,
+      "i16",
+      "animation"
+    ],
+    [
+      22,
+      "i16",
+      "animation_frame"
+    ],
+    [
+      40,
+      "x16",
+      "flags"
+    ]
+  ],
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/wall_game/state.bin",
+    "--frames",
+    "300",
+    "--out",
+    ".psx/door107_heldout",
+    "--summary",
+    "--sample",
+    "8019deac:i16:kind",
+    "--sample",
+    "8019deae:i16:state",
+    "--sample",
+    "8019deb0:i16:goal",
+    "--sample",
+    "8019deb4:i16:animation",
+    "--sample",
+    "8019deb6:i16:animation_frame",
+    "--sample",
+    "8019dec8:x16:flags",
+    "--poke",
+    "8019dec8=0x7e00:u16@0",
+    "--poke",
+    "8019dec8=0x4000:u16@24"
+  ],
+  "pokes": [
+    "8019dec8=0x7e00:u16@0",
+    "8019dec8=0x4000:u16@24"
+  ],
+  "build": {
+    "id": "src-7abefa01a0da12ad-release",
+    "profile": "release",
+    "source_sha256": "7abefa01a0da12ad1cbb6f6f0dab2db85a59dc12adb36d205e778e5209e5a224",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "frames": {
+    "end": 21300,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 300,
+    "requested": 300,
+    "start": 21000,
+    "unit": "vsync"
+  },
+  "samples_sha256": "1776140a3d915bb05d72888545fc39ab686773023d5a1838a6ed696ef3bb2db7",
+  "checkpoint_sha256": "8d3319bf7f63f989d98ef481bc513cf43e70fa7cb35ad42e8e62cc88d10ffc2f",
+  "heldout_after_implementation": true
+}

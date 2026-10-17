@@ -120,8 +120,25 @@ pub fn validate_level(level: &Level) -> Result<(), String> {
     for (i, a) in level.animations.iter().enumerate() {
         check(a.bounds.len() >= a.poses.len(), format!("/animations/{i}/bounds"), "each pose requires bounds")?;
         check(a.frame_start <= a.frame_end, format!("/animations/{i}"), "reversed frame range")?;
-        // Some imported clips have no poses or dangling continuation values;
-        // the runtime handles those with fallbacks. Preserve them verbatim.
+        check(
+            a.next_animation < level.animations.len(),
+            format!("/animations/{i}/next_animation"),
+            "animation index out of range",
+        )?;
+        for (j, change) in a.state_changes.iter().enumerate() {
+            check(
+                change.animation < level.animations.len(),
+                format!("/animations/{i}/state_changes/{j}/animation"),
+                "animation index out of range",
+            )?;
+            check(
+                change.first_frame <= change.last_frame,
+                format!("/animations/{i}/state_changes/{j}"),
+                "reversed dispatch window",
+            )?;
+        }
+        // Imported jumps can name frames outside the destination's ordinary
+        // key range. Preserve them: the timing step supports signed offsets.
     }
     for (i, s) in level.sound_map.iter().enumerate() {
         check(s.is_none_or(|s| s < level.sounds.len()), format!("/sound_map/{i}"), "sound index out of range")?;

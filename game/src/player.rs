@@ -213,7 +213,7 @@ impl Plugin for AvatarPlugin {
             FixedUpdate,
             (
                 publish_avatar.in_set(WorldSystems::Prepare).before(CameraSystems::Initialize),
-                publish_avatar.in_set(InteractionSystems::Reset),
+                publish_avatar.in_set(InteractionSystems::Publish),
                 publish_avatar.in_set(WorldSystems::Camera).before(CameraSystems::Update),
             ),
         )
@@ -235,7 +235,8 @@ impl Plugin for PlayerRulesPlugin {
             FixedUpdate,
             (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
         )
-        .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled));
+        .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled))
+        .add_systems(FixedUpdate, sync_transform.in_set(InteractionSystems::Publish).run_if(simulation_enabled));
     }
 }
 
@@ -1018,15 +1019,22 @@ fn animate(
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
     pad: Res<ControllerState>,
-    mut players: Query<(&Player, &Motion, &mut AnimationState, &mut Transform)>,
+    mut players: Query<(&Player, &Motion, &mut AnimationState)>,
 ) {
-    for (player, motion, mut animation, mut transform) in &mut players {
+    for (player, motion, mut animation) in &mut players {
         let index = mode_clip(player, motion, &pad);
         let start = match player.mode {
             PlayerMode::Landing { start_frame, .. } => Some(start_frame),
             _ => None,
         };
         *animation = step_animation(&animation, index, start, clips.as_deref(), original_frames(time.delta_secs()));
+    }
+}
+
+/// Commit visual placement after object pushes, without stepping the animation
+/// a second time. The camera and the render hierarchy see the same final actor.
+fn sync_transform(mut players: Query<(&Player, &mut Transform)>) {
+    for (player, mut transform) in &mut players {
         transform.translation = player.position;
         transform.rotation = Quat::from_rotation_y(player.yaw);
     }

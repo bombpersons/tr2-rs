@@ -33,6 +33,9 @@ def command(client, **fields):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', type=Path, default=ROOT / 'engine/assets/levels/sandbox/level.json')
+    parser.add_argument('--pose-placement', type=int)
+    parser.add_argument('--pose-clip', type=int)
+    parser.add_argument('--pose-steps', type=int, default=1)
     args = parser.parse_args()
     source = args.level.resolve()
     out = ROOT / 'validation/editor-smoke' / source.parent.name
@@ -49,7 +52,33 @@ def main():
         command(client, save=True)
         assert copy.read_bytes() == original, 'untouched save changed bytes'
         captures.append(client.capture('opened'))
+        if source.parent.name == 'sandbox':
+            command(client, pointer='/placements/1', navigate=True, frame=True)
+            client.edit('Editor', 'AnimationPreview', {'active':True, 'isolate':True, 'placement':1, 'clip':0, 'frame':0.0, 'goal':1, 'playing':False})
+            captures.append(client.capture('pose-closed'))
+            for _ in range(9):
+                client.edit('Editor', 'AnimationPreview', {'step':True})
+                time.sleep(0.05)
+            preview = next(e for e in client.query(name='Editor',components=['AnimationPreview'])['entities'] if e['name']=='Editor')['components']['AnimationPreview']
+            assert (preview['clip'],preview['frame']) == (2,0.0), preview
+            assert not status(client)['dirty'], 'preview changed persistent level data'
+            captures.append(client.capture('pose-open'))
+            from PIL import Image, ImageChops
+            with Image.open(out/'pose-closed.png') as a, Image.open(out/'pose-open.png') as b:
+                assert ImageChops.difference(a.convert('RGB').crop((500,80,1280,650)), b.convert('RGB').crop((500,80,1280,650))).getbbox(), 'authored pose did not change rendered geometry'
+            client.edit('Editor','AnimationPreview',{'active':False,'isolate':False})
         before = json.loads(original)
+        if args.pose_placement is not None:
+            assert args.pose_clip is not None
+            command(client,pointer=f'/placements/{args.pose_placement}',navigate=True,frame=True)
+            client.edit('Editor','AnimationPreview',{'active':True,'isolate':True,'placement':args.pose_placement,'clip':args.pose_clip,'frame':0.0,'goal':before['animations'][args.pose_clip]['state'],'playing':False})
+            captures.append(client.capture('model-start'))
+            for _ in range(args.pose_steps):
+                client.edit('Editor','AnimationPreview',{'step':True})
+                time.sleep(0.03)
+            captures.append(client.capture('model-end'))
+            assert not status(client)['dirty'], 'model playback changed the document'
+            client.edit('Editor','AnimationPreview',{'active':False,'isolate':False})
         x = before['placements'][1]['position'][0]
         state = command(client, pointer='/placements/1/position/0', json=str(x + 512), apply=True)
         assert state['dirty'] and state['message'] == 'Applied edit', state

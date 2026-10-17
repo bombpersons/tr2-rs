@@ -7,8 +7,8 @@
 //! Which goal a controller asks for, and when, is game code.
 use bevy::prelude::*;
 
+use crate::schedule::{ItemSystems, simulation_enabled};
 use crate::shell::GameSystems;
-use crate::schedule::{WorldSystems, simulation_enabled};
 use crate::world::{Command, Level, Model, Pose, WorldGeometry, position, units};
 
 /// Authored clip frames per second.
@@ -143,7 +143,8 @@ impl AnimationLibrary {
     pub fn dispatch(&self, animation: &AnimationState, goal: usize) -> Option<(usize, f32)> {
         let clip = self.clips.get(animation.animation)?;
         let frame = clip.frame_start + animation.frame.max(0.0).floor() as usize + 1;
-        let range = clip.state_ranges.iter().find(|r| r.state == goal && (r.first_frame..=r.last_frame).contains(&frame))?;
+        let range =
+            clip.state_ranges.iter().find(|r| r.state == goal && (r.first_frame..=r.last_frame).contains(&frame))?;
         let destination = self.clips.get(range.animation)?;
         Some((range.animation, range.frame.saturating_sub(destination.frame_start) as f32))
     }
@@ -195,7 +196,8 @@ pub fn advance(animation: &mut AnimationState, library: Option<&AnimationLibrary
     }
 }
 
-/// A looping clip on a placed object (doors, creatures, scenery).
+/// A placed object's current clip and clip-relative frame. Add AnimationGoal
+/// to use authored state dispatch and next-clip links.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
 pub struct ObjectAnimation {
@@ -226,10 +228,118 @@ pub fn select_state(world: &WorldGeometry, kind: u16, state: usize, a: &mut Obje
     }
 }
 
-fn animate_objects(time: Res<Time>, world: Option<Res<WorldGeometry>>, mut objects: Query<&mut ObjectAnimation>) {
+/// A controller's requested state for authored dispatch. Only objects with
+/// this component use table-driven transitions; legacy prototype controllers
+/// retain their existing clip selection until independently verified.
+#[derive(Component, Reflect, Debug, Clone, Default)]
+#[reflect(Component)]
+pub struct AnimationGoal {
+    pub state: usize,
+}
+
+/// A cue from an authored frame or clip end. Motion/end commands are exposed
+/// for a controller to handle; this pose step does not invent object physics.
+#[derive(Debug, Clone)]
+pub struct AnimationCue {
+    pub animation: usize,
+    pub frame: i64,
+    pub at_end: bool,
+    pub command: Command,
+}
+
+#[derive(Message, Debug, Clone)]
+pub struct ObjectAnimationCue {
+    pub entity: Entity,
+    pub cue: AnimationCue,
+}
+
+/// Advance one authored frame: increment, dispatch on an inclusive range,
+/// then follow the selected clip's end link. PSX AnimateItem 0x8001DD98 and
+/// GetChange 0x8001E250; verified per tick on a recorded door cycle.
+/// Dispatch retains the requested goal. A natural end link resets it only
+/// if the destination's state differs from the state just being played.
+pub fn step_authored_animation(data: &Level, a: &mut ObjectAnimation, goal: &mut AnimationGoal) -> Vec<AnimationCue> {
+    let mut cues = Vec::new();
+    let Some(mut clip) = data.animations.get(a.animation) else { return cues };
+    let mut absolute = clip.frame_start as i64 + a.frame.floor() as i64 + 1;
+    if clip.state != goal.state
+        && let Some(range) = clip
+            .state_changes
+            .iter()
+            .find(|r| r.state == goal.state && (r.first_frame as i64..=r.last_frame as i64).contains(&absolute))
+        && let Some(destination) = data.animations.get(range.animation)
+    {
+        a.animation = range.animation;
+        absolute = range.frame as i64;
+        clip = destination;
+    }
+    if absolute > clip.frame_end as i64 {
+        for command in &clip.commands {
+            if !matches!(command, Command::Sound { .. } | Command::Effect { .. }) {
+                cues.push(AnimationCue {
+                    animation: a.animation,
+                    frame: absolute,
+                    at_end: true,
+                    command: command.clone(),
+                });
+            }
+        }
+        if let Some(destination) = data.animations.get(clip.next_animation) {
+            a.animation = clip.next_animation;
+            absolute = clip.next_frame as i64;
+            if destination.state != clip.state {
+                goal.state = destination.state;
+            }
+            clip = destination;
+        }
+    }
+    a.frame = (absolute - clip.frame_start as i64) as f32;
+    for command in &clip.commands {
+        let frame = match command {
+            Command::Sound { frame, .. } | Command::Effect { frame, .. } => *frame as i64,
+            _ => continue,
+        };
+        if frame == absolute {
+            cues.push(AnimationCue { animation: a.animation, frame, at_end: false, command: command.clone() });
+        }
+    }
+    cues
+}
+
+/// Advance authored frames with fractional interpolation at other fixed tick
+/// rates. The validated game runs at exactly one authored frame per tick.
+pub fn advance_authored_animation(
+    data: &Level,
+    a: &mut ObjectAnimation,
+    goal: &mut AnimationGoal,
+    frames: f32,
+) -> Vec<AnimationCue> {
+    if !frames.is_finite() || frames <= 0.0 {
+        return vec![];
+    }
+    let elapsed = a.frame.rem_euclid(1.0) + frames;
+    a.frame = a.frame.floor();
+    let mut cues = Vec::new();
+    for _ in 0..elapsed.floor() as usize {
+        cues.extend(step_authored_animation(data, a, goal));
+    }
+    a.frame += elapsed.fract();
+    cues
+}
+
+fn animate_objects(
+    time: Res<Time>,
+    world: Option<Res<WorldGeometry>>,
+    mut objects: Query<(Entity, &mut ObjectAnimation, Option<&mut AnimationGoal>)>,
+    mut cues: MessageWriter<ObjectAnimationCue>,
+) {
     let Some(world) = world else { return };
-    for mut a in &mut objects {
-        if let Some(clip) = world.data.animations.get(a.animation) {
+    for (entity, mut a, goal) in &mut objects {
+        if let Some(mut goal) = goal {
+            for cue in advance_authored_animation(&world.data, &mut a, &mut goal, animation_frames(time.delta_secs())) {
+                cues.write(ObjectAnimationCue { entity, cue });
+            }
+        } else if let Some(clip) = world.data.animations.get(a.animation) {
             a.frame += time.delta_secs() * ANIMATION_FPS;
             if a.frame > clip.frame_end.saturating_sub(clip.frame_start) as f32 {
                 a.frame = 0.0;
@@ -314,9 +424,9 @@ impl Plugin for AnimationPlugin {
     fn build(&self, app: &mut App) {
         // AnimationLibrary is inserted when a level loads; rules treat its
         // absence as "no authored clips".
-        app.add_systems(
+        app.add_message::<ObjectAnimationCue>().add_systems(
             FixedUpdate,
-            animate_objects.in_set(WorldSystems::Animation).in_set(GameSystems::Game).run_if(simulation_enabled),
+            animate_objects.in_set(ItemSystems::Animation).in_set(GameSystems::Game).run_if(simulation_enabled),
         );
     }
 }

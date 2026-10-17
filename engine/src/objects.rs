@@ -10,7 +10,7 @@ use std::sync::Arc;
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::psx::PsxMaterial;
-use crate::schedule::{InteractionSystems, simulation_enabled};
+use crate::schedule::{LifecycleSystems, simulation_enabled};
 use crate::shell::GameSystems;
 use crate::world::{Placement, WorldGeometry};
 
@@ -206,7 +206,7 @@ impl Plugin for ObjectsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ObjectTypes>().init_resource::<ObjectDiagnostics>().add_systems(
             FixedUpdate,
-            initialize_objects.in_set(InteractionSystems::Initialize).in_set(GameSystems::Game).run_if(simulation_enabled),
+            initialize_objects.in_set(LifecycleSystems::Initialize).in_set(GameSystems::Game).run_if(simulation_enabled),
         );
     }
 }

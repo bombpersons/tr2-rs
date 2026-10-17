@@ -14,10 +14,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::prelude::*;
 use engine::{
-    animation::{ObjectAnimation, select_state},
+    animation::{AnimationGoal, ObjectAnimation, select_state},
     controller::{Button, ControllerState},
     objects::{AppObjectTypes, ObjectType},
-    schedule::{InteractionSystems, simulation_enabled},
+    schedule::{InteractionSystems, ItemSystems, LifecycleSystems, simulation_enabled},
     triggers::{AppTriggerActions, TriggerAction, TriggerState, TriggerSystems},
     world::{WorldGeometry, clear_line},
 };
@@ -157,7 +157,10 @@ fn register_object_types(app: &mut App) {
                 entity.insert(Enemy::new(creature));
             }
             if let Some(door) = &hook.door {
-                entity.insert(door.clone());
+                let state = world
+                    .and_then(|w| w.data.model(hook.id).and_then(|m| w.data.animations.get(m.animations[0])))
+                    .map_or(0, |clip| clip.state);
+                entity.insert((door.clone(), AnimationGoal { state }));
                 if let Some((min, max)) = world.and_then(|w| w.model_bounds(hook.id)) {
                     entity.insert(ObjectCollider { min, max });
                 }
@@ -248,11 +251,13 @@ impl Plugin for InteractionsPlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    reset_level.in_set(InteractionSystems::Reset),
+                    reset_level.in_set(LifecycleSystems::Reset),
                     collect_and_use.in_set(InteractionSystems::Use),
                     trigger_actions.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
                     resolve_objects.in_set(InteractionSystems::Resolve),
-                    (combat, creatures).chain().in_set(InteractionSystems::Creatures),
+                    creatures.in_set(ItemSystems::Control),
+                    control_doors.in_set(ItemSystems::Control),
+                    combat.in_set(InteractionSystems::Combat),
                     sync_session.in_set(InteractionSystems::Report),
                 )
                     .run_if(simulation_enabled),
@@ -498,8 +503,6 @@ fn resolve_objects(
     time: Res<Time>,
     objects: Query<(&WorldObject, &Transform, Option<&ObjectCollider>, Has<Spikes>)>,
     mut players: Query<(&mut Player, &Motion)>,
-    mut doors: Query<(&WorldObject, &mut ObjectAnimation), With<Door>>,
-    world: Option<Res<WorldGeometry>>,
 ) {
     for (mut p, motion) in &mut players {
         for (o, t, collider, spikes) in &objects {
@@ -541,9 +544,22 @@ fn resolve_objects(
             }
         }
     }
-    if let Some(w) = world {
-        for (o, mut a) in &mut doors {
-            select_state(&w, o.kind, usize::from(o.active), &mut a);
+}
+
+// PSX DoorControl 0x8004CA04..0x8004CA60 only changes the goal when
+// closed+active or open+inactive. Reopening during a close cannot cancel it:
+// the close completes before the next open request (docs/door-animation-evidence.md).
+fn control_doors(
+    world: Option<Res<WorldGeometry>>,
+    mut doors: Query<(&WorldObject, &ObjectAnimation, &mut AnimationGoal), With<Door>>,
+) {
+    let Some(world) = world else { return };
+    for (object, animation, mut goal) in &mut doors {
+        let Some(clip) = world.data.animations.get(animation.animation) else { continue };
+        match (object.active, clip.state) {
+            (true, 0) => goal.state = 1,
+            (false, 1) => goal.state = 0,
+            _ => (),
         }
     }
 }

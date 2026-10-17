@@ -47,9 +47,11 @@ running.
 
 The skeleton is a starting point; reshape it to match `docs/engine-model.md`.
 
-- `schedule.rs`, **`EngineSet`**: named sets in the original's update order,
-  inside `GameSystems::Game`. Game systems join a set rather than ordering
-  themselves ad hoc. Rename and reorder the placeholders from evidence.
+- `schedule.rs`: **`WorldSystems`** orders major phases inside
+  `GameSystems::Game`; **`LifecycleSystems`**, **`ItemSystems`** and
+  **`InteractionSystems`** order work within them. Game controllers join a
+  set rather than ordering themselves ad hoc. Keep phase changes backed by
+  PSX evidence and existing trajectories (docs/tick-order-evidence.md).
 - `objects.rs`, **object type registry**: type id → spawn hook, plus metadata
   (name, tuning resource). Adding a type means registering it, never editing a
   central `match`. Unknown ids are counted in `UnknownObjectTypes`.

@@ -1,4 +1,5 @@
 //! A full-resolution authoring app over engine formats, with no game dependency.
+mod animation;
 mod ui;
 use bevy::{
     camera::RenderTarget,
@@ -129,7 +130,7 @@ fn main() -> AppExit {
         .add_systems(Startup, setup)
         .add_systems(Update, (ui::input, automation, preview).chain().before(LevelSystems::Load))
         .add_systems(Update, (standard_preview, ui::camera, status).chain().after(LevelSystems::Visibility))
-        .add_plugins(ui::UiPlugin);
+        .add_plugins((ui::UiPlugin, animation::AnimationPreviewPlugin));
     // The MCP's `screen` is an ordinary full-resolution render target here;
     // no PS1 plugin, screen pass, quantization or affine shader is installed.
     let image = app.world_mut().resource_mut::<Assets<Image>>().add({
@@ -196,7 +197,12 @@ fn capture(mut commands: Commands, mut capture: ResMut<Capture>, target: Res<Edi
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn((Name::new("Editor"), EditorCommand::default(), EditorStatus::default()));
+    commands.spawn((
+        Name::new("Editor"),
+        EditorCommand::default(),
+        EditorStatus::default(),
+        animation::AnimationPreview::default(),
+    ));
 }
 
 fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>) {

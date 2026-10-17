@@ -1,0 +1,262 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/home_side/state.bin",
+    "--frames",
+    "6",
+    "--trace",
+    "--trace-range",
+    "0x8001DC00-0x8001DD08",
+    "--trace-range",
+    "0x80038194-0x800384D0",
+    "--max-events",
+    "100000",
+    "--out",
+    ".psx/tick_order_heldout",
+    "--summary",
+    "--replay",
+    "game/tests/data/original/tick_order_turn.input.json"
+  ],
+  "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+  "trace_sha256": "2bd1ec56e3ee7daf59b34d51275dce41fd8fb2cd7f5a27a55df6c03a470d79bd",
+  "frames": {
+    "end": 14998,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 6,
+    "requested": 6,
+    "start": 14992,
+    "unit": "vsync"
+  },
+  "input": [
+    {
+      "buttons": [
+        "RIGHT"
+      ],
+      "frame": 0,
+      "sticks": [
+        128,
+        128,
+        128,
+        128
+      ]
+    },
+    {
+      "buttons": [],
+      "frame": 6,
+      "sticks": [
+        128,
+        128,
+        128,
+        128
+      ]
+    }
+  ],
+  "build": {
+    "id": "src-7abefa01a0da12ad-release",
+    "profile": "release",
+    "source_sha256": "7abefa01a0da12ad1cbb6f6f0dab2db85a59dc12adb36d205e778e5209e5a224",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "recorded_after_schedule_change": true,
+  "ticks": [
+    {
+      "field": 14993,
+      "calls": [
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DCE8",
+          "phase": "player_control"
+        },
+        {
+          "caller": "0x800383E0",
+          "phase": "player_animation"
+        },
+        {
+          "caller": "0x80038400",
+          "phase": "object_collision"
+        },
+        {
+          "caller": "0x80038438",
+          "phase": "state_collision"
+        },
+        {
+          "caller": "0x80038444",
+          "phase": "room_update"
+        },
+        {
+          "caller": "0x8003844C",
+          "phase": "weapons"
+        },
+        {
+          "caller": "0x80038458",
+          "phase": "triggers"
+        },
+        {
+          "caller": "0x8001DCF0",
+          "phase": "secondary_motion"
+        },
+        {
+          "caller": "0x8001DCF8",
+          "phase": "camera"
+        },
+        {
+          "caller": "0x8001DD00",
+          "phase": "sound"
+        }
+      ]
+    },
+    {
+      "field": 14995,
+      "calls": [
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DCE8",
+          "phase": "player_control"
+        },
+        {
+          "caller": "0x800383E0",
+          "phase": "player_animation"
+        },
+        {
+          "caller": "0x80038400",
+          "phase": "object_collision"
+        },
+        {
+          "caller": "0x80038438",
+          "phase": "state_collision"
+        },
+        {
+          "caller": "0x80038444",
+          "phase": "room_update"
+        },
+        {
+          "caller": "0x8003844C",
+          "phase": "weapons"
+        },
+        {
+          "caller": "0x80038458",
+          "phase": "triggers"
+        },
+        {
+          "caller": "0x8001DCF0",
+          "phase": "secondary_motion"
+        },
+        {
+          "caller": "0x8001DCF8",
+          "phase": "camera"
+        },
+        {
+          "caller": "0x8001DD00",
+          "phase": "sound"
+        }
+      ]
+    },
+    {
+      "field": 14997,
+      "calls": [
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DC54",
+          "phase": "items"
+        },
+        {
+          "caller": "0x8001DCE8",
+          "phase": "player_control"
+        },
+        {
+          "caller": "0x800383E0",
+          "phase": "player_animation"
+        },
+        {
+          "caller": "0x80038400",
+          "phase": "object_collision"
+        },
+        {
+          "caller": "0x80038438",
+          "phase": "state_collision"
+        },
+        {
+          "caller": "0x80038444",
+          "phase": "room_update"
+        },
+        {
+          "caller": "0x8003844C",
+          "phase": "weapons"
+        },
+        {
+          "caller": "0x80038458",
+          "phase": "triggers"
+        },
+        {
+          "caller": "0x8001DCF0",
+          "phase": "secondary_motion"
+        },
+        {
+          "caller": "0x8001DCF8",
+          "phase": "camera"
+        },
+        {
+          "caller": "0x8001DD00",
+          "phase": "sound"
+        }
+      ]
+    }
+  ]
+}

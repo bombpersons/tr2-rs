@@ -38,8 +38,8 @@ cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/d
 ```
 
 A full-resolution Bevy editor with standard 3D rendering, a field browser for
-the engine's level format, validated edits, undo/redo, and exact untouched
-saves. It depends only on the engine. See [editor controls and workflow](docs/editor.md).
+the engine's level format, validated edits, undo/redo, exact untouched
+saves, and authored animation playback/stepping with isolated model previews. It depends only on the engine. See [editor controls and workflow](docs/editor.md).
 Keep it in step with engine formats as the port grows.
 
 ## The template workspace
