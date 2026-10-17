@@ -1,0 +1,27 @@
+{
+  "description": "Original Wall: turn right, run into the +x two-click ledge with UP+CROSS, climb (clip50), run up the slope and stop at the wall (clip53). No pokes.",
+  "source_run": ".psx/climb_probe",
+  "checkpoint": ".psx/wall_game/state.bin",
+  "checkpoint_sha256": "8d3319bf7f63f989d98ef481bc513cf43e70fa7cb35ad42e8e62cc88d10ffc2f",
+  "checkpoint_start": 21000,
+  "original_run_input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "RIGHT"
+      ],
+      "until": 56
+    },
+    {
+      "frame": 60,
+      "buttons": [
+        "UP",
+        "CROSS"
+      ],
+      "until": 260
+    }
+  ],
+  "fields": 260,
+  "samples_sha256": "33616625247d893d7cb8bbfa582a8a4a628a21a87a3b7d955f694b7baa210ee2",
+  "item": "0x8019cf30 (Lara item in Wall); yaw +0x42, xyz +0x34, anim +0x14, frame +0x16, state +0x0e, goal +0x10, speed +0x1e, fall +0x20"
+}

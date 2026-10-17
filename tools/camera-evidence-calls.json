@@ -1,0 +1,290 @@
+{
+  "description": "PSX MCP calls, in dependency order. Reproduction should use new output directory names to preserve the original evidence.",
+  "calls": [
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/wall_load/state_f000175.bin",
+        "frames": 42,
+        "watch": [
+          "0x8008b278:4",
+          "0x8008b2a4:8"
+        ],
+        "max_events": 2500,
+        "save_state_at": [
+          18,
+          20
+        ],
+        "out": ".psx/camera_initialization"
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/camera_initialization/state_f000020.bin",
+        "frames": 8,
+        "poke": [
+          "0x8008b258=62052:i32"
+        ],
+        "watch": [
+          "0x8008b258:4",
+          "0x8008b2a8:4"
+        ],
+        "max_events": 1000,
+        "out": ".psx/camera_smoothing_probe"
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/camera_initialization/state_f000020.bin",
+        "frames": 12,
+        "poke": [
+          "0x8008b2a8=3:i16"
+        ],
+        "watch": [
+          "0x8008b278:4",
+          "0x8008b2a8:4"
+        ],
+        "max_events": 1000,
+        "out": ".psx/camera_timer_probe"
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": []
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/wall_load/state_f000175.bin",
+        "frames": 90,
+        "poke": [
+          "0x8010ad14=32769:u16@17",
+          "0x8010ad20=32769:u16@17"
+        ],
+        "watch": [
+          "0x8008b278:4",
+          "0x8008b2a4:8"
+        ],
+        "max_events": 2500,
+        "out": ".psx/camera_authored_timer_probe"
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": [
+              "LEFT"
+            ],
+            "until": 16
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/camera_initialization/state_f000020.bin",
+        "frames": 16,
+        "watch": [
+          "0x8008b278:4",
+          "0x8008b2a8:4"
+        ],
+        "max_events": 1000,
+        "out": ".psx/camera_heldout_left"
+      }
+    },
+    {
+      "tool": "run",
+      "arguments": {
+        "sample": [
+          "0x8008b258:i32:camera_x",
+          "0x8008b25c:i32:camera_y",
+          "0x8008b260:i32:camera_z",
+          "0x8008b268:i32:target_x",
+          "0x8008b26c:i32:target_y",
+          "0x8008b270:i32:target_z",
+          "0x8008b278:i32:camera_mode",
+          "0x8008b2a4:i16:camera_index",
+          "0x8008b2a6:i16:last_camera",
+          "0x8008b2a8:i16:camera_timer",
+          "0x8008b2aa:i16:camera_divisor"
+        ],
+        "input": [
+          {
+            "frame": 0,
+            "buttons": [
+              "RIGHT"
+            ],
+            "until": 16
+          }
+        ],
+        "summary": true,
+        "from_state": ".psx/camera_initialization/state_f000020.bin",
+        "frames": 16,
+        "out": ".psx/camera_heldout_right"
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80019b28",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x8001ecb8",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x8001f308",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80017e80",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80019d50",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x8001a02c",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x8001a1dc",
+        "count": 96,
+        "text": true
+      }
+    },
+    {
+      "tool": "disasm",
+      "arguments": {
+        "ram": ".psx/wall_spawn",
+        "addr": "0x80028904",
+        "count": 96,
+        "text": true
+      }
+    }
+  ]
+}

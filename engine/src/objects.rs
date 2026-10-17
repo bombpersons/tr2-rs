@@ -1,0 +1,187 @@
+//! Placed objects and the object type registry.
+//!
+//! Every placement in a level becomes an entity. What an object *is* (a
+//! pickup, a door, a creature, the player) is not engine knowledge: games
+//! register each object type id with an [`ObjectType`], whose hooks add the
+//! game's components when the object is spawned or first ticks.
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
+use bevy::{ecs::system::EntityCommands, prelude::*};
+
+use crate::psx::PsxMaterial;
+use crate::schedule::{InteractionSystems, simulation_enabled};
+use crate::shell::GameSystems;
+use crate::world::{Placement, WorldGeometry};
+
+/// Activation code bits of an object's flag word (one bit per trigger mask
+/// slot). An object is active when all five are set, unless it is inverted.
+pub const CODE_BITS: u16 = 0x3e00;
+/// Inverted activation: active while the code is *not* complete.
+pub const INVERTED: u16 = 0x4000;
+/// Not drawn until activated.
+pub const INVISIBLE: u16 = 0x0100;
+
+/// A placed object and its activation state.
+#[derive(Component, Reflect, Debug, Clone)]
+#[reflect(Component)]
+#[require(Transform)]
+pub struct WorldObject {
+    /// Index of the placement in the level; triggers address objects by it.
+    pub index: usize,
+    /// Object type id (see [`ObjectTypes`]).
+    pub kind: u16,
+    pub room: usize,
+    pub flags: u16,
+    pub active: bool,
+    /// Collected or otherwise removed from play.
+    pub consumed: bool,
+}
+
+impl WorldObject {
+    pub fn new(index: usize, kind: u16, room: usize, flags: u16) -> Self {
+        // A complete authored code means "start active": it becomes an
+        // inverted object with the code cleared, so triggers deactivate it.
+        let flags = if flags & CODE_BITS == CODE_BITS { (flags & !CODE_BITS) | INVERTED } else { flags };
+        let mut object = Self { index, kind, room, flags, active: false, consumed: false };
+        object.update_active();
+        object
+    }
+
+    /// The object a level placement starts as.
+    pub fn from_placement(index: usize, placement: &Placement) -> Self {
+        let flags = placement.other_flags
+            | u16::from(placement.code & 31) << 9
+            | if placement.inverted { INVERTED } else { 0 }
+            | if placement.invisible { INVISIBLE } else { 0 };
+        Self::new(index, placement.kind, placement.room, flags)
+    }
+
+    /// Recompute `active` from the code bits and the inverted flag.
+    pub fn update_active(&mut self) {
+        self.active = (self.flags & CODE_BITS == CODE_BITS) ^ (self.flags & INVERTED != 0);
+    }
+}
+
+/// Added once an object's type hooks have run.
+#[derive(Component)]
+pub struct Initialized;
+
+/// Adds components to a newly placed or newly spawned object of one type.
+pub type InitHook = Arc<dyn Fn(&mut EntityCommands, &WorldObject, Option<&WorldGeometry>) + Send + Sync>;
+/// Builds the entity for a placement instead of the default [`WorldObject`].
+pub type SpawnHook = Arc<dyn Fn(&mut EntityCommands, &SpawnContext) + Send + Sync>;
+
+/// What a spawn hook knows about the placement it builds.
+pub struct SpawnContext<'a> {
+    /// Placement index in the level.
+    pub index: usize,
+    pub placement: &'a Placement,
+    pub world: &'a WorldGeometry,
+    /// Parent of everything drawn for the level.
+    pub render_root: Entity,
+    /// One mesh per level mesh (`LevelData::meshes`).
+    pub meshes: &'a [Handle<Mesh>],
+    /// The lit material shared by this object's model, when it has one.
+    pub lit_material: Option<Handle<PsxMaterial>>,
+}
+
+/// One object type: a name for tools and logs, and the game's hooks.
+#[derive(Clone, Default)]
+pub struct ObjectType {
+    pub name: String,
+    init: Vec<InitHook>,
+    spawn: Option<SpawnHook>,
+}
+
+impl ObjectType {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), ..default() }
+    }
+
+    /// Run `hook` the first tick an object of this type exists.
+    pub fn on_init(mut self, hook: impl Fn(&mut EntityCommands, &WorldObject, Option<&WorldGeometry>) + Send + Sync + 'static) -> Self {
+        self.init.push(Arc::new(hook));
+        self
+    }
+
+    /// Build placements of this type with `hook` instead of as a [`WorldObject`].
+    pub fn on_spawn(mut self, hook: impl Fn(&mut EntityCommands, &SpawnContext) + Send + Sync + 'static) -> Self {
+        self.spawn = Some(Arc::new(hook));
+        self
+    }
+
+    pub fn spawn_hook(&self) -> Option<&SpawnHook> {
+        self.spawn.as_ref()
+    }
+}
+
+/// Object type id -> type. Unregistered types are plain [`WorldObject`]s.
+#[derive(Resource, Default)]
+pub struct ObjectTypes {
+    types: BTreeMap<u16, ObjectType>,
+}
+
+impl ObjectTypes {
+    pub fn insert(&mut self, kind: u16, object_type: ObjectType) {
+        self.types.insert(kind, object_type);
+    }
+
+    pub fn get(&self, kind: u16) -> Option<&ObjectType> {
+        self.types.get(&kind)
+    }
+}
+
+/// Object type ids placed in the level that no game registered.
+#[derive(Resource, Reflect, Default, Debug)]
+#[reflect(Resource)]
+pub struct ObjectDiagnostics {
+    pub unregistered_types: BTreeSet<u16>,
+}
+
+/// Registering object types on the app.
+pub trait AppObjectTypes {
+    fn register_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self;
+}
+
+impl AppObjectTypes for App {
+    fn register_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self {
+        self.init_resource::<ObjectTypes>();
+        self.world_mut().resource_mut::<ObjectTypes>().insert(kind, object_type);
+        self
+    }
+}
+
+fn initialize_objects(
+    mut commands: Commands,
+    world: Option<Res<WorldGeometry>>,
+    types: Res<ObjectTypes>,
+    mut diagnostics: ResMut<ObjectDiagnostics>,
+    objects: Query<(Entity, &WorldObject), Without<Initialized>>,
+) {
+    for (e, o) in &objects {
+        let mut entity = commands.entity(e);
+        entity.insert(Initialized);
+        match types.get(o.kind) {
+            Some(object_type) => {
+                for hook in &object_type.init {
+                    hook(&mut entity, o, world.as_deref());
+                }
+            }
+            None => {
+                diagnostics.unregistered_types.insert(o.kind);
+            }
+        }
+    }
+}
+
+pub struct ObjectsPlugin;
+
+impl Plugin for ObjectsPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ObjectTypes>().init_resource::<ObjectDiagnostics>().add_systems(
+            FixedUpdate,
+            initialize_objects.in_set(InteractionSystems::Initialize).in_set(GameSystems::Game).run_if(simulation_enabled),
+        );
+    }
+}

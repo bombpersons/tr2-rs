@@ -1,0 +1,384 @@
+{
+ "_comment": "Object types placed in Tomb Raider II levels and the game behaviours each one gets. Ids are the levels' object type ids. Creature radius is in world units (1024 per metre); health and damage in hit points (Lara has 1000).",
+ "types": [
+  {
+   "id": 0,
+   "name": "lara"
+  },
+  {
+   "id": 36,
+   "name": "creature_36",
+   "creature": {
+    "health": 5,
+    "radius": 102,
+    "damage": 25
+   }
+  },
+  {
+   "id": 37,
+   "name": "creature_37",
+   "creature": {
+    "health": 40,
+    "radius": 341,
+    "damage": 100
+   }
+  },
+  {
+   "id": 39,
+   "name": "tiger",
+   "creature": {
+    "health": 20,
+    "radius": 341,
+    "damage": 100
+   }
+  },
+  {
+   "id": 59,
+   "name": "spikes",
+   "spikes": {}
+  },
+  {
+   "id": 92,
+   "name": "switch_92",
+   "switch": {}
+  },
+  {
+   "id": 93,
+   "name": "switch_93",
+   "switch": {}
+  },
+  {
+   "id": 103,
+   "name": "switch_103",
+   "switch": {}
+  },
+  {
+   "id": 104,
+   "name": "switch_104",
+   "switch": {}
+  },
+  {
+   "id": 105,
+   "name": "underwater_switch",
+   "switch": {
+    "underwater": true
+   }
+  },
+  {
+   "id": 106,
+   "name": "door_1",
+   "door": {}
+  },
+  {
+   "id": 107,
+   "name": "door_2",
+   "door": {}
+  },
+  {
+   "id": 108,
+   "name": "door_3",
+   "door": {}
+  },
+  {
+   "id": 109,
+   "name": "door_4",
+   "door": {}
+  },
+  {
+   "id": 110,
+   "name": "door_5",
+   "door": {}
+  },
+  {
+   "id": 111,
+   "name": "door_6",
+   "door": {}
+  },
+  {
+   "id": 112,
+   "name": "door_7",
+   "door": {}
+  },
+  {
+   "id": 113,
+   "name": "door_8",
+   "door": {}
+  },
+  {
+   "id": 135,
+   "name": "pickup_135",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 136,
+   "name": "pickup_136",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 137,
+   "name": "pickup_137",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 138,
+   "name": "pickup_138",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 139,
+   "name": "pickup_139",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 140,
+   "name": "pickup_140",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 141,
+   "name": "pickup_141",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 142,
+   "name": "pickup_142",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 143,
+   "name": "pickup_143",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 144,
+   "name": "pickup_144",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 145,
+   "name": "pickup_145",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 146,
+   "name": "pickup_146",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 147,
+   "name": "pickup_147",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 148,
+   "name": "pickup_148",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 149,
+   "name": "small_medipack",
+   "pickup": {
+    "message": "Small medipack"
+   }
+  },
+  {
+   "id": 150,
+   "name": "large_medipack",
+   "pickup": {
+    "message": "Large medipack"
+   }
+  },
+  {
+   "id": 151,
+   "name": "pickup_151",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 152,
+   "name": "pickup_152",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 174,
+   "name": "puzzle_1",
+   "pickup": {
+    "message": "Puzzle item collected"
+   }
+  },
+  {
+   "id": 175,
+   "name": "puzzle_2",
+   "pickup": {
+    "message": "Puzzle item collected"
+   }
+  },
+  {
+   "id": 176,
+   "name": "puzzle_3",
+   "pickup": {
+    "message": "Puzzle item collected"
+   }
+  },
+  {
+   "id": 177,
+   "name": "puzzle_4",
+   "pickup": {
+    "message": "Puzzle item collected"
+   }
+  },
+  {
+   "id": 182,
+   "name": "puzzle_hole_1",
+   "keyhole": {
+    "key": 174
+   }
+  },
+  {
+   "id": 183,
+   "name": "puzzle_hole_2",
+   "keyhole": {
+    "key": 175
+   }
+  },
+  {
+   "id": 184,
+   "name": "puzzle_hole_3",
+   "keyhole": {
+    "key": 176
+   }
+  },
+  {
+   "id": 185,
+   "name": "puzzle_hole_4",
+   "keyhole": {
+    "key": 177
+   }
+  },
+  {
+   "id": 190,
+   "name": "secret_1",
+   "pickup": {
+    "message": "Secret found",
+    "secret": 0
+   }
+  },
+  {
+   "id": 191,
+   "name": "secret_2",
+   "pickup": {
+    "message": "Secret found",
+    "secret": 1
+   }
+  },
+  {
+   "id": 192,
+   "name": "secret_3",
+   "pickup": {
+    "message": "Secret found",
+    "secret": 2
+   }
+  },
+  {
+   "id": 193,
+   "name": "key_1",
+   "pickup": {
+    "message": "Key collected"
+   }
+  },
+  {
+   "id": 194,
+   "name": "key_2",
+   "pickup": {
+    "message": "Key collected"
+   }
+  },
+  {
+   "id": 195,
+   "name": "key_3",
+   "pickup": {
+    "message": "Key collected"
+   }
+  },
+  {
+   "id": 196,
+   "name": "key_4",
+   "pickup": {
+    "message": "Key collected"
+   }
+  },
+  {
+   "id": 201,
+   "name": "keyhole_1",
+   "keyhole": {
+    "key": 193
+   }
+  },
+  {
+   "id": 202,
+   "name": "keyhole_2",
+   "keyhole": {
+    "key": 194
+   }
+  },
+  {
+   "id": 203,
+   "name": "keyhole_3",
+   "keyhole": {
+    "key": 195
+   }
+  },
+  {
+   "id": 204,
+   "name": "keyhole_4",
+   "keyhole": {
+    "key": 196
+   }
+  },
+  {
+   "id": 205,
+   "name": "pickup_205",
+   "pickup": {
+    "message": "Item collected"
+   }
+  },
+  {
+   "id": 206,
+   "name": "pickup_206",
+   "pickup": {
+    "message": "Item collected"
+   }
+  }
+ ]
+}

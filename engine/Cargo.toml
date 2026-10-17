@@ -1,0 +1,25 @@
+# This game's engine family: reusable by a different game, so nothing here
+# names this game's characters, items, assets or table ids. See AGENTS.md.
+[package]
+name = "engine"
+description = "Reusable room-and-sector action engine with a PS1 look; knows nothing about any one game."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+dev-mcp = ["psx-bevy/dev-mcp"]
+
+[dependencies]
+psx-bevy.workspace = true
+bevy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ron.workspace = true
+
+# A second game built only from the engine; its tests run with `cargo test`.
+[[example]]
+name = "sandbox"
+test = true

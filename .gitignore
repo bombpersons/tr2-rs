@@ -1,0 +1,24 @@
+# Source media, reference emulator state and local machine configuration.
+/rom/
+/bios/
+/research/
+/ghidra-projects/
+/.psx/
+/.codex/
+/.agents/
+/.aws/
+/psx-project.config.toml
+
+# Content baked from the disc (copyrighted): rebuild with tools/bake_assets.sh
+# from your own copy of the game. Never commit it.
+/game/assets/levels/
+/game/assets/music/
+/game/assets/screens/
+
+# Builds, generated validation captures and transient Python files.
+**/target/
+/validation/
+**/__pycache__/
+*.pyc
+/game/savegame.json
+/game/savegame.json.tmp

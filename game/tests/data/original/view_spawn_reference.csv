@@ -1,0 +1,3 @@
+run_frame,frame,player_x,player_y,player_z,animation,animation_frame,camera_x,camera_y,camera_z,target_x,target_y,target_z
+0,16693,62976,1536,23040,34,492,61952,384,23040,62976,709,23040
+1,16694,62976,1542,23040,34,493,61952,384,23040,62976,776,23040
