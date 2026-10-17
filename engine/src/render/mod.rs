@@ -37,6 +37,15 @@ pub struct LevelLoaded {
     pub data: Arc<Level>,
 }
 
+/// Show an authored level without saving it. The caller supplies a validated
+/// level; the atlas path is relative to the configured asset root. An editor
+/// uses a metadata-only object registry, so no game controllers are spawned.
+#[derive(Message, Clone)]
+pub struct PreviewLevel {
+    pub data: Arc<Level>,
+    pub atlas: String,
+}
+
 /// The level that is spawned now.
 #[derive(Resource)]
 pub struct ActiveLevel {
@@ -159,6 +168,7 @@ impl Plugin for RenderPlugin {
             .init_resource::<ViewSettings>()
             .init_resource::<ObjectTypes>()
             .add_message::<LevelLoaded>()
+            .add_message::<PreviewLevel>()
             .configure_sets(Update, (LevelSystems::Load, LevelSystems::Pose, LevelSystems::Visibility).chain())
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
@@ -268,9 +278,15 @@ fn finish_level(
     types: Res<ObjectTypes>,
     old: Query<Entity, (With<LevelEntity>, Without<ChildOf>)>,
     mut loaded: MessageWriter<LevelLoaded>,
+    mut previews: MessageReader<PreviewLevel>,
 ) {
-    let Some(p) = pending else { return };
-    let Some(data) = assets.remove(&p.handle) else { return };
+    let (name, data, atlas_path) = if let Some(preview) = previews.read().last() {
+        (preview.data.name.clone(), preview.data.clone(), preview.atlas.clone())
+    } else {
+        let Some(p) = pending else { return };
+        let Some(data) = assets.remove(&p.handle) else { return };
+        (p.name.clone(), Arc::new(data), format!("levels/{}/atlas.png", p.name))
+    };
     for e in &old {
         commands.entity(e).despawn();
     }
@@ -279,9 +295,8 @@ fn finish_level(
     let render_root = commands
         .spawn((Transform::from_scale(view::LEVEL_TO_RENDER), Visibility::default(), LevelEntity, Name::new("LevelWorld")))
         .id();
-    let data = Arc::new(data);
     let world = WorldGeometry { data: data.clone() };
-    let atlas = server.load(format!("levels/{}/atlas.png", p.name));
+    let atlas = server.load(atlas_path);
     let material = materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });
     for (room_index, room) in data.rooms.iter().enumerate() {
         let vs: Vec<_> = room.vertices.iter().map(|v| position([v[0], v[1], v[2]]).to_array()).collect();
@@ -396,9 +411,9 @@ fn finish_level(
     commands.insert_resource(AnimationLibrary::from(data.as_ref()));
     commands.insert_resource(CameraState::default());
     commands.insert_resource(world);
-    commands.insert_resource(ActiveLevel { name: p.name.clone() });
+    commands.insert_resource(ActiveLevel { name: name.clone() });
     commands.remove_resource::<Pending>();
-    loaded.write(LevelLoaded { name: p.name.clone(), data });
+    loaded.write(LevelLoaded { name, data });
 }
 
 /// Per-object material whose lighting follows the item light of

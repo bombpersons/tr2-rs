@@ -30,7 +30,7 @@ def serializable(value):
 
 
 class Client:
-    def __init__(self, binary: Path, out: Path, level: str | None):
+    def __init__(self, binary: Path, out: Path, level: str | None, asset_root: Path | None = None):
         self.out = out
         self.out.mkdir(parents=True, exist_ok=True)
         self.log = (out / 'game.log').open('w')
@@ -43,7 +43,7 @@ class Client:
         env = os.environ.copy()
         env.pop('DISPLAY', None)
         env.pop('WAYLAND_DISPLAY', None)
-        env['BEVY_ASSET_ROOT'] = str(ROOT / 'game')
+        env['BEVY_ASSET_ROOT'] = str(asset_root or ROOT / 'game')
         # CI has no speaker device. ALSA's null output avoids PulseAudio/JACK
         # connection retries while still exercising the game's audio plugin.
         alsa = out / 'alsa-null.conf'

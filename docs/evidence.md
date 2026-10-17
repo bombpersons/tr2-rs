@@ -24,3 +24,9 @@ defined in [engine-model.md](engine-model.md).
 | Object type table | 265 x 48 bytes at `0x800936D0`, reset `0x8005717C`, setup `0x800538A0`/`0x80055774`/`0x80055FE4`, InitialiseItem `0x80037690`; read watch `.psx/object_table_reads` ([object-table-evidence](object-table-evidence.md)) | not checked by a test (docs only) | PSX; +0x28 and flag bits 17-23 not named |
 | Object kinds (switch, door, pickup, keyhole, spikes) by id | shared control/collision pointers in the setup routines ([object-table-evidence](object-table-evidence.md)) | `object_types.json` grouping | PSX for 59, 92-93, 103-113, 135-152, 174-177, 182-185, 190-196, 201-206 |
 | Main loop and tick order | game loop `0x8006DD98`, ControlPhase `0x8001D7FC` (items → effects → Lara → hair → camera → sound/flip), Lara control internals (animation → object collision → state collision → triggers); trace `.psx/main_loop_trace` ([object-table-evidence](object-table-evidence.md)) | none; `engine::schedule` differs (see engine-model, Frame) | PSX; port order not yet changed |
+
+Editor authoring support is a new tool, not a claim about original gameplay.
+It consumes the existing engine format and retains its Structural/Inherited
+provenance. The full-resolution standard-rendering preview is deliberately an
+authoring view. See [editor.md](editor.md) for format coverage, validation,
+byte-exact save tests and the GPU/MCP smoke workflow.

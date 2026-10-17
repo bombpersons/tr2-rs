@@ -8,7 +8,7 @@
 #   tools/import/  offline importers: extracted disc data -> engine formats
 [workspace]
 resolver = "3"
-members = ["psx-bevy", "engine", "game", "tools/import"]
+members = ["psx-bevy", "engine", "game", "editor", "tools/import"]
 default-members = ["game"]
 
 [workspace.package]

@@ -18,6 +18,7 @@
 //! - [`camera`]: chase camera and fixed shots.
 //! - [`lighting`], [`render`], [`audio`]: drawing and sound.
 //! - [`config`]: RON tuning files for per-type design numbers.
+//! - [`editor`]: authoring transactions, exact no-op saves and level validation.
 //! - [`psx`], [`shell`], [`controller`], [`controls`], [`launcher`],
 //!   [`viewer`], [`model_viewer`], [`testing`] and, with the `dev-mcp`
 //!   feature, `dev_mcp`: the PS1 look, logic ticks and input, rebinding, the
@@ -29,6 +30,7 @@ pub mod animation;
 pub mod audio;
 pub mod camera;
 pub mod config;
+pub mod editor;
 pub mod lighting;
 pub mod objects;
 pub mod render;

@@ -276,3 +276,8 @@ calls in screen space. It is for *checking* your rebuild, never for shipping:
   library and overwrite each other's, so tests and binaries silently link the
   other copy's code. Keep the default `target/` at the workspace root, or
   rename the package.
+
+Keep the engine-only editor usable with each settled format or feature added
+to the port (`../docs/editor.md`). Add generic format/validation work in the
+engine and authoring UI in `editor/`; never make the editor depend on game
+controllers. Preserve every existing trajectory through these changes.
