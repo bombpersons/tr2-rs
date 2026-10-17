@@ -20,6 +20,8 @@ use engine::{
     prelude::*,
     launcher::{self, Game},
     render::LevelRequest,
+    animation::AnimationGoal,
+    schedule::ItemSystems,
     triggers::{AppTriggerActions, TriggerAction, TriggerSystems},
     world::{WorldGeometry, angle, position},
 };
@@ -40,7 +42,7 @@ impl Plugin for SandboxPlugin {
         engine::add_once(app, engine::EngineRulesPlugin);
         app.register_object_type(WALKER, ObjectType::new("walker").on_spawn(spawn_walker))
             .register_object_type(PILLAR, ObjectType::new("pillar").on_init(|entity, _, _| {
-                entity.insert(Pillar::default());
+                entity.insert((Pillar::default(), AnimationGoal::default()));
             }))
             .register_trigger_action("chime")
             .init_resource::<Chimes>()
@@ -49,7 +51,7 @@ impl Plugin for SandboxPlugin {
                 (
                     walk.in_set(WorldSystems::Control),
                     chime.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
-                    raise_pillars.in_set(WorldSystems::Animation),
+                    raise_pillars.in_set(ItemSystems::Control),
                 )
                     .run_if(simulation_enabled),
             );
@@ -125,8 +127,9 @@ fn chime(mut actions: MessageReader<TriggerAction>, mut chimes: ResMut<Chimes>) 
     }
 }
 
-fn raise_pillars(time: Res<Time>, mut pillars: Query<(&WorldObject, &mut Pillar, &mut Transform)>) {
-    for (object, mut pillar, mut transform) in &mut pillars {
+fn raise_pillars(time: Res<Time>, mut pillars: Query<(&WorldObject, &mut Pillar, &mut Transform, &mut AnimationGoal)>) {
+    for (object, mut pillar, mut transform, mut goal) in &mut pillars {
+        goal.state = usize::from(object.active);
         if object.active && pillar.raised < 1.0 {
             let step = time.delta_secs().min(1.0 - pillar.raised);
             pillar.raised += step;
@@ -152,6 +155,7 @@ mod tests {
     use super::*;
     use engine::{
         camera::CameraState,
+        animation::ObjectAnimation,
         controller::Button,
         objects::WorldObject,
         testing::{TickApp, headless_app},
@@ -167,7 +171,7 @@ mod tests {
             .world_mut()
             .spawn((Walker, Avatar { position: position([2560, 0, 2560]), grounded: true, alive: true, ..default() }))
             .id();
-        let pillar = app.world_mut().spawn((WorldObject::new(1, PILLAR, 0, 0), Transform::from_translation(position([4608, 0, 4608])))).id();
+        let pillar = app.world_mut().spawn((WorldObject::new(1, PILLAR, 0, 0), Transform::from_translation(position([4608, 0, 4608])), ObjectAnimation { animation: 0, frame: 0.0 })).id();
         (app, walker, pillar)
     }
 
@@ -193,9 +197,13 @@ mod tests {
     fn trigger_raises_the_pillar_and_chimes_once() {
         let (mut app, walker, pillar) = sandbox();
         app.world_mut().get_mut::<Avatar>(walker).unwrap().position = position([3584, 0, 3584]);
-        app.run_ticks(40, &[]);
+        app.run_tick(&[]);
+        assert!(app.world().get::<WorldObject>(pillar).unwrap().active);
+        assert_eq!(app.world().get::<Pillar>(pillar).unwrap().raised, 0.0, "the item pass precedes the trigger");
+        app.run_ticks(39, &[]);
         assert!(app.world().get::<WorldObject>(pillar).unwrap().active);
         assert!(app.world().get::<Pillar>(pillar).unwrap().raised > 0.99);
+        assert_eq!(app.world().get::<ObjectAnimation>(pillar).unwrap().animation, 2, "authored motion has reached its hold clip");
         let chimes = app.world().resource::<Chimes>();
         assert_eq!((chimes.count, chimes.last), (1, 3), "a one-shot trigger");
     }

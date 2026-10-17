@@ -213,7 +213,7 @@ fn summary(value: &Value) -> String {
         _ => value.to_string().chars().take(100).collect(),
     }
 }
-fn selected_pointer(editor: &Editor) -> String {
+pub(super) fn selected_pointer(editor: &Editor) -> String {
     entries(editor).get(editor.page + editor.selected).map_or_else(|| editor.pointer.clone(), |(p, _)| p.clone())
 }
 fn enter(editor: &mut Editor) {

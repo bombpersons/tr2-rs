@@ -52,7 +52,7 @@ impl Plugin for PresentationPlugin {
             .add_systems(Startup, setup)
             .add_systems(Update, (level_loaded, crate::save::restore).chain().after(LevelSystems::Load))
             .add_systems(FixedUpdate, menus.in_set(WorldSystems::Prepare).before(PlayerSystems::Control).in_set(GameSystems::Game))
-            .add_systems(FixedUpdate, crate::braid::simulate.in_set(WorldSystems::Effects).in_set(GameSystems::Game))
+            .add_systems(FixedUpdate, crate::braid::simulate.in_set(WorldSystems::SecondaryMotion).in_set(GameSystems::Game))
             .add_systems(Update, (crate::braid::pose_segments.in_set(LevelSystems::Pose), update_hud));
     }
 }

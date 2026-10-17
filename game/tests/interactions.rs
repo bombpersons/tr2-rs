@@ -124,3 +124,84 @@ fn initially_open_object_closes_when_its_authored_reverse_trigger_fires() {
     app.run_tick(&[]);
     assert!(!app.world().get::<WorldObject>(entity).unwrap().active);
 }
+
+/// A floor trigger changes activation after item control has already finished.
+/// The damage amount is a fixture/prototype rule, not new PSX damage evidence.
+#[test]
+fn a_triggered_creature_first_controls_on_the_following_tick() {
+    let mut app = app();
+    app.insert_resource(geometry(activate(4)));
+    let player = app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0)).id();
+    let enemy = app.world_mut().spawn((WorldObject::new(4, 39, 0, 0), Transform::from_xyz(0.5, 0.0, 0.5))).id();
+    app.run_tick(&[]);
+    assert!(app.world().get::<WorldObject>(enemy).unwrap().active);
+    assert_eq!(app.world().get::<Player>(player).unwrap().health, 1000, "no second item-control pass after triggers");
+    app.run_tick(&[]);
+    assert!(app.world().get::<Player>(player).unwrap().health < 1000);
+}
+
+#[test]
+fn an_active_creature_reads_the_player_before_this_ticks_movement() {
+    use engine::schedule::WorldSystems;
+    let mut app = app();
+    let mut world = geometry(activate(99));
+    std::sync::Arc::make_mut(&mut world.data).floor_infos.clear();
+    app.insert_resource(world).add_systems(
+        FixedUpdate,
+        (|mut players: Query<&mut Player>| {
+            for mut p in &mut players {
+                p.position.x = 1.5;
+            }
+        })
+        .in_set(WorldSystems::Control),
+    );
+    let player = app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0)).id();
+    app.world_mut().spawn((WorldObject::new(4, 39, 0, CODE_BITS), Transform::from_xyz(0.5, 0.0, 0.5)));
+    app.run_tick(&[]);
+    let player = app.world().get::<Player>(player).unwrap();
+    assert_eq!(player.position.x, 1.5);
+    assert!(player.health < 1000, "creature control used the previous position");
+}
+
+#[test]
+fn floor_triggers_use_the_position_after_object_collision() {
+    let mut app = app();
+    app.add_plugins(game::player::PlayerRulesPlugin);
+    app.insert_resource(geometry(activate(9)));
+    let player = app.world_mut().spawn(Player::at(Vec3::new(0.99, 0.0, 0.5), 0.0, 0)).id();
+    app.world_mut().spawn((
+        WorldObject::new(3, 106, 0, 0),
+        Transform::from_xyz(0.95, 0.0, 0.5),
+        ObjectCollider { min: Vec3::new(-0.05, 0.0, -0.5), max: Vec3::new(0.05, 2.0, 0.5) },
+    ));
+    let target = app.world_mut().spawn(WorldObject::new(9, 106, 0, 0)).id();
+    app.run_tick(&[]);
+    let position = app.world().get::<Player>(player).unwrap().position;
+    assert!(position.x > 1.0, "the closed door pushed the player out of the trigger sector");
+    assert_eq!(app.world().get::<engine::schedule::Avatar>(player).unwrap().position, position);
+    assert_eq!(app.world().get::<Transform>(player).unwrap().translation, position, "render placement includes the collision push");
+    assert!(!app.world().get::<WorldObject>(target).unwrap().active, "the pre-collision sector must not fire");
+}
+
+#[test]
+fn a_door_retargets_its_animation_on_the_tick_after_activation() {
+    use engine::{
+        animation::ObjectAnimation,
+        world::{Animation, Model, format::StateChange},
+    };
+    let mut app = app();
+    let mut world = geometry(activate(4));
+    let level = std::sync::Arc::make_mut(&mut world.data);
+    level.animations =
+        vec![Animation { state: 0, frame_end: 10, state_changes: vec![StateChange { state: 1, first_frame: 0, last_frame: 11, animation: 1, frame: 0 }], ..default() }, Animation { state: 1, frame_end: 10, ..default() }];
+    level.models = vec![Model { id: 106, animations: [0, 2], ..default() }];
+    app.insert_resource(world);
+    app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0));
+    let door =
+        app.world_mut().spawn((WorldObject::new(4, 106, 0, 0), ObjectAnimation { animation: 0, frame: 0.0 })).id();
+    app.run_tick(&[]);
+    assert!(app.world().get::<WorldObject>(door).unwrap().active);
+    assert_eq!(app.world().get::<ObjectAnimation>(door).unwrap().animation, 0);
+    app.run_tick(&[]);
+    assert_eq!(app.world().get::<ObjectAnimation>(door).unwrap().animation, 1);
+}

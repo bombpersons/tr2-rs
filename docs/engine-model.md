@@ -59,6 +59,13 @@ word list. *Structural.*
   advance, commands, posing): what the original reads from tables.
   **Game:** `game::player`: the state handlers, turn rules, vault and wall
   tests, ported per handler with their constants and quirks.
+- **Placed-object pose timing:** `AnimationGoal` opts objects into authored
+  dispatch and next links in the engine; doors use this path. Wall type 107
+  matches a complete open/close cycle and held-out reversal per tick (*PSX*,
+  [door-animation-evidence](door-animation-evidence.md)). Frame/end cues are
+  engine messages; object movement/effect commands remain controller work.
+  The editor uses the same step for silent model previews. Legacy creature
+  clip selection remains provisional.
 
 ## Objects
 
@@ -156,8 +163,12 @@ with the centre at 192x120 (`0x80065c48`, `0x80065c90`) and projection distance
 228 (`0x80065cb8`) (*PSX*, `game::display`).
 
 Order within a tick (`engine::schedule::WorldSystems`, chained):
-Prepare → Control → Motion → Interaction (Reset, Initialize, Use, Triggers,
-Resolve, Creatures, Report) → Animation → Camera → Effects.
+Prepare → Initialize (Reset, Initialize) → Items (Control, Animation) →
+Control → Motion → Animation → Interaction (Use, Resolve, Publish, Combat,
+Triggers, Report) → SecondaryMotion → Camera → Effects.
+
+The implemented phase boundaries are checked against a fresh native call
+trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
 
 - Lara's part is *PSX* at the level of one controller: the handler runs, then
   turn decay and yaw, and displacement uses last tick's heading
@@ -183,30 +194,26 @@ Resolve, Creatures, Report) → Animation → Camera → Effects.
   8. timers.
   Drawing (including each item's draw pointer) happens after all ticks of
   that frame.
-- **Compared with `engine::schedule`** (no code changed yet):
-  - *Creatures* run **before** Lara in the original. Creatures see last
-    tick's Lara, and Lara collides with creatures that have already moved
-    this tick. The port runs `InteractionSystems::Creatures` after Control,
-    Motion and Triggers. A faithful order puts item controllers (creatures,
-    doors, traps: everything on the active list) in a set before
-    `WorldSystems::Control`.
-  - *Use* and *Resolve* are one pass in the original: each nearby item's
-    collision function, in room-list order, **before** triggers. The port
-    has Use → Triggers → Resolve, so Resolve should move before Triggers,
-    or be merged with Use into one object-collision set.
-  - *Triggers* come last in Lara's control, after collision, room update
-    and weapons. This matches the port, where Triggers follows Motion.
-  - *Animation*: Lara's animation step runs inside her control, before
-    collision and triggers. The port's `WorldSystems::Animation` runs after
-    Interaction. The Lara trajectory tests pass, so check what the port's
-    Animation set actually advances before moving it.
-  - *Effects*: hair runs before the camera, and sounds/flip effects after
-    it. The port puts all Effects after Camera. Hair only reads Lara, so
-    this cannot change a number, but the flip-effect step belongs after
-    Camera.
-  - *Initialize* is not a per-tick phase in the original. InitialiseItem
-    runs at level load and when code creates or activates an item.
-  - There is no active-effect list in the port yet (step 3).
+- **Current `engine::schedule` boundaries** (*PSX* call ordering;
+  [tick-order-evidence](tick-order-evidence.md)):
+  - `LifecycleSystems` resets level state and initializes object components
+    before the first item controller runs. Native initialization is at load /
+    spawn; the port still defers hooks until the first eligible tick.
+  - Creature and door controllers run in `ItemSystems::Control`, before
+    Lara's Control/Motion. They see the previous player position and cannot
+    respond to a floor trigger until the next tick's item phase.
+  - Generic object animation follows those controllers. Lara's pose commit
+    runs after Motion and before nearby object interaction; recorded
+    player/camera trajectories remain exact.
+  - Use and Resolve now both precede floor triggers. The Publish set copies
+    the collision result to Avatar before combat resolution and triggers.
+    This fixes triggers using the position before a door's push.
+  - Hair is in SecondaryMotion before Camera; sound remains after Camera.
+  - Remaining differences: no native active-item/effect lists or room-list
+    iteration order; legacy creature/scenery clip stepping remains provisional;
+    state/level collision is still in Motion before object collision;
+    use and pushes remain separate passes. The new tests verify the phase
+    order and its consequences, not unverified per-type AI/damage/animation.
 
 ## Open questions (evidence to collect)
 

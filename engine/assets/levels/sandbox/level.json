@@ -134,11 +134,224 @@
      "offset": [0, 0, 0]
     }
    ],
-   "animations": [0, 0]
+   "animations": [0, 4]
   }
  ],
  "static_meshes": [],
- "animations": [],
+ "animations": [
+ {
+  "frame_rate": 1,
+  "frame_start": 0,
+  "frame_end": 0,
+  "next_animation": 0,
+  "next_frame": 0,
+  "state": 0,
+  "speed": 0,
+  "accel": 0,
+  "poses": [
+   {
+    "root": [
+     0,
+     0,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   }
+  ],
+  "bounds": [
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ]
+  ],
+  "state_changes": [
+   {
+    "state": 1,
+    "first_frame": 0,
+    "last_frame": 1,
+    "animation": 1,
+    "frame": 1
+   }
+  ],
+  "commands": []
+ },
+ {
+  "frame_rate": 7,
+  "frame_start": 1,
+  "frame_end": 8,
+  "next_animation": 2,
+  "next_frame": 9,
+  "state": 1,
+  "speed": 0,
+  "accel": 0,
+  "poses": [
+   {
+    "root": [
+     0,
+     -32,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "root": [
+     0,
+     -256,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   }
+  ],
+  "bounds": [
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ],
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ]
+  ],
+  "state_changes": [],
+  "commands": []
+ },
+ {
+  "frame_rate": 1,
+  "frame_start": 9,
+  "frame_end": 9,
+  "next_animation": 2,
+  "next_frame": 9,
+  "state": 1,
+  "speed": 0,
+  "accel": 0,
+  "poses": [
+   {
+    "root": [
+     0,
+     -256,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   }
+  ],
+  "bounds": [
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ]
+  ],
+  "state_changes": [
+   {
+    "state": 0,
+    "first_frame": 9,
+    "last_frame": 10,
+    "animation": 3,
+    "frame": 10
+   }
+  ],
+  "commands": []
+ },
+ {
+  "frame_rate": 7,
+  "frame_start": 10,
+  "frame_end": 17,
+  "next_animation": 0,
+  "next_frame": 0,
+  "state": 0,
+  "speed": 0,
+  "accel": 0,
+  "poses": [
+   {
+    "root": [
+     0,
+     -224,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   },
+   {
+    "root": [
+     0,
+     0,
+     0
+    ],
+    "angles": [
+     [
+      0,
+      0,
+      0
+     ]
+    ]
+   }
+  ],
+  "bounds": [
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ],
+   [
+    -256,
+    256,
+    -1280,
+    0,
+    -256,
+    256
+   ]
+  ],
+  "state_changes": [],
+  "commands": []
+ }
+],
  "placements": [
   {
    "kind": 1,

@@ -52,11 +52,29 @@ change is accepted. Unknown JSON properties survive edits and saves.
 Draft input currently supports replacement and appending, rather than a
 full text editor with cursor movement or clipboard integration. Geometry is
 edited through its fields; viewport selection, transform gizmos, dedicated
-sector painting and animation timelines are future work. Sound tables are
+sector painting and a graphical timeline are future work. Sound tables are
 editable, but audio playback and atlas/image editing belong to future tools.
 There are no authored tuning RON assets in the current port; add an authoring
 surface when those formats become used, rather than inventing a controller
 schema for the editor.
+
+## Animation preview
+
+Select an entry under `animations` (or a placement with authored clips), then
+click **Preview selection** beneath the viewport. The editor frames the first
+placed model using that clip and isolates it. **Play / Pause** runs authored
+frames at 30 Hz; **Step** advances one frame including dispatch/end links;
+**Frame -** seeks backward within the current clip. **Next goal** cycles the
+states of the selected model. **Scene / Isolate** restores the surrounding
+level, and **Stop** restores the level's initial preview poses. The caption
+shows the current clip, absolute frame, current state and requested goal.
+
+This preview uses only engine animation data and suppresses sound, effects,
+movement and game controllers. It never changes level data or dirty state.
+Models that have no placement in the level cannot yet be previewed here.
+The hand-authored sandbox has four pillar clips to exercise the workflow
+without game assets. [Door animation evidence](door-animation-evidence.md)
+describes the PSX checks behind the shared animation step.
 
 ## Files and validation
 
@@ -71,8 +89,9 @@ Validation checks typed fields and format version, mesh indices, sector grid
 sizes, room/floor/navigation references, skeleton parents, placements,
 trigger masks and engine action references, model clip ranges and sound maps.
 The engine permits empty/reversed model clip ranges (including the imported
-no-animation marker), and clips whose continuation is handled by the runtime's
-fallbacks. The editor preserves those. Validation does not claim to prove
+no-animation marker). Clip links and dispatch targets must reference valid
+animations; original jumps outside the destination's ordinary key range are
+preserved as signed relative frames. Validation does not claim to prove
 unknown game actions or the gameplay meaning of inherited fields.
 
 Save uses a sibling temporary file and an atomic replacement. If the source
@@ -81,6 +100,10 @@ Open again after saving your work elsewhere. Save as requires a new filename
 and writes just the JSON; atlas and audio files remain in their level folder.
 Copy that folder first when making a separately playable level. The game
 loads `levels/<name>/level.json`, so use that layout for authored levels.
+
+The tick-order port changes simulation phases only; it adds no engine asset
+fields. Level authoring and standard-rendering preview remain independent of
+those controllers (see [tick-order evidence](tick-order-evidence.md)).
 
 ## Keeping it current
 
@@ -101,7 +124,7 @@ cargo test --workspace --all-features
 cargo clippy --workspace --all-targets --all-features
 cargo build -p editor --all-features
 python3 tools/editor_smoke.py
-python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json
+python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-placement 72 --pose-clip 334 --pose-steps 61
 ```
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
@@ -123,3 +146,9 @@ Use `game_query` on the exact entity `Editor` with `EditorStatus`. Set
 `navigate: true` to browse a field. These commands use the UI's document
 transactions. Headless `game_screenshot(target="screen")` captures the
 full-resolution editor; use `target="window"` in a desktop session.
+
+`AnimationPreview` is a reflected component on the `Editor` entity. Automation
+can set `active`, `isolate`, `placement`, `clip`, clip-relative `frame`, `goal`,
+`playing`, and the one-shot `step` flag. The smoke script checks a full
+sandbox dispatch/hold transition and confirms changed viewport pixels while
+the document remains clean.

@@ -13,7 +13,7 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraCue, CameraCues};
 use crate::objects::{CODE_BITS, WorldObject};
-use crate::schedule::{Avatar, InteractionSystems, simulation_enabled};
+use crate::schedule::{Avatar, InteractionSystems, LifecycleSystems, simulation_enabled};
 use crate::shell::GameSystems;
 pub use crate::world::TriggerKind;
 use crate::world::WorldGeometry;
@@ -221,7 +221,7 @@ impl Plugin for TriggersPlugin {
             .add_systems(
                 FixedUpdate,
                 (
-                    reset_level.in_set(InteractionSystems::Reset),
+                    reset_level.in_set(LifecycleSystems::Reset),
                     dispatch_triggers.in_set(TriggerSystems::Dispatch),
                 )
                     .in_set(GameSystems::Game)
