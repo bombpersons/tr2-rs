@@ -219,8 +219,11 @@ impl WorldGeometry {
     /// meshes; this only prevents distant rooms showing through open portals.
     pub fn visible_rooms(&self, room: usize, pos: Vec3) -> Vec<bool> {
         let mut visible = vec![false; self.data.rooms.len()];
-        let mut stack = vec![(room, 0)];
-        while let Some((id, depth)) = stack.pop() {
+        // Visit shortest portal paths first. A depth-first walk can reach a
+        // room at the depth limit through a cycle, mark it visited, then
+        // suppress a shorter path that would reveal its neighbours.
+        let mut pending = std::collections::VecDeque::from([(room, 0)]);
+        while let Some((id, depth)) = pending.pop_front() {
             if id >= visible.len() || visible[id] {
                 continue;
             }
@@ -230,9 +233,11 @@ impl WorldGeometry {
             }
             for p in &self.data.rooms[id].portals {
                 let r = &self.data.rooms[id];
-                let near = p.vertices.iter().any(|&v| (position([v[0] + r.origin[0], v[1], v[2] + r.origin[2]]) - pos).length_squared() < 28.0 * 28.0);
+                let near = p.vertices.iter().any(|&v| {
+                    (position([v[0] + r.origin[0], v[1], v[2] + r.origin[2]]) - pos).length_squared() < 28.0 * 28.0
+                });
                 if near {
-                    stack.push((p.room, depth + 1));
+                    pending.push_back((p.room, depth + 1));
                 }
             }
         }
