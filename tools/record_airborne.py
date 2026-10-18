@@ -12,6 +12,16 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'forward_ledge_run': ('forward_ledge_start', 210, [event(['UP'], 90)]),
+    'forward_ledge_delay_heldout': ('forward_ledge_start', 240, [event(['UP'], 146, 14)]),
+    'forward_ledge_release_heldout': ('forward_ledge_start', 240, [event(['UP'], 58),
+                                                               event(['SQUARE'], 70, 64),
+                                                               event(['UP'], 184, 138)]),
+    'forward_ledge_release_validation_heldout': ('forward_ledge_start', 240, [event(['UP'], 68, 14),
+                                                                          event(['SQUARE'], 84, 74),
+                                                                          event(['UP'], 160, 146)]),
+    'forward_ledge_walk_heldout': ('forward_ledge_start', 240, [event(['UP'], 58),
+                                                            event(['UP', 'R1'], 130, 58)]),
     'run_stop_left_heldout': ('home_runway_start', 200, [event(['UP'], 60)]),
     'run_stop_right_heldout': ('home_runway_start', 220, [event(['UP'], 80)]),
     'run_stop_rehold_heldout': ('home_runway_start', 240, [event(['UP'], 56), event(['UP'], 114, 70)]),
@@ -60,6 +70,10 @@ def main():
     parser.add_argument('--summarize-only', action='store_true')
     args = parser.parse_args()
     if args.prepare_checkpoints:
+        subprocess.run(['psx', 'run', '--from-state', '.psx/home_hang_start/state.bin',
+                        '--frames', '90', '--input', json.dumps([event(['CIRCLE'], 2)]),
+                        '--save-state', '--out', '.psx/forward_ledge_start', '--summary'],
+                       cwd=ROOT, check=True)
         subprocess.run(['psx', 'run', '--from-state', '.psx/backward_rolled_start/state.bin',
                         '--frames', '240', '--input', json.dumps([event(['UP', 'R1'], 160)]),
                         '--save-state', '--out', '.psx/airborne_wall_start', '--summary'],
@@ -94,7 +108,7 @@ def main():
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
         'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout'),
-        'diagnostic_only': False,
+        'diagnostic_only': args.case in ('forward_ledge_release_heldout', 'forward_ledge_walk_heldout'),
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,
