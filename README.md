@@ -27,6 +27,7 @@ python3 tools/camera_smoke.py                  # fixed entrance camera through o
 python3 tools/backward_smoke.py                # backward hop/walk against retained PSX motion and cameras
 python3 tools/backward_collision_smoke.py      # backward walls, steps, ledges, slopes and hop-fall recovery
 python3 tools/traversal_smoke.py               # jumps, ledges, pull-ups and authored landing recovery
+python3 tools/airborne_smoke.py                # high wall rebound, fast fall, reach and heavy landing recovery
 python3 tools/item_lighting_smoke.py           # per-object lighting in aligned Home and Wall views
 python3 tools/subdivision_smoke.py             # off/split/filled room meshes at two PSX camera poses
 ```
