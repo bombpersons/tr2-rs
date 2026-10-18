@@ -57,8 +57,12 @@ fn compare_case(csv: &str, metadata: &str) {
         let p = world.get::<Player>(entity).unwrap();
         let m = world.get::<Motion>(entity).unwrap();
         let a = world.get::<AnimationState>(entity).unwrap();
-        // Vault collision temporarily overrides the clip's state 2 with 19.
-        let state = if matches!(p.mode, PlayerMode::Climbing { .. }) { 19 } else { states[a.animation] };
+        // Collision can override the clip's authored state until its end link.
+        let state = match p.mode {
+            PlayerMode::Climbing { .. } => 19,
+            PlayerMode::JumpImpact => 14,
+            _ => states[a.animation],
+        };
         vec![
             f64::from(p.position.x * 1024.0),
             f64::from(-p.position.y * 1024.0),
@@ -105,3 +109,9 @@ recorded_case!(original_reach_keeps_speed_against_the_wall_and_uses_ordinary_lan
 recorded_case!(original_turning_jump_uses_the_previous_collision_heading_before_rebounding, "forward_steer");
 recorded_case!(heldout_delayed_rebound_ignores_jump_during_heavy_landing, "forward_delay_heldout");
 recorded_case!(heldout_released_reach_lands_before_resuming_backward_walk, "reach_release_heldout");
+recorded_case!(original_middle_wall_rebounds_without_changing_the_jump_clip, "middle_wall");
+recorded_case!(original_wall_blocks_forward_takeoff_and_uses_the_vertical_jump, "blocked_takeoff");
+recorded_case!(original_running_jump_hits_a_low_wall, "running_low_wall");
+recorded_case!(heldout_middle_impact_ignores_another_jump_while_airborne, "middle_delay_heldout");
+recorded_case!(calibration_low_impact_exposes_fast_turn_goal_before_its_dispatch_window, "low_cancel_heldout");
+recorded_case!(heldout_low_impact_validates_recovery_and_authored_left_fast_turn, "low_cancel_validation_heldout");
