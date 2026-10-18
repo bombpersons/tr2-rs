@@ -51,8 +51,8 @@ it off. Record partial progress below without checking the parent item.
   steep downhill and airborne deflection remain.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
   Standing/forward jumps, hang drops and low/middle/high forward wall impacts are done;
-  unassisted fast falls, slide landings and backward/sideways jump collision
-  remain.
+  ordinary running ledge falls now use authored running/standing landings.
+  Unassisted fast falls, slide landings and backward/sideways jump collision remain.
 - [x] Ordinary grounded run-start room-wall stop and held-jump retry.
   The retained diagnostic and two fresh independent routes pass; see
   [evidence](docs/run-start-evidence.md) and [tests](game/tests/airborne.rs).
@@ -84,6 +84,11 @@ it off. Record partial progress below without checking the parent item.
 - [x] Ordinary run-start room-wall stop into the authored standing pose,
   held-Jump retry and release-before-contact behavior. Two independent
   validation routes pass. [Evidence](docs/run-start-evidence.md),
+  [tests](game/tests/airborne.rs).
+- [x] Ordinary cardinal running ledge departure and authored running/standing
+  landing, with release, ignored airborne jump and later restart. Three complete
+  routes include two independent validations. Separate Walk and braking-wall
+  diagnostics remain open. [Evidence](docs/ledge-fall-evidence.md),
   [tests](game/tests/airborne.rs).
 
 ## Water
@@ -172,7 +177,16 @@ it off. Record partial progress below without checking the parent item.
   lint/format differences remain. No engine format or template changes.
   [Ceiling evidence](docs/ceiling-evidence.md),
   [run-stop evidence](docs/run-stop-evidence.md).
-- Next: unassisted forward ledge-fall landing into a run (diagnostic route
-  identified in [run-stop-evidence](docs/run-stop-evidence.md)), then corner
-  airborne ceiling impacts, fast-fall/slide recovery, remaining traversal and water.
+- 2026-10-18: Running ledge-fall milestone: three complete no-poke PSX routes,
+  348 sampled ticks across thirteen columns, including two independent validation
+  routes. Run departures into clip34 now use the existing authored forward-flight
+  controller and land into running92 or standing82. Two additional diagnostic
+  recordings preserve Walk/goal52 and later braking-wall state12 gaps without
+  parity claims. Workspace tests (211 passed), Clippy, all-target builds, sandbox
+  movement/rendering and editor sandbox/Home saves and clip92 preview pass.
+  The full airborne smoke passes201 poses across22 routes, including41 new
+  ledge-fall poses.
+  [Evidence](docs/ledge-fall-evidence.md).
+- Next: the retained Walk and braking-wall diagnostics, corner airborne ceiling
+  impacts, fast-fall/slide recovery, remaining traversal and water.
   Combat, interactions and appearance remain queued above.

@@ -136,7 +136,7 @@ pub enum PlayerMode {
     JumpingUp {
         launch_speed: f32,
     },
-    /// Forward leap and reach, using authored preparation and grab ranges.
+    /// Forward flight, including running off a ledge, and authored reach/grab.
     JumpingForward,
     /// State9: retain the collision heading, brake in air and use the heavy landing.
     FastFalling,
@@ -1183,7 +1183,19 @@ fn integrate(
                 player.position.y = hit.height;
             } else {
                 motion.grounded = false;
-                player.mode = PlayerMode::Fall;
+                if player.mode == PlayerMode::Run && clips.is_some() && old.y - hit.height > units(384.0) {
+                    // Run collision calls the shared ledge-fall test
+                    // 0x8003A500: a drop >384 enters clip34/state3, retains
+                    // horizontal speed and starts with zero fall speed.
+                    // Subsequent flight and landing use forward collision.
+                    player.mode = PlayerMode::JumpingForward;
+                    motion.velocity.y = 0.0;
+                    traversal.goal = 3;
+                    traversal.animation_stepped = true;
+                    animation.enter(34, 0.0, 34);
+                } else {
+                    player.mode = PlayerMode::Fall;
+                }
             }
         }
         if player.position.y + PLAYER_HEIGHT > hit.ceiling && motion.velocity.y > 0.0 {

@@ -62,6 +62,7 @@ fn compare_case(csv: &str, metadata: &str) {
         let state = match p.mode {
             PlayerMode::Climbing { .. } => 19,
             PlayerMode::JumpImpact => 14,
+            PlayerMode::HitWall { .. } => 12,
             _ => states[a.animation],
         };
         vec![
@@ -189,6 +190,12 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 }
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
+recorded_case!(original_forward_ledge_fall_lands_into_the_authored_running_clip, "forward_ledge_run");
+recorded_case!(heldout_delayed_ledge_fall_lands_running_then_hits_a_wall, "forward_ledge_delay_heldout");
+recorded_case!(
+    heldout_released_ledge_fall_ignores_airborne_jump_and_recovers_before_running,
+    "forward_ledge_release_validation_heldout"
+);
 recorded_case!(original_reach_keeps_speed_against_the_wall_and_uses_ordinary_landing, "reach_wall");
 recorded_case!(original_turning_jump_uses_the_previous_collision_heading_before_rebounding, "forward_steer");
 recorded_case!(heldout_delayed_rebound_ignores_jump_during_heavy_landing, "forward_delay_heldout");

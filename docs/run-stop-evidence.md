@@ -72,8 +72,9 @@ field138, changes to35 at148, and lands into clip92/state1 at170, with speed47.
 Releasing Up while92 continues requests goal2 and eventually brakes via8.
 The port's ordinary fall path still uses its provisional landing timer and
 `freefall_landing`; this is a concrete next investigation, not verified parity.
-The diagnostic has not been used to change fall rules or added as a passing
-regression. The broader unassisted/slide landing TODO remains open.
+The subsequent [ledge-fall milestone](ledge-fall-evidence.md) uses a checkpoint
+after the roll and now verifies ordinary running ledge departure and both
+authored landings. The broader unassisted-fast-fall/slide landing TODO remains open.
 
 ## Verification
 
