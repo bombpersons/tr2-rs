@@ -12,5 +12,6 @@ dev-mcp = ["engine/dev-mcp"]
 
 [dependencies]
 engine.workspace = true
-bevy = { workspace = true, features = ["bevy_picking"] }
+# Pointer observers also need the UI hit-testing backend.
+bevy = { workspace = true, features = ["ui_picking", "mesh_picking", "bevy_gizmos_render"] }
 serde_json.workspace = true

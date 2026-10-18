@@ -1,0 +1,492 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native, no pokes",
+  "method": "First CalculateLight call before the first avatar mesh; input Z reconstructed from its observed light-Z subtraction",
+  "cases": [
+    {
+      "level": "assault",
+      "point": [
+        19977,
+        2172,
+        95752
+      ],
+      "room": 16,
+      "ambient": 3865,
+      "strength": 1511,
+      "directional_denominator": 44413,
+      "command": [
+        "psx",
+        "run",
+        "--from-state",
+        ".psx/home_start/state.bin",
+        "--frames",
+        "2",
+        "--input",
+        "[{\"frame\":0,\"buttons\":[]}]",
+        "--trace",
+        "--trace-range",
+        "8006c6f4-8006cc14",
+        "--trace-range",
+        "80064954-80064b18",
+        "--max-events",
+        "16000",
+        "--out",
+        ".psx/item_light_home_complete",
+        "--summary"
+      ],
+      "build": {
+        "id": "src-41f296d388d06491-release",
+        "profile": "release",
+        "source_sha256": "41f296d388d06491b5c2eae15b7cc7b9c4ed2f60e0596ef23d4f9caf152ebc00",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "mesh_matrix_columns": [
+        [
+          13715,
+          260,
+          8935
+        ],
+        [
+          432,
+          16338,
+          -1141
+        ],
+        [
+          -8930,
+          1192,
+          13671
+        ]
+      ],
+      "view_light_direction": [
+        11177,
+        10968,
+        -4728
+      ],
+      "vertices": [
+        {
+          "normal": [
+            6139,
+            14955,
+            -2086
+          ],
+          "shade": 93
+        },
+        {
+          "normal": [
+            2115,
+            14376,
+            7386
+          ],
+          "shade": 115
+        },
+        {
+          "normal": [
+            8288,
+            4449,
+            -13312
+          ],
+          "shade": 94
+        },
+        {
+          "normal": [
+            10094,
+            7305,
+            10510
+          ],
+          "shade": 125
+        },
+        {
+          "normal": [
+            2273,
+            6923,
+            14581
+          ],
+          "shade": 142
+        },
+        {
+          "normal": [
+            10386,
+            -7673,
+            -9947
+          ],
+          "shade": 121
+        },
+        {
+          "normal": [
+            14386,
+            -6079,
+            4665
+          ],
+          "shade": 137
+        },
+        {
+          "normal": [
+            5077,
+            -1563,
+            15410
+          ],
+          "shade": 157
+        },
+        {
+          "normal": [
+            7589,
+            -13967,
+            -3606
+          ],
+          "shade": 148
+        },
+        {
+          "normal": [
+            7339,
+            -10229,
+            10354
+          ],
+          "shade": 163
+        },
+        {
+          "normal": [
+            -6132,
+            14961,
+            -2067
+          ],
+          "shade": 108
+        },
+        {
+          "normal": [
+            -1947,
+            14370,
+            7444
+          ],
+          "shade": 120
+        },
+        {
+          "normal": [
+            -8386,
+            4331,
+            -13289
+          ],
+          "shade": 115
+        },
+        {
+          "normal": [
+            -9930,
+            7349,
+            10634
+          ],
+          "shade": 149
+        },
+        {
+          "normal": [
+            -1942,
+            6935,
+            14623
+          ],
+          "shade": 147
+        },
+        {
+          "normal": [
+            -10286,
+            -7750,
+            -9991
+          ],
+          "shade": 147
+        },
+        {
+          "normal": [
+            -14312,
+            -6268,
+            4646
+          ],
+          "shade": 173
+        },
+        {
+          "normal": [
+            -4747,
+            -1556,
+            15516
+          ],
+          "shade": 169
+        },
+        {
+          "normal": [
+            -7474,
+            -14014,
+            -3666
+          ],
+          "shade": 166
+        },
+        {
+          "normal": [
+            -7051,
+            -10360,
+            10424
+          ],
+          "shade": 181
+        },
+        {
+          "normal": [
+            15888,
+            3076,
+            -1953
+          ],
+          "shade": 106
+        },
+        {
+          "normal": [
+            -15894,
+            2979,
+            -2045
+          ],
+          "shade": 145
+        }
+      ],
+      "frames": {
+        "end": 14882,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 2,
+        "requested": 2,
+        "start": 14880,
+        "unit": "vsync"
+      },
+      "checkpoint": ".psx/home_start/state.bin",
+      "checkpoint_sha256": "107cbc05042a79927bb322bb82773eb2e3db6f28a95304d1cd90c11b0e18cd01",
+      "trace": ".psx/item_light_home_complete/trace.txt",
+      "trace_sha256": "0ee89d77262232e2c2de34145499c4020a6add36544e8d7e3fafd0fdaf204f91"
+    },
+    {
+      "level": "wall",
+      "point": [
+        64167,
+        4989,
+        26081
+      ],
+      "room": 35,
+      "ambient": 7691,
+      "strength": 244,
+      "directional_denominator": 275036,
+      "command": [
+        "psx",
+        "run",
+        "--from-state",
+        ".psx/wall_game/state.bin",
+        "--frames",
+        "2",
+        "--input",
+        "[{\"frame\":0,\"buttons\":[]}]",
+        "--trace",
+        "--trace-range",
+        "8006c6f4-8006cc14",
+        "--trace-range",
+        "80064954-80064b18",
+        "--max-events",
+        "16000",
+        "--out",
+        ".psx/item_light_wall",
+        "--summary"
+      ],
+      "build": {
+        "id": "src-41f296d388d06491-release",
+        "profile": "release",
+        "source_sha256": "41f296d388d06491b5c2eae15b7cc7b9c4ed2f60e0596ef23d4f9caf152ebc00",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "mesh_matrix_columns": [
+        [
+          8269,
+          83,
+          14129
+        ],
+        [
+          974,
+          16341,
+          -669
+        ],
+        [
+          -14099,
+          1178,
+          8242
+        ]
+      ],
+      "view_light_direction": [
+        15277,
+        5390,
+        -2331
+      ],
+      "vertices": [
+        {
+          "normal": [
+            5410,
+            15100,
+            -2898
+          ],
+          "shade": 10
+        },
+        {
+          "normal": [
+            2874,
+            14427,
+            7021
+          ],
+          "shade": 15
+        },
+        {
+          "normal": [
+            11596,
+            2399,
+            -11201
+          ],
+          "shade": 8
+        },
+        {
+          "normal": [
+            12688,
+            7093,
+            7375
+          ],
+          "shade": 15
+        },
+        {
+          "normal": [
+            4228,
+            7136,
+            14032
+          ],
+          "shade": 19
+        },
+        {
+          "normal": [
+            9038,
+            -8147,
+            -10846
+          ],
+          "shade": 11
+        },
+        {
+          "normal": [
+            14912,
+            -6534,
+            804
+          ],
+          "shade": 14
+        },
+        {
+          "normal": [
+            4979,
+            -1044,
+            15486
+          ],
+          "shade": 21
+        },
+        {
+          "normal": [
+            7589,
+            -13967,
+            -3606
+          ],
+          "shade": 15
+        },
+        {
+          "normal": [
+            7254,
+            -10246,
+            10397
+          ],
+          "shade": 20
+        },
+        {
+          "normal": [
+            -5412,
+            15107,
+            -2859
+          ],
+          "shade": 12
+        },
+        {
+          "normal": [
+            -2716,
+            14418,
+            7102
+          ],
+          "shade": 16
+        },
+        {
+          "normal": [
+            -11591,
+            2285,
+            -11230
+          ],
+          "shade": 12
+        },
+        {
+          "normal": [
+            -12572,
+            7160,
+            7509
+          ],
+          "shade": 19
+        },
+        {
+          "normal": [
+            -3876,
+            7178,
+            14112
+          ],
+          "shade": 20
+        },
+        {
+          "normal": [
+            -8938,
+            -8204,
+            -10886
+          ],
+          "shade": 14
+        },
+        {
+          "normal": [
+            -14822,
+            -6751,
+            660
+          ],
+          "shade": 19
+        },
+        {
+          "normal": [
+            -4688,
+            -982,
+            15580
+          ],
+          "shade": 22
+        },
+        {
+          "normal": [
+            -7474,
+            -14014,
+            -3666
+          ],
+          "shade": 17
+        },
+        {
+          "normal": [
+            -7051,
+            -10360,
+            10424
+          ],
+          "shade": 22
+        }
+      ],
+      "frames": {
+        "end": 21002,
+        "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+        "reached": 2,
+        "requested": 2,
+        "start": 21000,
+        "unit": "vsync"
+      },
+      "checkpoint": ".psx/wall_game/state.bin",
+      "checkpoint_sha256": "8d3319bf7f63f989d98ef481bc513cf43e70fa7cb35ad42e8e62cc88d10ffc2f",
+      "trace": ".psx/item_light_wall/trace.txt",
+      "trace_sha256": "b66dfefafa1f85188e52bff4808c00f79abbca423206d0efa69eb9af60eaa514"
+    }
+  ]
+}

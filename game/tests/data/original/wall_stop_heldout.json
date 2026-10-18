@@ -1,0 +1,112 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
+  "description": "Climb, hit the wall, hold UP, release, retry UP, release again",
+  "heldout_after_implementation": true,
+  "command": [
+    "/home/maisy/projects/reverse_engineering/psx/psx/target/debug/psx",
+    "run",
+    "--from-state",
+    ".psx/wall_game/state.bin",
+    "--frames",
+    "340",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"RIGHT\"], \"until\": 56}, {\"frame\": 60, \"buttons\": [\"UP\", \"CROSS\"], \"until\": 240}, {\"frame\": 260, \"buttons\": [\"UP\", \"CROSS\"], \"until\": 300}]",
+    "--watch",
+    "8019cf64:12",
+    "--trace",
+    "--trace-from-frame",
+    "216",
+    "--trace-frames",
+    "6",
+    "--trace-range",
+    "8003a844-8003aa08",
+    "--trace-range",
+    "8003a500-8003a660",
+    "--trace-range",
+    "8003c318-8003c55c",
+    "--trace-range",
+    "8001b018-8001b150",
+    "--max-events",
+    "20000",
+    "--out",
+    ".psx/wall_stop_heldout",
+    "--summary",
+    "--sample",
+    "8019cf72:i16:yaw",
+    "--sample",
+    "8019cf64:i32:x",
+    "--sample",
+    "8019cf68:i32:y",
+    "--sample",
+    "8019cf6c:i32:z",
+    "--sample",
+    "8019cf44:i16:animation",
+    "--sample",
+    "8019cf46:i16:animation_frame",
+    "--sample",
+    "8019cf3e:i16:state",
+    "--sample",
+    "8019cf40:i16:goal",
+    "--sample",
+    "8019cf4e:i16:speed",
+    "--sample",
+    "8019cf50:i16:fall_speed"
+  ],
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "RIGHT"
+      ],
+      "until": 56
+    },
+    {
+      "frame": 60,
+      "buttons": [
+        "UP",
+        "CROSS"
+      ],
+      "until": 240
+    },
+    {
+      "frame": 260,
+      "buttons": [
+        "UP",
+        "CROSS"
+      ],
+      "until": 300
+    }
+  ],
+  "samples": [
+    "8019cf72:i16:yaw",
+    "8019cf64:i32:x",
+    "8019cf68:i32:y",
+    "8019cf6c:i32:z",
+    "8019cf44:i16:animation",
+    "8019cf46:i16:animation_frame",
+    "8019cf3e:i16:state",
+    "8019cf40:i16:goal",
+    "8019cf4e:i16:speed",
+    "8019cf50:i16:fall_speed"
+  ],
+  "build": {
+    "id": "src-88132a8eecb2461c-debug",
+    "profile": "debug",
+    "source_sha256": "88132a8eecb2461c2d96aef81d33786c79bb93f26f9400b96aa79abd6c430bde",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "frames": {
+    "end": 21340,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 340,
+    "requested": 340,
+    "start": 21000,
+    "unit": "vsync"
+  },
+  "checkpoint": ".psx/wall_game/state.bin",
+  "checkpoint_sha256": "8d3319bf7f63f989d98ef481bc513cf43e70fa7cb35ad42e8e62cc88d10ffc2f",
+  "samples_sha256": "2ed89df285d216aed79c217cc59989da66d0927b46fdb0021d1bae4e18c2c082",
+  "trace_sha256": "a8cec3e51fa8a76f25cbfc6bb77a7e88eec4217f615f41f3106494d2ab2c9651",
+  "writes_sha256": "18489c4c39589af5906848b30e75c2dfba573b8313bb980649cfbc6627d4e270"
+}

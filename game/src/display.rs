@@ -20,6 +20,6 @@ pub fn view_settings() -> ViewSettings {
         fog_start: 12.0,
         fog_end: 25.0,
         full_size: UVec2::new(384, 240),
-        size: UVec2::new(368, 240),
+        size: crate::SCREEN,
     }
 }

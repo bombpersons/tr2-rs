@@ -144,6 +144,7 @@ fn main() {
         title: "Engine sandbox",
         region: Region::Ntsc,
         fields_per_tick: 2,
+        screen: UVec2::new(320, 240),
         add: |app| {
             app.add_plugins((EnginePlugin, SandboxPlugin)).insert_resource(LevelRequest { name: "sandbox".into() });
         },

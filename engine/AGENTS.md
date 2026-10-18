@@ -3,7 +3,8 @@
 `engine/` is the reusable machinery this game runs on. Someone should be able
 to make a *different* game with it, without the original's content and without
 this game's rules. It builds on `psx-bevy` (re-exported as `engine::psx`,
-`engine::shell`, `engine::testing`, ...), which you don't edit.
+`engine::shell`, `engine::testing`, ...). Edit `psx-bevy` only where that is
+the right place, keeping template updates mergeable (`docs/template.md`).
 
 ## Cut it where the original cuts
 
@@ -65,12 +66,22 @@ The skeleton is a starting point; reshape it to match `docs/engine-model.md`.
 
 ## Formats
 
+Camera-dependent room rendering is opt-in through
+`render::rooms::RoomMeshPolicy` / `RoomTessellator`. The engine owns cached
+source faces, writable mesh assets, visibility and scheduling; the game
+supplies the split/LOD/clipping rule. The sandbox and editor retain static
+authored meshes without a policy. Do not bake camera-specific tessellation
+into level files.
+
 - Normal units: `f32` metres or a documented world unit, radians, seconds or
   ticks, linear colour where it applies. State conversions once, in the
   importer (`tools/import`) and in `docs/`.
 - Readable files (RON for tables, PNG, WAV, glTF where they fit), so people
   can author them by hand or with ordinary tools, and an editor can open and
   save them.
+- The editor uses full window resolution, mouse and keyboard, and ordinary
+  UI. It does not use the PS1 renderer, bitmap font or pad menus (see the
+  psx `guide` topic `port`).
 - Exact enough that trajectory tests still match. Where float conversion would
   change behaviour (fixed-point accumulation, rounding), keep the integer
   quantity and document why.

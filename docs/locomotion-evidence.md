@@ -56,8 +56,68 @@ keeps y for that tick, then clip11 -> clip103.
 ## Tests and limits
 
 `original_turn_run_grab_climb_and_wall_stop_match_every_tick` compares x, y, z,
-yaw, animation and absolute frame for every tick through field 217 (the
+yaw, animation and absolute frame for every tick through field 259 (the
 decay constant mutated to 363 fails at tick 2). Unverified: the negative-axis
 wall shift (assumed mirror), 3-click climb timing, jump-up/monkey branches of
-the vault test, other state handlers, and the 6-unit higher standing height
-(4627) the original shows from field 219 while UP is held at the wall.
+the vault test, and other state handlers.
+
+## Blocked run starts on slopes: sampling before the wall shift
+
+PSX-only follow-up, no pokes. `.psx/wall_stop_watch` replays the same route
+and watches Lara's y (`0x8019cf68`, i32). At relative field 217 the run
+collision writer `0x8003AA04` changes y4633 to y4627; releasing UP at field
+260 lets standing collision `0x8003AAC8` restore y4633.
+
+The six-unit difference is a consequence of collision ordering, not a fixed
+height adjustment. `.psx/wall_stop_trace` starts from the saved field-216
+checkpoint and traces six fields with UP+CROSS. At absolute field 21217:
+
+1. Animation movement writes x65458 (old x65435 + speed23), z26010.
+2. Run collision `0x8003A844` calls `0x8003C318`; `0x8003C34C` calls
+   GetCollisionInfo with this proposed position. The centre floor query
+   `0x8001B0B8` returns y4627, so the stored middle-floor delta is -6.
+3. The collision shift (`0x8001C0AC`) restores x65435. Run-start clip6
+   skips the hit-wall animation and `0x8003A944` restores the standing
+   animation through `0x8003A56C`.
+4. Run collision still applies the previously sampled middle-floor delta:
+   `0x8003A9D8..0x8003AA04` adds it to y (downward correction capped at 50).
+   Repeating the blocked start now produces delta 0 and holds y4627.
+
+The port retains the centre floor at the proposed position when a blocked
+run start returns to standing. It recalculates the floor at the resolved
+position on subsequent neutral standing ticks. This change adds no format
+or editor fields; the slope and animation remain authored engine data.
+
+After implementing the rule, `tools/record_wall_stop.py` captured an
+independent 340-field hold/release/retry route from the unchanged settled
+Wall checkpoint: RIGHT [0,56), UP+CROSS [60,240), neutral [240,260),
+UP+CROSS [260,300), then neutral. The CSV and metadata are retained as
+`game/tests/data/original/wall_stop_heldout.{csv,json}`, including checkpoint,
+samples, trace and watch hashes and the full psx command. Its six-field trace
+independently repeats the ordering above without dropped events.
+`heldout_wall_stop_release_and_retry_match_every_tick` matches position
+within 0.02 original units and yaw/animation/frame exactly at every sampled
+logic tick, including both floor restorations and the retry. The original
+climb test now covers the complete recording instead of truncating it.
+
+Reproduce after baking content and building the developer binary:
+
+```sh
+python3 tools/record_wall_stop.py                       # psx on PATH, or --psx /path/to/psx
+cargo test -p tomb-raider-ii --all-features --test player
+python3 tools/climb_smoke.py --wall-stop-heldout --out validation/wall-stop-smoke
+```
+
+The existing capture delay applies to visual comparisons: a port field N
+corresponds approximately to original screen N+4. Other collision branches,
+including the 50-unit descent cap and restoring turn states after a blocked
+run, are not established by this route.
+
+Verification: workspace all-features tests and Clippy completed (existing
+lint warnings remain). The offscreen held-out smoke completed with 13 captured
+poses matching the original samples for position, yaw, clip and absolute
+frame. The final port/original screenshots and the engine-only sandbox
+screenshot were inspected. Existing rendering differences, including Lara's
+brightness and the HUD, remain; this is a collision correction, not a claim
+of pixel parity. Workspace formatting checks still report pre-existing
+formatting differences in unrelated code; those files were preserved.

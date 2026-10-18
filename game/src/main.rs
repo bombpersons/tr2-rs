@@ -5,7 +5,6 @@
 //! Extra flag: `--level NAME` starts in `assets/levels/NAME/` without the
 //! title screen (default: the title screen, then `wall`).
 use engine::launcher::{self, Args, Game};
-use engine::render::configure_view;
 
 fn main() {
     launcher::run(Game {
@@ -13,10 +12,11 @@ fn main() {
         title: game::TITLE,
         region: game::REGION,
         fields_per_tick: game::FIELDS_PER_TICK,
+        screen: game::SCREEN,
         add: |app| {
             let level = Args::from_env().value("--level");
-            configure_view(app, game::display::view_settings());
-            app.insert_resource(game::presentation::Session { title: level.is_none(), ..Default::default() })
+            app.insert_resource(game::display::view_settings())
+                .insert_resource(game::presentation::Session { title: level.is_none(), ..Default::default() })
                 .insert_resource(game::presentation::LevelRequest { name: level.unwrap_or_else(|| "wall".into()) })
                 .add_plugins(game::GamePlugin);
         },

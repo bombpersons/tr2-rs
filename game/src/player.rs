@@ -89,9 +89,13 @@ pub enum PlayerMode {
     Idle,
     Walk,
     Run,
+    /// State16: authored backward walk, including its start and stop clips.
     Back,
-    StepLeft,
-    StepRight,
+    /// State5: a complete backward hop; releasing Down does not cancel it.
+    HopBack,
+    /// States22/21: finish the current stride and stop pose after release.
+    StepLeft { stopping: bool },
+    StepRight { stopping: bool },
     Sliding {
         direction: Vec3,
         backwards: bool,
@@ -397,22 +401,45 @@ fn jump_animation(forward: Vec3, velocity: Vec3) -> usize {
     }
 }
 
+/// Ground directions after the original's R2 modifier (0x80069634..0x800696F0).
+/// R1 slows walking/turning; R2+Left/Right sidesteps. Up/Down while stepping
+/// steer toward/away from the facing direction. R2 alone requests no movement.
+struct GroundControls {
+    direction: Vec2,
+    side: f32,
+    walk: bool,
+}
+
+impl GroundControls {
+    fn read(pad: &ControllerState) -> Self {
+        let direction = pad.direction();
+        let modified = pad.held(Button::R2);
+        let side = if modified && direction.x.abs() > 0.1 { direction.x.signum() } else { 0.0 };
+        if side != 0.0 {
+            Self { direction: Vec2::new(-side * direction.y, 0.0), side, walk: pad.held(Button::R1) }
+        } else {
+            Self { direction, side, walk: pad.held(Button::R1) || (modified && direction.y != 0.0) }
+        }
+    }
+}
+
 /// The state handler (keyed by the mode at the start of the tick) adjusts the
 /// shared turn rate; the rate then decays and turns Lara in every state.
 /// Handlers: stop 0x8003899c, walk 0x800386c4 (cap 728), run 0x800387b0
 /// (1456), turn 0x80038d94 (+409 before reading input), fast turn 0x80039370
 /// (sets 1456), walk back 0x80039270 (728), forward jump 0x80038b88 (546).
-fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: f32) {
+fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: f32, fast_turn: bool) {
     if player.mode == PlayerMode::Swimming {
         // The underwater controller is separate and not yet traced.
         motion.turn_rate = 0;
         motion.turning = 0;
         return;
     }
-    let direction = pad.direction();
+    let controls = GroundControls::read(pad);
+    let direction = controls.direction;
     let held = if direction.x < -0.1 { -1 } else if direction.x > 0.1 { 1 } else { 0 };
-    let walk = pad.held(Button::R1);
-    let side_step = pad.held(Button::L2) || pad.held(Button::R2) || (walk && direction.y.abs() < 0.2 && held != 0);
+    let walk = controls.walk;
+    let side_step = controls.side != 0.0;
     let push = |rate: &mut i32, cap: i32| {
         if held != 0 {
             *rate = (*rate + held * TURN_PUSH).clamp(-cap, cap);
@@ -421,7 +448,7 @@ fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: 
     let alive = player.health > 0;
     match player.mode {
         PlayerMode::Idle if alive && motion.turning != 0 => {
-            if motion.turn_frames >= 33.0 {
+            if fast_turn {
                 motion.turn_rate = if motion.turn_rate >= 0 { 1456 } else { -1456 };
             } else {
                 motion.turn_rate += motion.turning * TURN_PUSH;
@@ -438,12 +465,19 @@ fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: 
         }
         // Stop delegates to the walk/run handler on the tick UP is pressed.
         PlayerMode::Idle if alive && direction.y > 0.1 => push(&mut motion.turn_rate, if walk { 728 } else { 1456 }),
+        // Stop delegates DOWN+walk to state16 (0x80038B44..0x80038B5C).
+        PlayerMode::Idle if alive && direction.y < -0.1 && walk => push(&mut motion.turn_rate, 728),
         PlayerMode::Idle if alive && motion.grounded && held != 0 && !side_step && direction.y.abs() <= 0.1 => {
             motion.turning = held;
             motion.turn_frames = ticks;
         }
-        PlayerMode::Walk | PlayerMode::Back if alive => push(&mut motion.turn_rate, 728),
+        // Side handlers 0x800393D8/0x800394B8 steer with the walk turn cap.
+        PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. } if alive => {
+            push(&mut motion.turn_rate, 728);
+        }
         PlayerMode::Run if alive => push(&mut motion.turn_rate, 1456),
+        // Hop-back handler 0x80038D00: cap1092, or 728 after shared decay.
+        PlayerMode::HopBack if alive => push(&mut motion.turn_rate, 1092),
         PlayerMode::Jump | PlayerMode::Fall if alive => push(&mut motion.turn_rate, 546),
         _ => {}
     }
@@ -473,9 +507,17 @@ fn control(
     mut players: Query<(&mut Player, &mut Motion, &mut WeaponState, &AnimationState)>,
 ) {
     let dt = time.delta_secs();
-    let direction = pad.direction();
+    let controls = GroundControls::read(&pad);
     for (mut player, mut motion, mut weapon, animation) in &mut players {
-        turn(&mut player, &mut motion, &pad, original_frames(dt));
+        // Swimming retains the provisional controller until separately traced.
+        let direction = if player.mode == PlayerMode::Swimming { pad.direction() } else { controls.direction };
+        // State20 sets the fast rate; slow states6/7 keep adding 409 even
+        // after a long R1 hold is released (0x80038DA4..0x80038E04).
+        let fast_turn = clips
+            .as_deref()
+            .and_then(|c| c.state(animation.animation))
+            .map_or(motion.turn_frames >= 33.0, |state| state == 20);
+        turn(&mut player, &mut motion, &pad, original_frames(dt), fast_turn);
         weapon.cooldown_seconds = (weapon.cooldown_seconds - dt).max(0.0);
         weapon.firing = false;
         if player.health <= 0 {
@@ -492,6 +534,41 @@ fn control(
             weapon.shot_serial += 1;
             // Provisional pistol cadence; not yet measured from the PS1 weapon controller.
             weapon.cooldown_seconds = 0.2;
+        }
+        if matches!(
+            player.mode,
+            PlayerMode::Back | PlayerMode::HopBack | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
+        )
+            && motion.grounded
+            && let Some(clips) = clips.as_deref()
+        {
+            // State5 always asks to stop (0x80038D0C); state16 asks to stop
+            // unless DOWN+walk remains held (0x80039294..0x800392C0).
+            // Authored ranges decide when a walking foot can stop. The hop
+            // instead finishes clips88->89->90->11 regardless of release.
+            // Side handlers only assign goal2 on release; re-holding before
+            // the stop window does not cancel it (0x80039418/0x800394F8).
+            match &mut player.mode {
+                PlayerMode::StepLeft { stopping } => *stopping |= controls.side >= 0.0,
+                PlayerMode::StepRight { stopping } => *stopping |= controls.side <= 0.0,
+                _ => {}
+            }
+            let index = mode_clip(&player, &motion, &pad);
+            let next = step_animation(animation, index, None, Some(clips), original_frames(dt));
+            let forward = player.forward();
+            let right = Vec3::new(forward.z, 0.0, -forward.x);
+            // AnimateLara uses the preceding collision heading. The side
+            // collision writes yaw +/-90 degrees at 0x8003B5FC.
+            let heading = match clips.state(animation.animation) {
+                Some(21) => right,
+                Some(22) => -right,
+                _ => -forward,
+            };
+            motion.velocity = heading * clip_speed(clips, &next).unwrap_or(0.0);
+            if clips.state(next.animation) == Some(2) {
+                player.mode = PlayerMode::Idle;
+            }
+            continue;
         }
         match player.mode {
             PlayerMode::Sliding { direction, .. } => {
@@ -561,16 +638,8 @@ fn control(
             }
             _ => {}
         }
-        let walk = pad.held(Button::R1);
-        let side = if pad.held(Button::R2) {
-            1.0
-        } else if pad.held(Button::L2) {
-            -1.0
-        } else if walk && direction.y.abs() < 0.2 {
-            direction.x
-        } else {
-            0.0
-        };
+        let walk = controls.walk;
+        let side = controls.side;
         if player.mode == PlayerMode::Swimming {
             let turn = if motion.grounded { 150.0_f32.to_radians() } else { std::f32::consts::FRAC_PI_3 };
             player.yaw = (player.yaw + direction.x * turn * dt).rem_euclid(std::f32::consts::TAU);
@@ -594,14 +663,23 @@ fn control(
             continue;
         }
         let (mode, velocity) = if side.abs() > 0.1 {
-            (if side < 0.0 { PlayerMode::StepLeft } else { PlayerMode::StepRight }, right * side * STEP_SPEED)
+            (
+                if side < 0.0 {
+                    PlayerMode::StepLeft { stopping: false }
+                } else {
+                    PlayerMode::StepRight { stopping: false }
+                },
+                right * side * STEP_SPEED,
+            )
         } else if direction.y > 0.1 {
             (
                 if walk { PlayerMode::Walk } else { PlayerMode::Run },
                 forward * direction.y * if walk { WALK_SPEED } else { RUN_SPEED },
             )
         } else if direction.y < -0.1 {
-            (PlayerMode::Back, forward * direction.y * BACK_SPEED)
+            // Stop handler 0x80038B44: DOWN alone requests state5; with
+            // walk it delegates to state16. Both moves use the level clips.
+            (if walk { PlayerMode::Back } else { PlayerMode::HopBack }, forward * direction.y * BACK_SPEED)
         } else {
             (PlayerMode::Idle, Vec3::ZERO)
         };
@@ -611,13 +689,28 @@ fn control(
             motion.locomotion_frame = 0.0;
         }
         player.mode = mode;
-        motion.velocity = if matches!(mode, PlayerMode::Run | PlayerMode::Walk) {
+        motion.velocity = if matches!(
+            mode,
+            PlayerMode::Run | PlayerMode::Walk | PlayerMode::Back | PlayerMode::HopBack
+                | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
+        ) {
             // The move uses the frame this tick's animation step will show.
             let speed = clips.as_deref().and_then(|clips| {
                 let index = mode_clip(&player, &motion, &pad);
                 clip_speed(clips, &step_animation(animation, index, None, Some(clips), original_frames(dt)))
             });
-            forward * direction.y * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
+            if matches!(
+                mode,
+                PlayerMode::Back | PlayerMode::HopBack | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
+            ) {
+                // AnimateLara moves using the previous collision pass's
+                // heading (0x80043248). Entering backward walk or a sidestep
+                // takes one forward step before collision changes the heading
+                // (0x8003B43C/0x8003B5FC); both PSX recordings confirm it.
+                speed.map_or(velocity, |speed| forward * speed)
+            } else {
+                forward * direction.y * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
+            }
         } else {
             velocity
         };
@@ -762,8 +855,10 @@ fn integrate(
         let horizontal = Vec3::new(proposed.x, old.y, proposed.z);
         let ahead = horizontal + motion.velocity.with_y(0.0).normalize_or_zero() * PLAYER_RADIUS;
         let candidate_floor = floor(geometry, ahead, player.room);
-        let walk =
-            matches!(player.mode, PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft | PlayerMode::StepRight);
+        let walk = matches!(
+            player.mode,
+            PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
+        );
         let passable = |hit: &FloorHit| {
             hit.ceiling - hit.height >= if swimming { units(400.0) } else { PLAYER_HEIGHT }
                 // Original jump.csv includes the last horizontal displacement
@@ -827,6 +922,7 @@ fn integrate(
                 }
             }
         }
+        let mut blocked_run_floor = None;
         let forward = player.forward();
         let facing = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
         if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing] {
@@ -848,10 +944,19 @@ fn integrate(
                     player.position.y = old.y;
                     continue;
                 }
-                None => player.mode = PlayerMode::Idle,
+                None => {
+                    player.mode = PlayerMode::Idle;
+                    // Run collision samples the centre floor before shifting
+                    // out of the wall, then keeps that height after stopping
+                    // (0x8003C34C, 0x8003A944, 0x8003AA04). On a slope this
+                    // differs from the floor under the resolved position.
+                    // wall_stop_trace: proposed x65458 -> y4627, resolved
+                    // x65435 -> y4633; releasing UP restores the latter.
+                    blocked_run_floor = floor(geometry, horizontal, player.room);
+                }
             }
         }
-        let Some(hit) = floor(geometry, player.position, player.room) else {
+        let Some(hit) = blocked_run_floor.or_else(|| floor(geometry, player.position, player.room)) else {
             continue;
         };
         player.room = hit.room;
@@ -898,9 +1003,10 @@ fn integrate(
 
 /// The clip each mode asks for; `step_animation` decides how it is entered.
 fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
-match player.mode {
+    let controls = GroundControls::read(pad);
+    match player.mode {
         PlayerMode::Idle => {
-            if motion.turning != 0 && motion.turn_frames >= 33.0 {
+            if motion.turning != 0 && motion.turn_frames >= 33.0 && !controls.walk {
                 44
             } else if motion.turning < 0 {
                 13
@@ -912,9 +1018,20 @@ match player.mode {
         }
         PlayerMode::Walk => 20,
         PlayerMode::Run => 6,
-        PlayerMode::Back => 40,
-        PlayerMode::StepLeft => 67,
-        PlayerMode::StepRight => 65,
+        PlayerMode::Back => {
+            if controls.direction.y < -0.1 && controls.walk {
+                40
+            } else {
+                103
+            }
+        }
+        PlayerMode::HopBack => 88,
+        PlayerMode::StepLeft { stopping } => {
+            if stopping { 103 } else { 65 }
+        }
+        PlayerMode::StepRight { stopping } => {
+            if stopping { 103 } else { 67 }
+        }
         PlayerMode::Sliding { backwards, .. } => {
             if backwards {
                 105
@@ -974,6 +1091,24 @@ pub fn step_animation(
     ticks: f32,
 ) -> AnimationState {
     let mut animation = current.clone();
+    if let Some(clips) = clips
+        && let (Some(state), Some(target)) = (clips.state(current.animation), clips.state(index))
+        && (matches!(state, 5 | 16 | 21 | 22) || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))
+    {
+        // AnimateLara 0x80042E30..0x80042FD8 advances, tries the goal
+        // every tick, then follows end links. A backward walk or sidestep
+        // stop request must wait for a foot's authored dispatch window.
+        let goal = if state == 5 { 2 } else { target };
+        if state != goal
+            && let Some((clip, frame)) = clips.dispatch(current, goal)
+        {
+            animation.enter(clip, frame, index);
+        } else {
+            animation.acknowledge(index);
+            advance(&mut animation, Some(clips), ticks);
+        }
+        return animation;
+    }
     if animation.requested() != index {
         let target = clips.and_then(|c| c.state(index));
         let state = clips.and_then(|c| c.state(animation.animation));

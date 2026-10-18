@@ -1,0 +1,93 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
+  "heldout_after_implementation": true,
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/home_side/state.bin",
+    "--frames",
+    "100",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"DOWN\"], \"until\": 4}, {\"frame\": 6, \"buttons\": [\"LEFT\"], \"until\": 42}]",
+    "--snapshot-every",
+    "1",
+    "--watch",
+    "8008c572:2",
+    "--max-events",
+    "10000",
+    "--out",
+    ".psx/backward_hop_heldout",
+    "--summary",
+    "--sample",
+    "8017c8be:i16:yaw",
+    "--sample",
+    "8017c8b0:i32:x",
+    "--sample",
+    "8017c8b4:i32:y",
+    "--sample",
+    "8017c8b8:i32:z",
+    "--sample",
+    "8017c890:i16:animation",
+    "--sample",
+    "8017c892:i16:animation_frame",
+    "--sample",
+    "8017c88a:i16:state",
+    "--sample",
+    "8017c88c:i16:goal",
+    "--sample",
+    "8017c89a:i16:speed",
+    "--sample",
+    "8017c89c:i16:fall_speed",
+    "--sample",
+    "8008c570:i16:turn_rate"
+  ],
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "DOWN"
+      ],
+      "until": 4
+    },
+    {
+      "frame": 6,
+      "buttons": [
+        "LEFT"
+      ],
+      "until": 42
+    }
+  ],
+  "samples": [
+    "8017c8be:i16:yaw",
+    "8017c8b0:i32:x",
+    "8017c8b4:i32:y",
+    "8017c8b8:i32:z",
+    "8017c890:i16:animation",
+    "8017c892:i16:animation_frame",
+    "8017c88a:i16:state",
+    "8017c88c:i16:goal",
+    "8017c89a:i16:speed",
+    "8017c89c:i16:fall_speed",
+    "8008c570:i16:turn_rate"
+  ],
+  "build": {
+    "id": "src-41f296d388d06491-release",
+    "profile": "release",
+    "source_sha256": "41f296d388d06491b5c2eae15b7cc7b9c4ed2f60e0596ef23d4f9caf152ebc00",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "frames": {
+    "end": 15092,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 100,
+    "requested": 100,
+    "start": 14992,
+    "unit": "vsync"
+  },
+  "checkpoint": ".psx/home_side/state.bin",
+  "checkpoint_sha256": "5a24191e2947640581b3e1b52b2ecf7e3b4cc30dda1470f65cd809d0f54a338a",
+  "samples_sha256": "5caa93464dc431cce55643abe60d668e9ec02ba229c5dac819a9f14792d0e052",
+  "writes_sha256": "6d0ce029ffe8b9d144e8d0e87855c6538fed64d700ed928a1ba49382d48da8aa"
+}
