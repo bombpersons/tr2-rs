@@ -21,6 +21,7 @@ defined in [engine-model.md](engine-model.md).
 | High airborne room-wall rebound, fast fall and heavy landing | deflection `0x8003C5F4`, fast-fall control `0x80038F6C`, airborne animation `0x800431C8`, landing `0x8003AEEC`; five no-poke routes ([airborne-evidence](airborne-evidence.md)) | `game/tests/airborne.rs` (515 ticks, two independent validation routes), `tools/airborne_smoke.py` | PSX for high forward wall impacts, retained rebound heading, signed speed, heavy recovery and the contrasting reach; corner/ceiling impacts, unassisted falls and slide landings pending |
 | Low/middle airborne room-wall impacts and blocked takeoff | deflection `0x8003C66C`, state14 `0x8003909C`/`0x8003B2FC`, slow-turn goals `0x80038DD0`/`0x80038EA0`; six additional no-poke routes ([low-airborne-evidence](low-airborne-evidence.md)) | `game/tests/airborne.rs` (676 additional ticks, two new independent validation routes and one labelled calibration), `tools/airborne_smoke.py` | PSX for mid-height rebound, low-impact state override/recovery, vertical fallback and authored left fast-turn dispatch; corner/ceiling, static-mesh, unassisted/slide/sideways branches pending |
 | Grounded run-start room-wall stop and held-jump retry | ground deflection `0x8003C544`, shared stop `0x8003A56C`, standing held-Jump check `0x80038B00`; former diagnostic and two fresh no-poke routes ([run-start-evidence](run-start-evidence.md)) | `game/tests/airborne.rs` (333 additional sampled ticks, two independent validation routes), `tools/airborne_smoke.py` | PSX for cardinal room-wall clip11 stop, held retry, release-before-contact and restored idle progression; shared turn branches binary-backed only, angular/static-obstruction sweeps pending |
+| Neutral run release, authored braking and restart requests | Run control `0x80038948..0x80038994`, clip0/6 dispatch ranges and braking8/10; five ordinary routes plus shared calibration ([run-stop-evidence](run-stop-evidence.md)) | `game/tests/airborne.rs` (595 new sampled ticks), `tools/airborne_smoke.py` | PSX for neutral release and Up re-held during braking; calibration explicitly labelled, direction reversal/run-to-walk/jump interruptions pending |
 | Slope height after blocked run start, release and retry | centre floor sampled before collision shift; `0x8003C34C`, `0x8001B0B8`, `0x8003A944`, `0x8003AA04`; fresh no-poke hold/release/retry capture ([locomotion-evidence](locomotion-evidence.md)) | full climb recording and `heldout_wall_stop_release_and_retry_match_every_tick` | PSX, verified on the Wall slope; other collision branches unverified |
 | Wall entry fall and slides | `wall_entry.csv`, 207 fields neutral input ([original-evidence](original-evidence.md)) | `original_wall_entry_falls_slides_and_turns_across_every_recorded_tick` | PSX, verified; backward and diagonal slides unexercised |
 | Fixed camera shots, timers, easing | [camera-evidence](camera-evidence.md) | `game/tests/camera.rs` | PSX, verified |
@@ -45,8 +46,10 @@ Engine rendering regressions are tracked separately from PSX behavior:
 [missing room geometry](room-visibility-fix.md) covers material restoration,
 portal traversal ordering, and pixel-checked Wall/Home camera-return tests.
 
-Forward low-ceiling contacts are now PSX-verified for ordinary forward jumps:
+Flat low-ceiling contacts are now PSX-verified for ordinary forward, vertical and reach jumps:
 [ceiling evidence](ceiling-evidence.md) retains the explicitly controlled
-starting spawn, three unmodified replays (two recorded after implementation),
-293 sampled logic ticks and28 full-game pose checks. Vertical jumps, reach,
-corner/side and forward-top contacts remain unverified.
+starting fixtures, eleven unmodified replays with separate calibration and
+independent validation,1201 sampled logic ticks and120 full-game pose checks.
+Vertical contact requests authored landing while retaining upward speed; forward
+and Reach contact stop ascent while retaining their respective jump/reach clips.
+Corner/side and forward-top contacts remain unverified.

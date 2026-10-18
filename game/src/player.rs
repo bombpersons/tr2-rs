@@ -760,6 +760,10 @@ fn control(
             // Stop handler 0x80038B44: DOWN alone requests state5; with
             // walk it delegates to state16. Both moves use the level clips.
             (if walk { PlayerMode::Back } else { PlayerMode::HopBack }, forward * direction.y * BACK_SPEED)
+        } else if was_running && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(1) {
+            // Run control requests goal2 on release (0x8003898C), but the
+            // running state and authored speed persist until its stop range.
+            (PlayerMode::Run, forward * RUN_SPEED)
         } else {
             (PlayerMode::Idle, Vec3::ZERO)
         };
@@ -769,6 +773,12 @@ fn control(
             motion.locomotion_frame = 0.0;
         }
         player.mode = mode;
+        // Movement and the stop-state handoff use the same prospective
+        // authored frame; the animation system commits it after collision.
+        let next = clips.as_deref().map(|clips| {
+            let index = mode_clip(&player, &motion, &pad);
+            step_animation(animation, index, None, Some(clips), original_frames(dt))
+        });
         motion.velocity = if matches!(
             mode,
             PlayerMode::Run
@@ -779,10 +789,7 @@ fn control(
                 | PlayerMode::StepRight { .. }
         ) {
             // The move uses the frame this tick's animation step will show.
-            let speed = clips.as_deref().and_then(|clips| {
-                let index = mode_clip(&player, &motion, &pad);
-                clip_speed(clips, &step_animation(animation, index, None, Some(clips), original_frames(dt)))
-            });
+            let speed = clips.as_deref().zip(next.as_ref()).and_then(|(clips, next)| clip_speed(clips, next));
             if matches!(
                 mode,
                 PlayerMode::Back | PlayerMode::HopBack | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
@@ -798,11 +805,18 @@ fn control(
                 };
                 speed.map_or(velocity, |speed| heading * speed)
             } else {
-                forward * direction.y * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
+                let direction = if mode == PlayerMode::Run && direction.y == 0.0 { 1.0 } else { direction.y };
+                forward * direction * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
             }
         } else {
             velocity
         };
+        if mode == PlayerMode::Run
+            && direction.y == 0.0
+            && clips.as_deref().zip(next.as_ref()).and_then(|(clips, next)| clips.state(next.animation)) == Some(2)
+        {
+            player.mode = PlayerMode::Idle;
+        }
         // Stop handler0x80038B00 tests held Jump before delegating Up to
         // running. A run-start wall stop therefore retries a held request
         // on the following standing tick, without another button edge.
@@ -1201,7 +1215,13 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
             }
         }
         PlayerMode::Walk => 20,
-        PlayerMode::Run => 6,
+        PlayerMode::Run => {
+            if controls.direction.y == 0.0 {
+                STANDING_CLIP
+            } else {
+                6
+            }
+        }
         PlayerMode::Back => {
             if controls.direction.y < -0.1 && controls.walk {
                 40
@@ -1306,11 +1326,16 @@ pub fn step_animation(
     }
     if let Some(clips) = clips
         && let (Some(state), Some(target)) = (clips.state(current.animation), clips.state(index))
-        && (matches!(state, 5 | 16 | 21 | 22) || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))
+        && (matches!(state, 5 | 16 | 21 | 22)
+            || (state == 1 && matches!(index, 6 | 11 | 103))
+            || (state == 2 && index == 6)
+            || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))
     {
         // AnimateLara 0x80042E30..0x80042FD8 advances, tries the goal
-        // every tick, then follows end links. A backward walk or sidestep
+        // every tick, then follows end links. A run, backward walk or sidestep
         // stop request must wait for a foot's authored dispatch window.
+        // Run applies only to ordinary run/stand requests: collision-forced
+        // clips (e.g. vault50, whose declared state is also2) enter directly.
         let goal = if state == 5 { 2 } else { target };
         if state != goal
             && let Some((clip, frame)) = clips.dispatch(current, goal)

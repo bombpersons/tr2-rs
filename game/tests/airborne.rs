@@ -107,6 +107,67 @@ macro_rules! recorded_case {
 }
 
 #[test]
+fn original_action_before_low_ceiling_contact_waits_for_the_authored_reach_range() {
+    compare_case(include_str!("data/original/ceiling_reach.csv"), include_str!("data/original/ceiling_reach.json"));
+}
+
+#[test]
+fn original_reach_ceiling_contact_keeps_its_pose_and_forward_speed() {
+    compare_case(
+        include_str!("data/original/ceiling_reach_late.csv"),
+        include_str!("data/original/ceiling_reach_late.json"),
+    );
+}
+
+#[test]
+fn calibration_reach_ceiling_release_exposes_the_authored_run_stop() {
+    compare_case(
+        include_str!("data/original/ceiling_reach_late_release_heldout.csv"),
+        include_str!("data/original/ceiling_reach_late_release_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_delayed_reach_ceiling_contact_ignores_jump_during_recovery() {
+    compare_case(
+        include_str!("data/original/ceiling_reach_late_delay_heldout.csv"),
+        include_str!("data/original/ceiling_reach_late_delay_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_reach_ceiling_release_validates_landing_run_and_authored_stop() {
+    compare_case(
+        include_str!("data/original/ceiling_reach_late_validation_heldout.csv"),
+        include_str!("data/original/ceiling_reach_late_validation_heldout.json"),
+    );
+}
+
+#[test]
+fn original_vertical_jump_under_a_low_ceiling_requests_its_authored_landing() {
+    compare_case(
+        include_str!("data/original/ceiling_vertical.csv"),
+        include_str!("data/original/ceiling_vertical.json"),
+    );
+}
+
+#[test]
+fn heldout_delayed_vertical_jump_with_action_uses_ceiling_recovery_without_grabbing() {
+    compare_case(
+        include_str!("data/original/ceiling_vertical_delay_heldout.csv"),
+        include_str!("data/original/ceiling_vertical_delay_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_held_vertical_jump_repeats_through_authored_ceiling_recovery() {
+    compare_case(
+        include_str!("data/original/ceiling_vertical_hold_heldout.csv"),
+        include_str!("data/original/ceiling_vertical_hold_heldout.json"),
+    );
+}
+
+#[test]
 fn original_forward_jump_under_a_low_ceiling_keeps_its_heading_and_horizontal_speed() {
     compare_case(include_str!("data/original/ceiling_forward.csv"), include_str!("data/original/ceiling_forward.json"));
 }
@@ -141,3 +202,8 @@ recorded_case!(heldout_low_impact_validates_recovery_and_authored_left_fast_turn
 recorded_case!(original_run_start_wall_stop_retries_a_held_jump, "run_start_retry_probe");
 recorded_case!(heldout_releasing_jump_before_run_start_wall_contact_keeps_lara_grounded, "run_start_release_heldout");
 recorded_case!(heldout_early_held_jump_retries_after_run_start_wall_contact, "run_start_hold_heldout");
+recorded_case!(heldout_run_release_uses_the_left_authored_braking_clip, "run_stop_left_heldout");
+recorded_case!(heldout_run_release_uses_the_right_authored_braking_clip, "run_stop_right_heldout");
+recorded_case!(calibration_reholding_run_exposes_the_committed_braking_clip, "run_stop_rehold_heldout");
+recorded_case!(heldout_reholding_run_waits_for_the_committed_braking_clip, "run_stop_rehold_validation_heldout");
+recorded_case!(heldout_restarting_run_after_a_late_braking_request, "run_stop_restart_heldout");
