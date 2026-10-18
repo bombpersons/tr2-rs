@@ -14,9 +14,25 @@ it off. Record partial progress below without checking the parent item.
 - [ ] Jump, grab and hang: original grab conditions, alignment, animation and
   collision behavior; climb from a hang and release to drop. Include a complete
   recorded route and an independently recorded validation route.
-- [ ] Three-click climbs: entry conditions, authored timing and final offset.
+  Ordinary vertical/forward routes are done; static obstruction, angular
+  boundaries and climbable-wall/alternate-catch variants remain.
+- [x] Three-click climbs: ordinary entry, authored timing and final offset;
+  original and independent release/turn routes pass. See
+  [evidence](docs/traversal-evidence.md) and [tests](game/tests/traversal.rs).
 - [ ] Backward movement against walls, steps, drops and slopes.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
+  Standing/forward jumps and hang drops are done; unassisted/fast falls,
+  slide landings and backward/sideways jump collision remain.
+
+## Completed traversal milestones
+
+- [x] Ordinary vertical/forward ledge jump, reach, grab, hang, pull-up and
+  drop; independent early-climb, early-drop and missing-Action validation.
+  [Evidence](docs/traversal-evidence.md), [tests](game/tests/traversal.rs).
+- [x] Authored standing/forward/running jump preparation and landing recovery;
+  both running feet, landing into a run and a second jump through an authored
+  cancel window. [Evidence](docs/traversal-evidence.md),
+  [tests](game/tests/traversal.rs).
 
 ## Water
 
@@ -43,3 +59,14 @@ it off. Record partial progress below without checking the parent item.
 - 2026-10-18: Baseline `cargo test --workspace --all-features` passed before
   checkpoint commit/push. GPU/MCP tests are opt-in and were not run in that check.
   Ledge traversal is the first investigation.
+- 2026-10-18: First traversal milestone: sixteen PSX recordings, 1771 sampled
+  ticks and thirteen compared columns; independent validation retained apart
+  from the explicitly labelled alternate-takeoff calibration capture. The game
+  MCP smoke passed52 aligned poses over nine routes. The workspace tests,
+  engine sandbox run and editor save/animation smoke passed. The editor still
+  preserves untouched files byte for byte; no format or template changes were
+  required. Existing workspace formatting differences and Clippy warnings
+  outside the changed Rust files remain.
+- Next: backward wall/step/drop/slope collision, followed by the remaining
+  traversal branches and water. Combat, interactions and appearance remain
+  queued above; none is marked complete by the traversal work.

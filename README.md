@@ -25,6 +25,7 @@ cargo run --features dev-mcp -- --level wall   # start at the Great Wall, no tit
 python3 tools/port_smoke.py                    # offscreen screenshots vs the original (after a dev-mcp build)
 python3 tools/camera_smoke.py                  # fixed entrance camera through offscreen rendering
 python3 tools/backward_smoke.py                # backward hop/walk against retained PSX motion and cameras
+python3 tools/traversal_smoke.py               # jumps, ledges, pull-ups and authored landing recovery
 python3 tools/item_lighting_smoke.py           # per-object lighting in aligned Home and Wall views
 python3 tools/subdivision_smoke.py             # off/split/filled room meshes at two PSX camera poses
 ```
@@ -32,6 +33,8 @@ python3 tools/subdivision_smoke.py             # off/split/filled room meshes at
 Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/evidence.md);
 what the engine treats as data and what as per-type code is in
 [docs/engine-model.md](docs/engine-model.md).
+The remaining work and completed verification milestones are tracked in
+[TODO.md](TODO.md).
 
 ## Level editor
 

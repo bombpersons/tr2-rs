@@ -125,6 +125,11 @@ shows the current clip, absolute frame, current state and requested goal.
 This preview uses only engine animation data and suppresses sound, effects,
 movement and game controllers. It never changes level data or dirty state.
 Models that have no placement in the level cannot yet be previewed here.
+
+Player traversal uses these existing clips, bounds and end commands without
+adding an authoring format. The preview remains an inspection of authored
+object animation; it does not simulate player collision or Lara's distinct
+goal-persistence rule. See [traversal-evidence.md](traversal-evidence.md).
 The hand-authored sandbox has four pillar clips to exercise the workflow
 without game assets. [Door animation evidence](door-animation-evidence.md)
 describes the PSX checks behind the shared animation step.

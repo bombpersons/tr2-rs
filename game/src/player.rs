@@ -7,14 +7,19 @@
 //! Clip numbers (6 run, 20 walk, 103 stand...) index the levels' shared Lara
 //! animation table.
 use bevy::prelude::*;
-use engine::animation::{ANIMATION_FPS as ORIGINAL_FPS, AnimationLibrary, advance, animation_frames as original_frames};
 pub use engine::animation::AnimationState;
+use engine::animation::{
+    ANIMATION_FPS as ORIGINAL_FPS, AnimationLibrary, advance, animation_frames as original_frames,
+};
 use engine::camera::CameraSystems;
 use engine::controller::{Button, ControllerState};
-use engine::schedule::{Avatar, InteractionSystems, SchedulePlugin, WorldSystems};
 pub use engine::schedule::SimulationEnabled;
+use engine::schedule::{Avatar, InteractionSystems, SchedulePlugin, WorldSystems};
 pub use engine::world::units;
 use engine::world::{FloorHit, WorldGeometry};
+
+mod traversal;
+pub use traversal::Traversal;
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -49,7 +54,7 @@ const TURN_DECAY: i32 = 364;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(Motion, AnimationState, WeaponState, Transform, Avatar)]
+#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal)]
 pub struct Player {
     /// Feet position; rendering synchronizes this into Transform.
     pub position: Vec3,
@@ -94,8 +99,12 @@ pub enum PlayerMode {
     /// State5: a complete backward hop; releasing Down does not cancel it.
     HopBack,
     /// States22/21: finish the current stride and stop pose after release.
-    StepLeft { stopping: bool },
-    StepRight { stopping: bool },
+    StepLeft {
+        stopping: bool,
+    },
+    StepRight {
+        stopping: bool,
+    },
     Sliding {
         direction: Vec3,
         backwards: bool,
@@ -120,6 +129,16 @@ pub enum PlayerMode {
     Hanging {
         ledge: Vec3,
     },
+    /// A vertical ledge jump, including its authored preparation and drop.
+    JumpingUp {
+        launch_speed: f32,
+    },
+    /// Forward leap and reach, using authored preparation and grab ranges.
+    JumpingForward,
+    /// Authored pull-up clips apply their own end offsets, then settle.
+    PullingUp,
+    /// A landing whose authored ranges determine when control can resume.
+    Recovering,
     /// Position is frozen while the clip plays; `offset` (world units) is
     /// applied when it ends, as the clip's end-of-animation command.
     Climbing {
@@ -231,16 +250,17 @@ pub struct PlayerRulesPlugin;
 impl Plugin for PlayerRulesPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, AvatarPlugin);
+        app.register_type::<Traversal>();
         app.configure_sets(FixedUpdate, PlayerSystems::Control.in_set(WorldSystems::Control))
             .configure_sets(FixedUpdate, PlayerSystems::Motion.in_set(WorldSystems::Motion))
             .configure_sets(FixedUpdate, PlayerSystems::Animation.in_set(WorldSystems::Animation))
-        .add_systems(FixedUpdate, control.in_set(PlayerSystems::Control).run_if(simulation_enabled))
-        .add_systems(
-            FixedUpdate,
-            (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
-        )
-        .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled))
-        .add_systems(FixedUpdate, sync_transform.in_set(InteractionSystems::Publish).run_if(simulation_enabled));
+            .add_systems(FixedUpdate, control.in_set(PlayerSystems::Control).run_if(simulation_enabled))
+            .add_systems(
+                FixedUpdate,
+                (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
+            )
+            .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled))
+            .add_systems(FixedUpdate, sync_transform.in_set(InteractionSystems::Publish).run_if(simulation_enabled));
     }
 }
 
@@ -257,7 +277,10 @@ pub fn spawn_lara(entity: &mut bevy::ecs::system::EntityCommands, ctx: &engine::
     use engine::world::{angle, position};
     let e = ctx.placement;
     let mut player = Player::at(position(e.position), angle(e.rotation), e.room);
-    let grounded = ctx.world.floor_at(player.position, player.room).is_some_and(|hit| (hit.height - player.position.y).abs() < 0.05);
+    let grounded = ctx
+        .world
+        .floor_at(player.position, player.room)
+        .is_some_and(|hit| (hit.height - player.position.y).abs() < 0.05);
     if !grounded {
         player.mode = PlayerMode::Fall;
     }
@@ -286,6 +309,7 @@ struct Vault {
     yaw: f32,
     /// Bevy y such that the clip's end command lands on the front floor.
     height: f32,
+    jump_speed: Option<f32>,
 }
 
 /// Original vault test 0x8003d924, using GetCollisionInfo 0x8001b018 probes:
@@ -300,7 +324,7 @@ fn vault(world: Option<&WorldGeometry>, position: Vec3, yaw: f32, room: usize) -
         return None;
     }
     let r = 100;
-    let across = |trig: f32| (trig * 16384.0).trunc() as i32 * r >> 14;
+    let across = |trig: f32| ((trig * 16384.0).trunc() as i32 * r) >> 14;
     let (sin, cos) = yaw.sin_cos();
     let (front, left, right) = match quadrant {
         0 => ([across(sin), r], [-r, r], [r, r]),
@@ -321,29 +345,34 @@ fn vault(world: Option<&WorldGeometry>, position: Vec3, yaw: f32, room: usize) -
     if (left - right).abs() >= 60 || !(front_clear && left_clear && right_clear) {
         return None;
     }
-    let (animation, climb) = match front {
-        -640..=-384 => (50, 512),
-        -896..=-641 => (42, 768),
+    let (animation, climb, jump_speed) = match front {
+        -640..=-384 => (50, 512, None),
+        -896..=-641 => (42, 768, None),
+        // Vault test 0x8003DBB0: a higher flat ledge requests the
+        // authored vertical jump, overriding its end command's lift.
+        -1920..=-897 => (26, 0, Some(units((((front + 800) * -12) as f32).sqrt().floor() + 3.0) * ORIGINAL_FPS)),
         _ => return None,
     };
     Some(Vault {
         animation,
         yaw: quadrant as f32 * std::f32::consts::FRAC_PI_2,
-        height: position.y - (front + climb) as f32 / 1024.0,
+        height: if jump_speed.is_some() { position.y } else { position.y - (front + climb) as f32 / 1024.0 },
+        jump_speed,
     })
 }
 
-/// Collision shift out of a wall along one axis: one unit short of radius
-/// from the sector edge when moving positively (x64411 and x65435 in
-/// climb_two_click.csv). The negative mirror is assumed, not yet captured.
+/// Collision shift out of a wall along one axis: radius + 1 from the sector
+/// edge. Positive X is recorded in climb_two_click.csv; negative Z in
+/// traversal_three_click.csv (z92261, exactly 101 past the z92160 edge).
 fn wall_contact(old: f32, proposed: f32) -> f32 {
     let (old, proposed) = ((old * 1024.0).round() as i32, (proposed * 1024.0).round() as i32);
     let contact = if proposed > old {
         (proposed + 100).div_euclid(1024) * 1024 - 101
     } else {
-        ((proposed - 100).div_euclid(1024) + 1) * 1024 + 100
+        ((proposed - 100).div_euclid(1024) + 1) * 1024 + 101
     };
-    let contact = if proposed > old { contact.clamp(old, proposed) } else { contact.clamp(proposed, old) };
+    // The shift can push back beyond the old coordinate: forward_climb.csv
+    // reaches z88164, then collision restores the101-unit margin at88165.
     contact as f32 / 1024.0
 }
 
@@ -428,7 +457,14 @@ impl GroundControls {
 /// Handlers: stop 0x8003899c, walk 0x800386c4 (cap 728), run 0x800387b0
 /// (1456), turn 0x80038d94 (+409 before reading input), fast turn 0x80039370
 /// (sets 1456), walk back 0x80039270 (728), forward jump 0x80038b88 (546).
-fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: f32, fast_turn: bool) {
+fn turn(
+    player: &mut Player,
+    motion: &mut Motion,
+    pad: &ControllerState,
+    ticks: f32,
+    fast_turn: bool,
+    animation_state: Option<usize>,
+) {
     if player.mode == PlayerMode::Swimming {
         // The underwater controller is separate and not yet traced.
         motion.turn_rate = 0;
@@ -437,7 +473,13 @@ fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: 
     }
     let controls = GroundControls::read(pad);
     let direction = controls.direction;
-    let held = if direction.x < -0.1 { -1 } else if direction.x > 0.1 { 1 } else { 0 };
+    let held = if direction.x < -0.1 {
+        -1
+    } else if direction.x > 0.1 {
+        1
+    } else {
+        0
+    };
     let walk = controls.walk;
     let side_step = controls.side != 0.0;
     let push = |rate: &mut i32, cap: i32| {
@@ -479,6 +521,7 @@ fn turn(player: &mut Player, motion: &mut Motion, pad: &ControllerState, ticks: 
         // Hop-back handler 0x80038D00: cap1092, or 728 after shared decay.
         PlayerMode::HopBack if alive => push(&mut motion.turn_rate, 1092),
         PlayerMode::Jump | PlayerMode::Fall if alive => push(&mut motion.turn_rate, 546),
+        PlayerMode::JumpingForward if alive && animation_state == Some(3) => push(&mut motion.turn_rate, 546),
         _ => {}
     }
     if motion.turn_rate.abs() <= TURN_DECAY {
@@ -504,11 +547,21 @@ fn control(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
-    mut players: Query<(&mut Player, &mut Motion, &mut WeaponState, &AnimationState)>,
+    mut players: Query<(&mut Player, &mut Motion, &mut WeaponState, &AnimationState, &mut Traversal)>,
 ) {
     let dt = time.delta_secs();
     let controls = GroundControls::read(&pad);
-    for (mut player, mut motion, mut weapon, animation) in &mut players {
+    for (mut player, mut motion, mut weapon, animation, mut traversal) in &mut players {
+        let was_running = player.mode == PlayerMode::Run;
+        if was_running {
+            // Run handler0x800388D4..0x80038944 persists a jump-enable
+            // latch. Clip6 clears it; clip0 frame4 or any other clip sets it.
+            if animation.animation == 6 {
+                traversal.run_jump_ready = false;
+            } else if animation.animation != 0 || animation.frame == 4.0 {
+                traversal.run_jump_ready = true;
+            }
+        }
         // Swimming retains the provisional controller until separately traced.
         let direction = if player.mode == PlayerMode::Swimming { pad.direction() } else { controls.direction };
         // State20 sets the fast rate; slow states6/7 keep adding 409 even
@@ -517,7 +570,14 @@ fn control(
             .as_deref()
             .and_then(|c| c.state(animation.animation))
             .map_or(motion.turn_frames >= 33.0, |state| state == 20);
-        turn(&mut player, &mut motion, &pad, original_frames(dt), fast_turn);
+        turn(
+            &mut player,
+            &mut motion,
+            &pad,
+            original_frames(dt),
+            fast_turn,
+            clips.as_deref().and_then(|c| c.state(animation.animation)),
+        );
         weapon.cooldown_seconds = (weapon.cooldown_seconds - dt).max(0.0);
         weapon.firing = false;
         if player.health <= 0 {
@@ -538,8 +598,7 @@ fn control(
         if matches!(
             player.mode,
             PlayerMode::Back | PlayerMode::HopBack | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
-        )
-            && motion.grounded
+        ) && motion.grounded
             && let Some(clips) = clips.as_deref()
         {
             // State5 always asks to stop (0x80038D0C); state16 asks to stop
@@ -610,19 +669,13 @@ fn control(
                 }
                 continue;
             }
-            PlayerMode::Climbing { .. } | PlayerMode::HitWall { .. } => continue,
-            PlayerMode::Hanging { ledge } => {
-                if !pad.held(Button::Cross) {
-                    player.mode = PlayerMode::Fall;
-                    motion.grounded = false;
-                } else if direction.y > 0.5 {
-                    // Clip97 lasts 74 frames; its end command is not yet verified
-                    // for hanging, so finish exactly at the grabbed ledge.
-                    let offset = ledge - player.position;
-                    player.mode = PlayerMode::Climbing { animation: 97, frames_left: 74.0, offset };
-                }
-                continue;
-            }
+            PlayerMode::Climbing { .. }
+            | PlayerMode::HitWall { .. }
+            | PlayerMode::JumpingUp { .. }
+            | PlayerMode::JumpingForward
+            | PlayerMode::Hanging { .. }
+            | PlayerMode::PullingUp
+            | PlayerMode::Recovering => continue,
             PlayerMode::Landing { seconds_left, animation, start_frame } if seconds_left > dt => {
                 player.mode = PlayerMode::Landing { seconds_left: seconds_left - dt, animation, start_frame };
                 motion.velocity.x = 0.0;
@@ -691,8 +744,12 @@ fn control(
         player.mode = mode;
         motion.velocity = if matches!(
             mode,
-            PlayerMode::Run | PlayerMode::Walk | PlayerMode::Back | PlayerMode::HopBack
-                | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
+            PlayerMode::Run
+                | PlayerMode::Walk
+                | PlayerMode::Back
+                | PlayerMode::HopBack
+                | PlayerMode::StepLeft { .. }
+                | PlayerMode::StepRight { .. }
         ) {
             // The move uses the frame this tick's animation step will show.
             let speed = clips.as_deref().and_then(|clips| {
@@ -714,7 +771,19 @@ fn control(
         } else {
             velocity
         };
-        if pad.pressed(Button::Square) {
+        let jump_requested =
+            pad.pressed(Button::Square) || (was_running && traversal.run_jump_ready && pad.held(Button::Square));
+        if jump_requested && (!was_running || traversal.run_jump_ready) {
+            if direction.y >= 0.0 && direction.x.abs() <= 0.1 && side == 0.0 && clips.is_some() {
+                // Stop+Jump enters compression73 even with Up. Running asks
+                // for goal3 through its authored foot-dependent ranges;
+                // these select16 or18 (0x8003899C/0x800387B0).
+                traversal.enter = if was_running { None } else { Some(73) };
+                traversal.goal = if was_running { 3 } else { 15 };
+                player.mode = PlayerMode::JumpingForward;
+                motion.velocity = Vec3::ZERO;
+                continue;
+            }
             let jump_forward = if mode == PlayerMode::Run { RUN_JUMP_SPEED } else { JUMP_FORWARD_SPEED };
             let jump_direction = if side.abs() > 0.1 {
                 right * side.signum()
@@ -750,11 +819,42 @@ fn integrate(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
-    mut players: Query<(&mut Player, &mut Motion, &WeaponState, &AnimationState)>,
+    mut players: Query<(&mut Player, &mut Motion, &WeaponState, &mut AnimationState, &mut Traversal)>,
 ) {
     let dt = time.delta_secs();
     let geometry = world.as_deref();
-    for (mut player, mut motion, weapon, animation) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal) in &mut players {
+        if matches!(player.mode, PlayerMode::Jump | PlayerMode::Fall)
+            && !motion.grounded
+            && !weapon.drawn
+            && pad.held(Button::Cross)
+            && let Some(state) = clips.as_deref().and_then(|c| c.state(animation.animation))
+        {
+            match state {
+                28 => {
+                    player.mode = PlayerMode::JumpingUp { launch_speed: 0.0 };
+                    traversal.goal = 28;
+                }
+                3 => {
+                    player.mode = PlayerMode::JumpingForward;
+                    traversal.goal = 11;
+                }
+                _ => {}
+            }
+        }
+        if traversal::step(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            geometry,
+            clips.as_deref(),
+            weapon,
+            &pad,
+            dt,
+        ) {
+            continue;
+        }
         if let PlayerMode::Climbing { animation, frames_left, offset } = player.mode {
             motion.velocity = Vec3::ZERO;
             let frames_left = frames_left - original_frames(dt);
@@ -871,39 +971,42 @@ fn integrate(
         if can_move {
             player.position.x = proposed.x;
             player.position.z = proposed.z;
-        } else if !weapon.drawn && pad.held(Button::Cross) && pad.direction().y > 0.1 {
-            if let Some(hit) = candidate_floor {
-                let ledge = Vec3::new(ahead.x, hit.height, ahead.z);
-                if motion.grounded && let Some(vault) = vault(geometry, horizontal, player.yaw, player.room) {
-                    // The grab tick discards the move; collision first shifts
-                    // Lara out of the wall (climb_two_click.csv: x64411, z kept).
-                    let forward = Vec3::new(vault.yaw.sin(), 0.0, vault.yaw.cos());
-                    let axis = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
-                    player.position = old;
-                    player.position[axis] = wall_contact(old[axis], proposed[axis]);
-                    player.position.y = vault.height;
-                    player.yaw = vault.yaw;
-                    motion.turn_rate = 0;
-                    let (frames, offset) = clips.as_ref().and_then(|c| c.climb(vault.animation)).unwrap_or(
-                        if vault.animation == 50 { (28.0, [0, -512, 128]) } else { (66.0, [0, -768, 128]) },
-                    );
-                    let (sin, cos) = vault.yaw.sin_cos();
-                    let forward = offset[2] as f32;
-                    let offset = Vec3::new(sin * forward, -offset[1] as f32, cos * forward) / 1024.0;
-                    player.mode = PlayerMode::Climbing { animation: vault.animation, frames_left: frames, offset };
-                    motion.velocity = Vec3::ZERO;
-                    continue;
-                }
-                if !motion.grounded
-                    && motion.velocity.y <= 0.0
-                    && (hit.height - (old.y + units(724.0))).abs() < units(128.0)
-                {
-                    player.position.y = hit.height - units(724.0);
-                    player.mode = PlayerMode::Hanging { ledge };
-                    motion.velocity = Vec3::ZERO;
-                    continue;
-                }
+        } else if !weapon.drawn
+            && pad.held(Button::Cross)
+            && pad.direction().y > 0.1
+            && candidate_floor.is_some()
+            && motion.grounded
+            && let Some(vault) = vault(geometry, horizontal, player.yaw, player.room)
+        {
+            // The grab tick discards the move; collision first shifts
+            // Lara out of the wall (climb_two_click.csv: x64411, z kept).
+            let forward = Vec3::new(vault.yaw.sin(), 0.0, vault.yaw.cos());
+            let axis = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
+            player.position = old;
+            player.position[axis] = wall_contact(old[axis], proposed[axis]);
+            player.position.y = vault.height;
+            player.yaw = vault.yaw;
+            motion.turn_rate = 0;
+            if let Some(launch_speed) = vault.jump_speed {
+                player.mode = PlayerMode::JumpingUp { launch_speed };
+                motion.velocity = Vec3::ZERO;
+                traversal.goal = 28;
+                traversal.animation_stepped = true;
+                animation.enter(vault.animation, 0.0, vault.animation);
+                continue;
             }
+            let (frames, offset) = clips
+                .as_ref()
+                .and_then(|c| c.climb(vault.animation))
+                .unwrap_or(if vault.animation == 50 { (28.0, [0, -512, 128]) } else { (66.0, [0, -768, 128]) });
+            let (sin, cos) = vault.yaw.sin_cos();
+            let forward = offset[2] as f32;
+            let offset = Vec3::new(sin * forward, -offset[1] as f32, cos * forward) / 1024.0;
+            player.mode = PlayerMode::Climbing { animation: vault.animation, frames_left: frames, offset };
+            // The grab tick retains its animation speed (31 in the
+            // three-click recording). The frozen climb clears it on
+            // its following tick, after the clip has advanced.
+            continue;
         }
         if !can_move {
             // Resolve axes independently so a diagonal approach slides along a wall.
@@ -925,11 +1028,12 @@ fn integrate(
         let mut blocked_run_floor = None;
         let forward = player.forward();
         let facing = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
-        if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing] {
+        if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing]
+        {
             // Run collision 0x8003a844: no hit-wall clip during run-start clip6
             // (holding UP against the wall keeps standing); otherwise a wall 256
             // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.
-            let next = clips.as_deref().map(|c| (c, step_animation(animation, 6, None, Some(c), original_frames(dt))));
+            let next = clips.as_deref().map(|c| (c, step_animation(&animation, 6, None, Some(c), original_frames(dt))));
             let hit_clip = next.filter(|(_, next)| next.animation == 0).map(|(c, next)| {
                 let frame = c.clips[0].frame_start + next.frame.floor() as usize;
                 if frame < 10 { 53 } else { 54 }
@@ -937,7 +1041,9 @@ fn integrate(
             motion.velocity = Vec3::ZERO;
             match hit_clip.filter(|_| wall_ahead(geometry, old, player.yaw, player.room)) {
                 Some(clip) => {
-                    let frames = clips.as_deref().and_then(|c| c.clips.get(clip))
+                    let frames = clips
+                        .as_deref()
+                        .and_then(|c| c.clips.get(clip))
                         .map_or(15.0, |c| (c.frame_end + 1).saturating_sub(c.frame_start) as f32);
                     player.mode = PlayerMode::HitWall { animation: clip, frames_left: frames };
                     // climb_two_click.csv field 187: height settles on the next tick.
@@ -976,7 +1082,8 @@ fn integrate(
             }
             if !motion.grounded && player.health > 0 {
                 // Landing lock is a provisional readable substitute for animation dispatch windows.
-                let (animation, start_frame) = clips.as_deref().and_then(|clips| freefall_landing(clips, animation)).unwrap_or((24, 0.0));
+                let (animation, start_frame) =
+                    clips.as_deref().and_then(|clips| freefall_landing(clips, &animation)).unwrap_or((24, 0.0));
                 player.mode = PlayerMode::Landing { seconds_left: 0.15, animation, start_frame };
             }
             motion.grounded = true;
@@ -1027,10 +1134,18 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         }
         PlayerMode::HopBack => 88,
         PlayerMode::StepLeft { stopping } => {
-            if stopping { 103 } else { 65 }
+            if stopping {
+                103
+            } else {
+                65
+            }
         }
         PlayerMode::StepRight { stopping } => {
-            if stopping { 103 } else { 67 }
+            if stopping {
+                103
+            } else {
+                67
+            }
         }
         PlayerMode::Sliding { backwards, .. } => {
             if backwards {
@@ -1067,6 +1182,10 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         }
         PlayerMode::Landing { animation, .. } => animation,
         PlayerMode::Hanging { .. } => 96,
+        PlayerMode::JumpingUp { .. } => 26,
+        PlayerMode::JumpingForward => 76,
+        PlayerMode::PullingUp => 97,
+        PlayerMode::Recovering => 31,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
         PlayerMode::Rolling { .. } => 146,
         PlayerMode::Swimming => {
@@ -1122,9 +1241,7 @@ pub fn step_animation(
             (Some(from), Some(to)) if matches!(from, 6 | 7 | 20) && to == 2 => {
                 clips.and_then(|c| c.dispatch(&animation, 2))
             }
-            (Some(2), Some(to)) if matches!(to, 0 | 1) => {
-                clips.and_then(|c| c.dispatch(&animation, to))
-            }
+            (Some(2), Some(to)) if matches!(to, 0 | 1) => clips.and_then(|c| c.dispatch(&animation, to)),
             _ => None,
         };
         if let Some((clip, frame)) = entry {
@@ -1154,10 +1271,16 @@ fn animate(
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
     pad: Res<ControllerState>,
-    mut players: Query<(&Player, &Motion, &mut AnimationState)>,
+    mut players: Query<(&Player, &Motion, &mut AnimationState, &mut Traversal)>,
 ) {
-    for (player, motion, mut animation) in &mut players {
+    for (player, motion, mut animation, mut traversal) in &mut players {
+        if std::mem::take(&mut traversal.animation_stepped) {
+            continue;
+        }
         let index = mode_clip(player, motion, &pad);
+        if let Some(goal) = clips.as_deref().and_then(|c| c.state(index)) {
+            traversal.goal = goal;
+        }
         let start = match player.mode {
             PlayerMode::Landing { start_frame, .. } => Some(start_frame),
             _ => None,
