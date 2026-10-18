@@ -138,6 +138,8 @@ pub enum PlayerMode {
     },
     /// Forward leap and reach, using authored preparation and grab ranges.
     JumpingForward,
+    /// State9: retain the collision heading, brake in air and use the heavy landing.
+    FastFalling,
     /// Authored pull-up clips apply their own end offsets, then settle.
     PullingUp,
     /// A landing whose authored ranges determine when control can resume.
@@ -179,8 +181,9 @@ pub struct Motion {
     pub turn_frames: f32,
     /// Original airborne animation family, retained through the jump's descent.
     pub air_animation: usize,
-    /// Heading written by the preceding collision pass (0x8008C572). Entry
-    /// into backward movement uses it even after collision forced standing.
+    /// Heading written by the preceding collision pass (0x8008C572).
+    /// Backward entry retains it after a forced stop; fast fall retains
+    /// the rebound heading independently of the player's facing yaw.
     pub movement_heading: Option<f32>,
 }
 
@@ -690,6 +693,7 @@ fn control(
             | PlayerMode::HitWall { .. }
             | PlayerMode::JumpingUp { .. }
             | PlayerMode::JumpingForward
+            | PlayerMode::FastFalling
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
             | PlayerMode::Recovering => continue,
@@ -1223,6 +1227,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::Hanging { .. } => 96,
         PlayerMode::JumpingUp { .. } => 26,
         PlayerMode::JumpingForward => 76,
+        PlayerMode::FastFalling => 23,
         PlayerMode::PullingUp => 97,
         PlayerMode::Recovering => 31,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,

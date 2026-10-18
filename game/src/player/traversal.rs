@@ -90,10 +90,12 @@ pub(super) fn step(
     dt: f32,
 ) -> bool {
     let mut mode = player.mode;
+    let fast_fall_control = matches!(mode, PlayerMode::FastFalling);
     if !matches!(
         mode,
         PlayerMode::JumpingUp { .. }
             | PlayerMode::JumpingForward
+            | PlayerMode::FastFalling
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
             | PlayerMode::Recovering
@@ -163,6 +165,28 @@ pub(super) fn step(
         }
     }
     let state = clips.state(animation.animation).unwrap_or(2);
+    if state == 9 && matches!(mode, PlayerMode::JumpingForward) {
+        mode = PlayerMode::FastFalling;
+        player.mode = mode;
+    }
+    if !motion.grounded {
+        // Fast-fall control0x80038F6C brakes signed speed by95/100,
+        // truncating toward zero. AnimateLara0x800431C8 then adds the
+        // difference between consecutive authored integer speeds, even
+        // after a clip link. Clip32->33 briefly reverses the rebound.
+        let heading = motion.movement_heading.unwrap_or(player.yaw);
+        let direction = Vec3::new(heading.sin(), 0.0, heading.cos());
+        let mut speed = (motion.velocity.dot(direction) * 1024.0 / ORIGINAL_FPS).round() as i32;
+        if fast_fall_control {
+            speed = speed * 95 / 100;
+        }
+        if let Some(clip) = clips.clips.get(animation.animation) {
+            let frame = animation.frame.floor() as i64;
+            let velocity = |frame| (i64::from(clip.speed) + i64::from(clip.accel) * frame) >> 16;
+            speed += (velocity(frame) - velocity(frame - 1)) as i32;
+        }
+        motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
+    }
     if matches!(mode, PlayerMode::JumpingForward) && state == 28 {
         // Compression can finish into a vertical jump when no direction is
         // clear; the destination clip's command owns the launch velocity.
@@ -318,8 +342,10 @@ fn jump_motion(
     // AnimateLara0x80043248 uses the same verified sine table as the chase
     // camera, with an arithmetic shift for each horizontal coordinate. This
     // changes oblique trajectories by visible whole units over many ticks.
-    let angle = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
-    let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round() as i32;
+    let heading = motion.movement_heading.unwrap_or(player.yaw);
+    let direction = Vec3::new(heading.sin(), 0.0, heading.cos());
+    let angle = (heading * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let speed = (motion.velocity.dot(direction) * 1024.0 / ORIGINAL_FPS).round() as i32;
     let ticks = original_frames(dt);
     let displacement = Vec3::new(
         units(((engine::camera::chase::sin(angle) * speed) >> 14) as f32 * ticks),
@@ -327,18 +353,32 @@ fn jump_motion(
         units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * ticks),
     );
     let proposed = old + displacement;
+    // Forward collision0x8003AB00 refreshes its probe heading after
+    // animation motion. Fast-fall0x8003AEEC keeps the rebound heading.
+    let collision_yaw = player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0;
+    let collision_heading = if matches!(mode, PlayerMode::FastFalling) {
+        heading
+    } else if matches!(mode, PlayerMode::JumpingForward) && speed < 0 {
+        collision_yaw + std::f32::consts::PI
+    } else {
+        collision_yaw
+    };
+    motion.movement_heading = Some(collision_heading);
+    let direction = Vec3::new(collision_heading.sin(), 0.0, collision_heading.cos());
+    motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     let (quadrant, forward, delta) = cardinal(player.yaw);
-    let hits = front(world, proposed, player.yaw, player.room);
+    let hits = front(world, proposed, collision_heading, player.room);
     let mut blocked = false;
     if let Some(hits) = hits {
         // A descending sweep can cross its floor without turning that floor
         // into a horizontal wall. This is the same upper-endpoint rule used
         // by ordinary locomotion and the retained standing-jump recording.
         let floor_test = if motion.grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) };
-        let height = if matches!(mode, PlayerMode::JumpingForward) { PLAYER_HEIGHT } else { units(870.0) };
+        let height = if matches!(mode, PlayerMode::JumpingUp { .. }) { units(870.0) } else { PLAYER_HEIGHT };
         blocked = hits[0].height > floor_test || hits[0].ceiling < proposed.y + height;
         if blocked {
-            let axis = if forward.x != 0.0 { 0 } else { 2 };
+            let (_, collision_forward, _) = cardinal(collision_heading);
+            let axis = if collision_forward.x != 0.0 { 0 } else { 2 };
             player.position[axis] = wall_contact(old[axis], proposed[axis]);
         } else {
             player.position.x = proposed.x;
@@ -357,7 +397,7 @@ fn jump_motion(
         let can_grab = if reaching {
             state == 11 && world.floor_at(proposed, player.room).is_some_and(|h| proposed.y - h.height >= units(200.0))
         } else {
-            !motion.grounded
+            matches!(mode, PlayerMode::JumpingUp { .. }) && !motion.grounded
         };
         if blocked
             && can_grab
@@ -385,7 +425,24 @@ fn jump_motion(
         }
     }
     player.position.y = proposed.y;
-    if blocked && !matches!(mode, PlayerMode::JumpingForward) {
+    if blocked
+        && matches!(mode, PlayerMode::JumpingForward)
+        && state == 3
+        && world.floor_at(proposed, player.room).is_some_and(|h| proposed.y - h.height > units(512.0))
+    {
+        // LaraDeflectEdgeJump0x8003C66C: a frontal impact above512
+        // enters32 at+1, quarters speed and reverses movement heading.
+        // Reach uses0x8003C7F4 and deliberately keeps its speed/pose.
+        // Lower impacts and their state14 override remain provisional.
+        *animation = AnimationState::at_frame(32, 1.0);
+        traversal.goal = 9;
+        player.mode = PlayerMode::FastFalling;
+        let heading = collision_heading + std::f32::consts::PI;
+        motion.movement_heading = Some(heading);
+        motion.velocity = (Vec3::new(heading.sin(), 0.0, heading.cos()) * units((speed / 4) as f32 * ORIGINAL_FPS))
+            .with_y(motion.velocity.y.min(-units(ORIGINAL_FPS)));
+    }
+    if blocked && matches!(mode, PlayerMode::JumpingUp { .. }) {
         // Jump-up collision retains a2-unit speed against the wall.
         motion.velocity.x = player.forward().x * units(2.0 * ORIGINAL_FPS);
         motion.velocity.z = player.forward().z * units(2.0 * ORIGINAL_FPS);
@@ -411,6 +468,13 @@ fn jump_motion(
                 return true;
             }
             traversal.goal = if state == 3 && pad.held(Button::Up) && !pad.held(Button::R1) { 1 } else { 2 };
+            if matches!(mode, PlayerMode::FastFalling) {
+                // Fast-fall collision0x8003AF64 forces heavy landing24
+                // on this tick, retaining horizontal speed until control
+                // runs next tick. Its40 authored frames own recovery.
+                *animation = AnimationState::at_frame(24, 0.0);
+                player.mode = PlayerMode::Recovering;
+            }
             // The landing collision sets a goal; the next authored step
             // dispatches to31, which holds control through its landing pose.
             if matches!(mode, PlayerMode::JumpingForward) && state == 3 {

@@ -29,18 +29,18 @@ CAPTURES = {
 }
 
 
-def main():
+def main(captures=CAPTURES, prefix='backward_collision'):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--out', type=Path, default=ROOT / 'validation/backward-collision-smoke')
-    parser.add_argument('--cases', default=','.join(CAPTURES))
+    parser.add_argument('--out', type=Path, default=ROOT / f'validation/{prefix.replace("_", "-")}-smoke')
+    parser.add_argument('--cases', default=','.join(captures))
     args = parser.parse_args()
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     report = {'cases': {}, 'status': 'running'}
     try:
         for case in args.cases.split(','):
-            fields = CAPTURES[case]
-            source = ROOT / f'game/tests/data/original/backward_collision_{case}'
+            fields = captures[case]
+            source = ROOT / f'game/tests/data/original/{prefix}_{case}'
             rows = list(csv.DictReader(source.with_suffix('.csv').open()))
             metadata = json.loads(source.with_suffix('.json').read_text())
             inputs = metadata['input']
@@ -87,7 +87,7 @@ def main():
                     absolute = level['animations'][a['animation']]['frame_start'] + a['frame']
                     assert absolute == int(row['animation_frame']), (field, a, row)
                     image = client.capture(f'f{field:03}', min_colors=16)
-                    original = ROOT / f'.psx/backward_collision_{case}/screens/f{field+4:06}.png'
+                    original = ROOT / f'.psx/{prefix}_{case}/screens/f{field+4:06}.png'
                     target = client.out / f'f{field:03}-original.png'
                     shutil.copyfile(original, target)
                     poses.append({'field': field, 'state': state, 'image': image,

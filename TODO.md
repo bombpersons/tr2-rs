@@ -24,8 +24,9 @@ it off. Record partial progress below without checking the parent item.
   routes are done; static obstructions, corner boundaries, low ceilings,
   steep downhill and airborne deflection remain.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
-  Standing/forward jumps and hang drops are done; unassisted/fast falls,
-  slide landings and backward/sideways jump collision remain.
+  Standing/forward jumps, hang drops and high forward wall rebounds are done;
+  unassisted fast falls, slide landings and backward/sideways jump collision
+  remain.
 
 ## Completed traversal milestones
 
@@ -41,6 +42,10 @@ it off. Record partial progress below without checking the parent item.
   hop-fall/landing recovery. Four independent validation routes pass.
   [Evidence](docs/backward-collision-evidence.md),
   [tests](game/tests/backward_collision.rs).
+- [x] High forward room-wall rebound: retained movement heading, signed speed,
+  fast-fall animation and heavy landing recovery; contrasting wall reach,
+  airborne steering and two independent validation routes pass.
+  [Evidence](docs/airborne-evidence.md), [tests](game/tests/airborne.rs).
 
 ## Water
 
@@ -82,6 +87,14 @@ it off. Record partial progress below without checking the parent item.
   run and editor byte-exact save/animation smoke pass. Existing unrelated
   formatting differences and lint warnings remain. The broad backward
   collision item remains open for the exceptional branches listed above.
-- Next: airborne wall deflection and fast-fall/slide landing recovery, then
-  the remaining collision/traversal branches and water. Combat, interactions
+- 2026-10-18: High airborne wall-rebound milestone: five PSX recordings,
+  515 sampled logic ticks and thirteen compared columns, with two independent
+  validation routes. All 39 full-game MCP pose checks pass. Workspace tests,
+  Clippy, sandbox movement/rendering, and editor sandbox/Home save and authored
+  landing preview checks pass. Existing unrelated formatting differences and
+  Clippy warnings remain; changed Rust files are formatted. No engine format
+  or template change was needed.
+- Next: low/corner/ceiling airborne wall impacts and unassisted fast-fall/slide
+  landing recovery, then the remaining collision/traversal branches and water.
+  Combat, interactions
   and appearance remain queued above.
