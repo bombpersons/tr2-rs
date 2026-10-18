@@ -30,6 +30,8 @@ python3 tools/traversal_smoke.py               # jumps, ledges, pull-ups and aut
 python3 tools/airborne_smoke.py                # low/middle/high wall impacts, blocked takeoff and landing recovery
 python3 tools/item_lighting_smoke.py           # per-object lighting in aligned Home and Wall views
 python3 tools/subdivision_smoke.py             # off/split/filled room meshes at two PSX camera poses
+python3 tools/room_visibility_smoke.py         # Wall/Home room pixels after repeated camera turns
+python3 tools/ceiling_smoke.py                 # forward low-ceiling impacts and authored recovery
 ```
 
 Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/evidence.md);

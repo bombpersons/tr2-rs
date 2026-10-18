@@ -1,4 +1,5 @@
-//! Airborne wall collision routes recorded from the supplied PSX disc without memory pokes.
+//! Airborne collision routes recorded from the supplied PSX disc. Metadata
+//! distinguishes ordinary routes from controlled initial-position fixtures.
 #![cfg(feature = "baked-assets")]
 
 use bevy::prelude::*;
@@ -104,6 +105,28 @@ macro_rules! recorded_case {
         }
     };
 }
+
+#[test]
+fn original_forward_jump_under_a_low_ceiling_keeps_its_heading_and_horizontal_speed() {
+    compare_case(include_str!("data/original/ceiling_forward.csv"), include_str!("data/original/ceiling_forward.json"));
+}
+
+#[test]
+fn heldout_delayed_forward_jump_under_a_low_ceiling_preserves_ordinary_landing() {
+    compare_case(
+        include_str!("data/original/ceiling_forward_delay_heldout.csv"),
+        include_str!("data/original/ceiling_forward_delay_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
+    compare_case(
+        include_str!("data/original/ceiling_forward_release_heldout.csv"),
+        include_str!("data/original/ceiling_forward_release_heldout.json"),
+    );
+}
+
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
 recorded_case!(original_reach_keeps_speed_against_the_wall_and_uses_ordinary_landing, "reach_wall");
 recorded_case!(original_turning_jump_uses_the_previous_collision_heading_before_rebounding, "forward_steer");
