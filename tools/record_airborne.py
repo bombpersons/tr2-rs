@@ -12,6 +12,24 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'middle_wall': ('airborne_mid_wall_start', 200, [event(['UP', 'SQUARE'], 22)]),
+    'blocked_takeoff': ('airborne_blocked_wall_start', 200, [event(['UP', 'SQUARE'], 22)]),
+    'running_low_wall': ('airborne_wall_start', 220, [event(['UP'], 40),
+                                                   event(['UP', 'SQUARE'], 70, 40)]),
+    # Diagnostic only: grounded run-start collision and a held-jump retry
+    # remain a separate controller branch, not a passing airborne trajectory.
+    'run_start_retry_probe': ('airborne_mid_wall_start', 220, [event(['UP'], 12),
+                                                           event(['UP', 'SQUARE'], 30, 12)]),
+    'middle_delay_heldout': ('airborne_mid_wall_start', 220, [event(['UP', 'SQUARE'], 32, 10),
+                                                          event(['SQUARE'], 48, 40)]),
+    'low_cancel_heldout': ('airborne_wall_start', 240, [event(['UP'], 40),
+                                                     event(['UP', 'SQUARE'], 62, 40),
+                                                     event(['SQUARE'], 72, 66),
+                                                     event(['RIGHT'], 150, 80)]),
+    'low_cancel_validation_heldout': ('airborne_wall_start', 260, [event(['UP'], 40),
+                                                                event(['UP', 'SQUARE'], 62, 40),
+                                                                event(['SQUARE'], 74, 64),
+                                                                event(['LEFT'], 210, 86)]),
     'forward_wall': ('airborne_wall_start', 180, [event(['UP', 'SQUARE'], 22)]),
     'reach_wall': ('airborne_wall_start', 180, [event(['UP', 'SQUARE', 'CROSS'], 22),
                                             event(['CROSS'], 110, 22)]),
@@ -36,6 +54,12 @@ def main():
                         '--frames', '240', '--input', json.dumps([event(['UP', 'R1'], 160)]),
                         '--save-state', '--out', '.psx/airborne_wall_start', '--summary'],
                        cwd=ROOT, check=True)
+        for target, buttons, until, frames in [('airborne_mid_wall_start', ['UP', 'R1'], 100, 180),
+                                               ('airborne_blocked_wall_start', ['UP'], 40, 140)]:
+            subprocess.run(['psx', 'run', '--from-state', '.psx/airborne_wall_start/state.bin',
+                            '--frames', str(frames), '--input', json.dumps([event(buttons, until)]),
+                            '--save-state', '--out', f'.psx/{target}', '--summary'],
+                           cwd=ROOT, check=True)
         if args.case is None:
             return
     if args.case is None:
@@ -59,6 +83,8 @@ def main():
     metadata = {
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
+        'used_to_refine_rules': args.case == 'low_cancel_heldout',
+        'diagnostic_only': args.case.endswith('_probe'),
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,

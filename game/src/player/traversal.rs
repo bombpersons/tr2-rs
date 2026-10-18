@@ -96,6 +96,7 @@ pub(super) fn step(
         PlayerMode::JumpingUp { .. }
             | PlayerMode::JumpingForward
             | PlayerMode::FastFalling
+            | PlayerMode::JumpImpact
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
             | PlayerMode::Recovering
@@ -165,6 +166,12 @@ pub(super) fn step(
         }
     }
     let state = clips.state(animation.animation).unwrap_or(2);
+    if mode == PlayerMode::JumpImpact && animation.animation == STANDING_CLIP {
+        // AnimateLara's natural end link restores the destination state
+        // (0x80042FAC). Until then state14 overrides clip31's state2.
+        mode = PlayerMode::Recovering;
+        player.mode = mode;
+    }
     if state == 9 && matches!(mode, PlayerMode::JumpingForward) {
         mode = PlayerMode::FastFalling;
         player.mode = mode;
@@ -198,8 +205,46 @@ pub(super) fn step(
         PlayerMode::Hanging { .. } if state == 19 => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } => hang_collision(player, motion, animation, traversal, world, pad),
         PlayerMode::Recovering => recover(player, motion, animation, clips, state),
+        PlayerMode::JumpImpact => impact_motion(player, motion, animation, world, clips, dt),
         _ => jump_motion(player, motion, animation, traversal, world, clips, weapon, pad, dt),
     }
+}
+
+/// Low-impact state14 delegates collision to the ordinary standing handler
+/// (0x8003B2FC ->0x8003AA20). Its first animation move still uses the rebound
+/// heading/gravity; collision then settles the feet and clears gravity.
+fn impact_motion(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &AnimationState,
+    world: &WorldGeometry,
+    clips: &PlayerAnimations,
+    dt: f32,
+) -> bool {
+    if motion.grounded {
+        motion.velocity = player.forward() * clips.speed(animation).unwrap_or(0.0);
+    } else {
+        let fall_speed = -motion.velocity.y * 1024.0 / ORIGINAL_FPS;
+        motion.velocity.y -= units(if fall_speed < 128.0 { 6.0 } else { 1.0 } * ORIGINAL_FPS) * original_frames(dt);
+    }
+    let heading = motion.movement_heading.unwrap_or(player.yaw);
+    let direction = Vec3::new(heading.sin(), 0.0, heading.cos());
+    let speed = (motion.velocity.dot(direction) * 1024.0 / ORIGINAL_FPS).round() as i32;
+    let angle = (heading * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let ticks = original_frames(dt);
+    player.position += Vec3::new(
+        units(((engine::camera::chase::sin(angle) * speed) >> 14) as f32 * ticks),
+        motion.velocity.y * dt,
+        units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * ticks),
+    );
+    if let Some(hit) = world.floor_at(player.position, player.room) {
+        player.position.y = hit.height;
+        player.room = hit.room;
+    }
+    motion.grounded = true;
+    motion.velocity = player.forward() * units(speed as f32 * ORIGINAL_FPS);
+    motion.movement_heading = Some(player.yaw);
+    true
 }
 
 fn pull_up(player: &mut Player, motion: &mut Motion, world: &WorldGeometry, state: usize) -> bool {
@@ -428,15 +473,25 @@ fn jump_motion(
     if blocked
         && matches!(mode, PlayerMode::JumpingForward)
         && state == 3
-        && world.floor_at(proposed, player.room).is_some_and(|h| proposed.y - h.height > units(512.0))
+        && let Some(floor) = world.floor_at(proposed, player.room)
     {
-        // LaraDeflectEdgeJump0x8003C66C: a frontal impact above512
-        // enters32 at+1, quarters speed and reverses movement heading.
+        // LaraDeflectEdgeJump0x8003C66C: every frontal impact quarters
+        // speed and reverses heading. Above512 it also enters32 at+1;
+        // at129..512 the current jump clip and goal survive the impact.
         // Reach uses0x8003C7F4 and deliberately keeps its speed/pose.
-        // Lower impacts and their state14 override remain provisional.
-        *animation = AnimationState::at_frame(32, 1.0);
-        traversal.goal = 9;
-        player.mode = PlayerMode::FastFalling;
+        // Thresholds are tested in the original's integral world units.
+        let clearance = ((proposed.y - floor.height) * 1024.0).round() as i32;
+        if clearance > 512 {
+            *animation = AnimationState::at_frame(32, 1.0);
+            traversal.goal = 9;
+            player.mode = PlayerMode::FastFalling;
+        } else if clearance < 129 {
+            // The same handler enters31 with state/goal14, overriding
+            // the clip's declared state2 until an authored end link.
+            *animation = AnimationState::at_frame(31, 0.0);
+            traversal.goal = 14;
+            player.mode = PlayerMode::JumpImpact;
+        }
         let heading = collision_heading + std::f32::consts::PI;
         motion.movement_heading = Some(heading);
         motion.velocity = (Vec3::new(heading.sin(), 0.0, heading.cos()) * units((speed / 4) as f32 * ORIGINAL_FPS))
@@ -486,7 +541,12 @@ fn jump_motion(
                 advance_authored_animation(&world.data, &mut a, &mut goal, ticks);
                 *animation = AnimationState::at_frame(a.animation, a.frame);
                 traversal.goal = goal.state;
-                if clips.state(a.animation) == Some(1) {
+                if player.mode == PlayerMode::JumpImpact {
+                    // A pre-launch low impact can settle on this same tick.
+                    // AnimateLara writes grounded clip speed, but its state14
+                    // override survives until an authored dispatch/end link.
+                    motion.velocity = player.forward() * clips.speed(animation).unwrap_or(0.0);
+                } else if clips.state(a.animation) == Some(1) {
                     player.mode = PlayerMode::Run;
                     animation.acknowledge(6);
                     let speed = clips.speed(animation).unwrap_or(0.0);

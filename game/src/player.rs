@@ -37,8 +37,8 @@ pub const JUMP_SPEED: f32 = units(100.0 * ORIGINAL_FPS);
 pub const JUMP_FORWARD_SPEED: f32 = units(50.0 * ORIGINAL_FPS);
 /// Running jump command 2 in WALL.PSX animation 16: vertical -100, forward 75.
 pub const RUN_JUMP_SPEED: f32 = units(75.0 * ORIGINAL_FPS);
-/// OpenLara src/controller.h applyGravity: +6 units/frame² below 128 fall speed.
-/// https://github.com/XProger/OpenLara/blob/master/src/controller.h
+/// AnimateLara0x80043210..0x80043230 adds6 units/tick below128 fall speed,
+/// otherwise1. Fresh airborne recordings independently verify the6 branch.
 pub const GRAVITY: f32 = units(6.0 * ORIGINAL_FPS * ORIGINAL_FPS);
 /// OpenLara src/lara.h LARA_HEIGHT/RADIUS and Character's stepHeight.
 /// https://github.com/XProger/OpenLara/blob/master/src/lara.h
@@ -140,6 +140,8 @@ pub enum PlayerMode {
     JumpingForward,
     /// State9: retain the collision heading, brake in air and use the heavy landing.
     FastFalling,
+    /// State14: a low airborne impact locks clip31 through its authored end.
+    JumpImpact,
     /// Authored pull-up clips apply their own end offsets, then settle.
     PullingUp,
     /// A landing whose authored ranges determine when control can resume.
@@ -694,6 +696,7 @@ fn control(
             | PlayerMode::JumpingUp { .. }
             | PlayerMode::JumpingForward
             | PlayerMode::FastFalling
+            | PlayerMode::JumpImpact
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
             | PlayerMode::Recovering => continue,
@@ -1155,7 +1158,10 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
     let controls = GroundControls::read(pad);
     match player.mode {
         PlayerMode::Idle => {
-            if motion.turning != 0 && motion.turn_frames >= 33.0 && !controls.walk {
+            // Slow-turn control0x80038DD0/0x80038EA0 requests fast turn
+            // above728 before decay (above364 afterward). The clip's
+            // authored dispatch window decides when it can take effect.
+            if motion.turning != 0 && motion.turn_rate.abs() > TURN_DECAY && !controls.walk {
                 44
             } else if motion.turning < 0 {
                 13
@@ -1228,6 +1234,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::JumpingUp { .. } => 26,
         PlayerMode::JumpingForward => 76,
         PlayerMode::FastFalling => 23,
+        PlayerMode::JumpImpact => 31,
         PlayerMode::PullingUp => 97,
         PlayerMode::Recovering => 31,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
@@ -1254,6 +1261,20 @@ pub fn step_animation(
     ticks: f32,
 ) -> AnimationState {
     let mut animation = current.clone();
+    if let Some(clips) = clips
+        && matches!(clips.state(current.animation), Some(6 | 7))
+        && clips.state(index) == Some(20)
+    {
+        // Slow-turn goal20 can precede its dispatch window by many ticks.
+        // The authored range also chooses44 on the right and69 on the left.
+        if let Some((clip, frame)) = clips.dispatch(current, 20) {
+            animation.enter(clip, frame, index);
+        } else {
+            animation.acknowledge(index);
+            advance(&mut animation, Some(clips), ticks);
+        }
+        return animation;
+    }
     if let Some(clips) = clips
         && let (Some(state), Some(target)) = (clips.state(current.animation), clips.state(index))
         && (matches!(state, 5 | 16 | 21 | 22) || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))

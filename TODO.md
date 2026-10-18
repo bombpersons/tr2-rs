@@ -24,9 +24,12 @@ it off. Record partial progress below without checking the parent item.
   routes are done; static obstructions, corner boundaries, low ceilings,
   steep downhill and airborne deflection remain.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
-  Standing/forward jumps, hang drops and high forward wall rebounds are done;
+  Standing/forward jumps, hang drops and low/middle/high forward wall impacts are done;
   unassisted fast falls, slide landings and backward/sideways jump collision
   remain.
+- [ ] Grounded run-start wall stop and held-jump retry. The retained
+  `run_start_retry_probe` diverges at clip11 entry and the following jump
+  request; see [diagnostic](docs/low-airborne-evidence.md).
 
 ## Completed traversal milestones
 
@@ -46,6 +49,11 @@ it off. Record partial progress below without checking the parent item.
   fast-fall animation and heavy landing recovery; contrasting wall reach,
   airborne steering and two independent validation routes pass.
   [Evidence](docs/airborne-evidence.md), [tests](game/tests/airborne.rs).
+- [x] Low/middle forward room-wall impacts: repeated speed reduction without
+  heavy landing, low-impact state override and locked recovery, plus blocked
+  forward takeoff's vertical fallback. Two new independent validation routes
+  pass; the earlier turn-goal calibration remains explicitly labelled.
+  [Evidence](docs/low-airborne-evidence.md), [tests](game/tests/airborne.rs).
 
 ## Water
 
@@ -94,7 +102,17 @@ it off. Record partial progress below without checking the parent item.
   landing preview checks pass. Existing unrelated formatting differences and
   Clippy warnings remain; changed Rust files are formatted. No engine format
   or template change was needed.
-- Next: low/corner/ceiling airborne wall impacts and unassisted fast-fall/slide
-  landing recovery, then the remaining collision/traversal branches and water.
-  Combat, interactions
+- 2026-10-18: Low/middle airborne wall-impact milestone: six additional
+  passing recordings, 676 additional sampled logic ticks and thirteen compared
+  columns. The airborne suite now covers 1191 ticks and 80 full-game MCP poses.
+  Low impacts now keep state14 through clip31's end; slow-to-fast
+  turns now request their goal before waiting for the authored dispatch range.
+  Workspace tests (186 passed), Clippy, sandbox movement/rendering, and editor
+  sandbox/Home byte-exact saves and clip31 preview checks pass. Existing
+  unrelated formatting/lint differences remain. A separate diagnostic retains
+  the grounded run-start wall-stop/held-jump retry mismatch without claiming
+  that branch as verified. No engine format or template changes were needed.
+- Next: grounded run-start wall stop and held-jump retry, corner/ceiling
+  airborne wall impacts and unassisted fast-fall/slide landing recovery, then
+  the remaining collision/traversal branches and water. Combat, interactions
   and appearance remain queued above.

@@ -4,7 +4,8 @@ Evidence comes only from the supplied Tomb Raider II USA Rev 3 disc through
 `psx`. Five ordinary pad recordings use no memory pokes. This milestone covers
 a forward jump hitting an ordinary room wall more than512 units above the
 floor, the resulting fast fall, its heavy landing, and the contrasting reach
-against that wall. Lower impacts, ceilings, corner deflection, static meshes,
+against that wall. The subsequent [low/middle-impact milestone](low-airborne-evidence.md)
+extends the same controller. Ceilings, corner deflection, static meshes,
 unassisted fast falls and slide landings remain unverified.
 
 ## Binary evidence
@@ -29,8 +30,9 @@ instructions, its jump table at `0x80010994`, and runtime recordings.
   frame481 (relative1), state/goal9. It quarters signed horizontal speed
   with truncation toward zero, reverses movement heading, and clamps an
   ascending/stationary fall speed to1. The source also has a low-impact
-  branch below129 that forces state14; that branch remains provisional in
-  the port rather than being inferred from this higher-wall recording.
+  branch below129 that forces state14; it is independently verified and
+  ported in the subsequent low-impact milestone, not inferred from this
+  higher-wall recording.
 - Fast-fall control `0x80038F6C` multiplies signed speed by95/100, truncating
   toward zero. AnimateLara `0x800431C8..0x80043220` then adds the difference
   between consecutive integer authored speeds of the destination clip.
@@ -78,8 +80,8 @@ advances once per two NTSC video fields.
 | `forward_delay_heldout` | Recorded after implementation: delayed takeoff14..36, another Square100..120 during heavy recovery; the extra jump is ignored |
 | `reach_release_heldout` | Recorded after implementation: release Action64, request backward walk96..170; landing finishes before backward walk starts128 |
 
-`game/tests/airborne.rs` compares515 sampled logic ticks and thirteen columns
-across all five routes, including two independent validation routes. All
+The first five routes in `game/tests/airborne.rs` compare515 sampled logic
+ticks and thirteen columns, including two independent validation routes. All
 columns are exact except the existing0.02-source-unit y float allowance.
 The initial validation harness treated backward-entry speed as signed against
 the post-collision heading; its observation mapping was corrected to match
@@ -94,7 +96,7 @@ RAM poses by approximately four video fields; comparisons use that offset.
 
 ## Verification
 
-The workspace check `cargo test --workspace --all-features` passes 180 tests;
+At the high-rebound checkpoint, `cargo test --workspace --all-features` passed 180 tests;
 six opt-in/documentation tests remain ignored. Clippy completes with existing
 warnings outside the changed files. Changed Rust files pass rustfmt; the
 workspace-wide formatting check still reports 23 pre-existing unformatted
