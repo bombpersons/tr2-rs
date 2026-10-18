@@ -575,6 +575,8 @@ fn control(
     let controls = GroundControls::read(&pad);
     for (mut player, mut motion, mut weapon, animation, mut traversal) in &mut players {
         let was_running = player.mode == PlayerMode::Run;
+        let was_standing =
+            player.mode == PlayerMode::Idle && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(2);
         if was_running {
             // Run handler0x800388D4..0x80038944 persists a jump-enable
             // latch. Clip6 clears it; clip0 frame4 or any other clip sets it.
@@ -801,8 +803,11 @@ fn control(
         } else {
             velocity
         };
-        let jump_requested =
-            pad.pressed(Button::Square) || (was_running && traversal.run_jump_ready && pad.held(Button::Square));
+        // Stop handler0x80038B00 tests held Jump before delegating Up to
+        // running. A run-start wall stop therefore retries a held request
+        // on the following standing tick, without another button edge.
+        let jump_requested = pad.pressed(Button::Square)
+            || ((was_standing || (was_running && traversal.run_jump_ready)) && pad.held(Button::Square));
         if jump_requested && (!was_running || traversal.run_jump_ready) {
             if direction.y >= 0.0 && direction.x.abs() <= 0.1 && side == 0.0 && clips.is_some() {
                 // Stop+Jump enters compression73 even with Up. Running asks
@@ -1097,6 +1102,30 @@ fn integrate(
                 }
                 None => {
                     player.mode = PlayerMode::Idle;
+                    if let Some(clips) = clips.as_deref() {
+                        // LaraColStop0x8003A56C restores a preceding stand
+                        // or turn pose and advances it toward the held turn
+                        // goal. Otherwise it enters clip11 without advancing.
+                        traversal.goal = 2;
+                        if matches!(clips.state(animation.animation), Some(2 | 6 | 7 | 20)) {
+                            traversal.goal = if pad.held(Button::Left) {
+                                7
+                            } else if pad.held(Button::Right) {
+                                6
+                            } else {
+                                2
+                            };
+                            let request = match traversal.goal {
+                                7 => 13,
+                                6 => 12,
+                                _ => STANDING_CLIP,
+                            };
+                            *animation = step_animation(&animation, request, None, Some(clips), original_frames(dt));
+                        } else {
+                            animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
+                        }
+                        traversal.animation_stepped = true;
+                    }
                     // Run collision samples the centre floor before shifting
                     // out of the wall, then keeps that height after stopping
                     // (0x8003C34C, 0x8003A944, 0x8003AA04). On a slope this

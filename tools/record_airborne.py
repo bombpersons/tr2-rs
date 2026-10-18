@@ -16,10 +16,15 @@ CASES = {
     'blocked_takeoff': ('airborne_blocked_wall_start', 200, [event(['UP', 'SQUARE'], 22)]),
     'running_low_wall': ('airborne_wall_start', 220, [event(['UP'], 40),
                                                    event(['UP', 'SQUARE'], 70, 40)]),
-    # Diagnostic only: grounded run-start collision and a held-jump retry
-    # remain a separate controller branch, not a passing airborne trajectory.
+    # Retain the former diagnostic's name so its original recording identity
+    # stays traceable. It is now a passing calibration route.
     'run_start_retry_probe': ('airborne_mid_wall_start', 220, [event(['UP'], 12),
                                                            event(['UP', 'SQUARE'], 30, 12)]),
+    'run_start_release_heldout': ('airborne_mid_wall_start', 180, [event(['UP'], 12),
+                                                              event(['UP', 'SQUARE'], 24, 12),
+                                                              event(['UP'], 80, 24)]),
+    'run_start_hold_heldout': ('airborne_mid_wall_start', 260, [event(['UP'], 8),
+                                                           event(['UP', 'SQUARE'], 100, 8)]),
     'middle_delay_heldout': ('airborne_mid_wall_start', 220, [event(['UP', 'SQUARE'], 32, 10),
                                                           event(['SQUARE'], 48, 40)]),
     'low_cancel_heldout': ('airborne_wall_start', 240, [event(['UP'], 40),
@@ -83,8 +88,8 @@ def main():
     metadata = {
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
-        'used_to_refine_rules': args.case == 'low_cancel_heldout',
-        'diagnostic_only': args.case.endswith('_probe'),
+        'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe'),
+        'diagnostic_only': False,
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,

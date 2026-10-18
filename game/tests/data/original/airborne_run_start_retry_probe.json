@@ -1,8 +1,8 @@
 {
   "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
   "heldout_after_implementation": false,
-  "used_to_refine_rules": false,
-  "diagnostic_only": true,
+  "used_to_refine_rules": true,
+  "diagnostic_only": false,
   "level": "assault",
   "command": [
     "psx",

@@ -3,6 +3,9 @@
 from backward_collision_smoke import main
 
 CAPTURES = {
+    'run_start_retry_probe': [24, 26, 28, 30, 50, 58, 94, 130, 170],
+    'run_start_release_heldout': [24, 28, 30, 50, 78, 82, 150],
+    'run_start_hold_heldout': [26, 28, 30, 52, 58, 96, 100, 138, 174, 240],
     'middle_wall': [24, 30, 32, 36, 42, 50, 86],
     'running_low_wall': [46, 58, 60, 62, 64, 68, 100, 102],
     'blocked_takeoff': [14, 24, 30, 84, 102, 142],
