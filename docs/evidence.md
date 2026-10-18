@@ -43,3 +43,9 @@ byte-exact save tests and the GPU/MCP smoke workflow.
 Engine rendering regressions are tracked separately from PSX behavior:
 [missing room geometry](room-visibility-fix.md) covers material restoration,
 portal traversal ordering, and pixel-checked Wall/Home camera-return tests.
+
+Forward low-ceiling contacts are now PSX-verified for ordinary forward jumps:
+[ceiling evidence](ceiling-evidence.md) retains the explicitly controlled
+starting spawn, three unmodified replays (two recorded after implementation),
+293 sampled logic ticks and28 full-game pose checks. Vertical jumps, reach,
+corner/side and forward-top contacts remain unverified.

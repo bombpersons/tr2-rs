@@ -9,6 +9,17 @@ meaningful regression coverage and completing the applicable workspace,
 sandbox, editor and visual checks. Link the evidence and tests when checking
 it off. Record partial progress below without checking the parent item.
 
+## Recent rendering and collision fixes
+
+- [x] Missing room geometry at the Wall entrance and Home training course:
+  mesh/material restoration and portal traversal ordering, with pixel-checked
+  camera-return regressions. [Notes](docs/room-visibility-fix.md).
+- [x] Forward jumps under flat low ceilings: retain heading and horizontal
+  speed, stop ascent, then use ordinary authored landing/recovery. Three
+  PSX controlled-spawn replays include two independent validation routes.
+  [Evidence](docs/ceiling-evidence.md), [tests](game/tests/airborne.rs).
+  Vertical-jump, reach, side/corner and forward-top contacts remain open.
+
 ## Traversal
 
 - [ ] Jump, grab and hang: original grab conditions, alignment, animation and

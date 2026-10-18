@@ -29,7 +29,7 @@ CAPTURES = {
 }
 
 
-def main(captures=CAPTURES, prefix='backward_collision'):
+def main(captures=CAPTURES, prefix='backward_collision', min_colors=16):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / f'validation/{prefix.replace("_", "-")}-smoke')
     parser.add_argument('--cases', default=','.join(captures))
@@ -86,7 +86,7 @@ def main(captures=CAPTURES, prefix='backward_collision'):
                     assert a['animation'] == int(row['animation']), (field, a, row)
                     absolute = level['animations'][a['animation']]['frame_start'] + a['frame']
                     assert absolute == int(row['animation_frame']), (field, a, row)
-                    image = client.capture(f'f{field:03}', min_colors=16)
+                    image = client.capture(f'f{field:03}', min_colors=min_colors)
                     original = ROOT / f'.psx/{prefix}_{case}/screens/f{field+4:06}.png'
                     target = client.out / f'f{field:03}-original.png'
                     shutil.copyfile(original, target)

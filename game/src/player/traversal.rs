@@ -413,6 +413,13 @@ fn jump_motion(
     motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     let (quadrant, forward, delta) = cardinal(player.yaw);
     let hits = front(world, proposed, collision_heading, player.room);
+    let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == 3;
+    let centre = world.floor_at(proposed, player.room);
+    // GetCollisionInfo0x8001B768 sets a ceiling contact at the centre
+    // without treating the front as a wall: airborne bad_ceiling is192
+    // (0x8003AB40). Deflection0x8003C748 then stops ascent, retaining
+    // horizontal speed, heading, clip and goal. See ceiling-evidence.md.
+    let ceiling_contact = forward_jump && centre.is_some_and(|hit| proposed.y + PLAYER_HEIGHT >= hit.ceiling);
     let mut blocked = false;
     if let Some(hits) = hits {
         // A descending sweep can cross its floor without turning that floor
@@ -420,7 +427,8 @@ fn jump_motion(
         // by ordinary locomotion and the retained standing-jump recording.
         let floor_test = if motion.grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) };
         let height = if matches!(mode, PlayerMode::JumpingUp { .. }) { units(870.0) } else { PLAYER_HEIGHT };
-        blocked = hits[0].height > floor_test || hits[0].ceiling < proposed.y + height;
+        let ceiling_margin = if forward_jump { units(192.0) } else { 0.0 };
+        blocked = hits[0].height > floor_test || hits[0].ceiling + ceiling_margin < proposed.y + height;
         if blocked {
             let (_, collision_forward, _) = cardinal(collision_heading);
             let axis = if collision_forward.x != 0.0 { 0 } else { 2 };
@@ -470,6 +478,10 @@ fn jump_motion(
         }
     }
     player.position.y = proposed.y;
+    if ceiling_contact && !blocked {
+        player.position.y = centre.unwrap().ceiling - PLAYER_HEIGHT;
+        motion.velocity.y = motion.velocity.y.min(-units(ORIGINAL_FPS));
+    }
     if blocked
         && matches!(mode, PlayerMode::JumpingForward)
         && state == 3
