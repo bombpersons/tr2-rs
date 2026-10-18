@@ -39,3 +39,7 @@ It consumes the existing engine format and retains its Structural/Inherited
 provenance. The full-resolution standard-rendering preview is deliberately an
 authoring view. See [editor.md](editor.md) for format coverage, validation,
 byte-exact save tests and the GPU/MCP smoke workflow.
+
+Engine rendering regressions are tracked separately from PSX behavior:
+[missing room geometry](room-visibility-fix.md) covers material restoration,
+portal traversal ordering, and pixel-checked Wall/Home camera-return tests.

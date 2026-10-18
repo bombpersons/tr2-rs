@@ -223,7 +223,7 @@ pub(super) fn rebuild(
             if let Some(mut mesh) = meshes.get_mut(&source.surface) {
                 source.output.surface.write(&mut mesh);
             }
-            commands.entity(entity).insert(Mesh3d(source.surface.clone()));
+            show_mesh(&mut commands, entity, source.surface.clone());
         }
         if stats.underlay_triangles == 0 {
             commands.entity(source.underlay_entity).remove::<Mesh3d>();
@@ -239,12 +239,26 @@ pub(super) fn rebuild(
                 source.underlay = Some(handle.clone());
                 handle
             };
-            commands.entity(source.underlay_entity).insert(Mesh3d(handle));
+            show_mesh(&mut commands, source.underlay_entity, handle);
         }
         stats.rebuilds += 1;
         source.last_view = Some(context);
         source.last_policy = Some(revision);
     }
+}
+
+fn show_mesh(commands: &mut Commands, entity: Entity, mesh: Handle<Mesh>) {
+    commands.entity(entity).queue(move |mut entity: EntityWorldMut| {
+        if !entity.contains::<Mesh3d>() {
+            // Removing Mesh3d also removes Bevy's extracted material binding.
+            // Restoring the mesh alone need not change ViewVisibility (other
+            // cameras can keep it visible), so re-extract its material too.
+            if let Some(mut material) = entity.get_mut::<MeshMaterial3d<crate::psx::PsxMaterial>>() {
+                material.set_changed();
+            }
+        }
+        entity.insert(Mesh3d(mesh));
+    });
 }
 
 fn copy_mesh(data: &RoomMeshBuilder) -> Mesh {
@@ -256,6 +270,31 @@ fn copy_mesh(data: &RoomMeshBuilder) -> Mesh {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restoring_an_empty_mesh_refreshes_its_material_binding() {
+        let mut world = World::new();
+        let material = MeshMaterial3d::<crate::psx::PsxMaterial>::default();
+        let room = world.spawn(material).id();
+        world.clear_trackers();
+        show_mesh(&mut world.commands(), room, Handle::default());
+        world.flush();
+        assert!(world.entity(room).get_ref::<MeshMaterial3d<crate::psx::PsxMaterial>>().unwrap().is_changed());
+
+        world.clear_trackers();
+        show_mesh(&mut world.commands(), room, Handle::default());
+        world.flush();
+        assert!(
+            !world.entity(room).get_ref::<MeshMaterial3d<crate::psx::PsxMaterial>>().unwrap().is_changed(),
+            "ordinary camera rebuilds need not re-extract the material"
+        );
+
+        world.entity_mut(room).remove::<Mesh3d>();
+        world.clear_trackers();
+        show_mesh(&mut world.commands(), room, Handle::default());
+        world.flush();
+        assert!(world.entity(room).get_ref::<MeshMaterial3d<crate::psx::PsxMaterial>>().unwrap().is_changed());
+    }
 
     struct TestPolicy(bool);
     impl RoomTessellator for TestPolicy {
