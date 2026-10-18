@@ -38,9 +38,10 @@ it off. Record partial progress below without checking the parent item.
   Standing/forward jumps, hang drops and low/middle/high forward wall impacts are done;
   unassisted fast falls, slide landings and backward/sideways jump collision
   remain.
-- [ ] Grounded run-start wall stop and held-jump retry. The retained
-  `run_start_retry_probe` diverges at clip11 entry and the following jump
-  request; see [diagnostic](docs/low-airborne-evidence.md).
+- [x] Ordinary grounded run-start room-wall stop and held-jump retry.
+  The retained diagnostic and two fresh independent routes pass; see
+  [evidence](docs/run-start-evidence.md) and [tests](game/tests/airborne.rs).
+  Angular/corner/ceiling and static-obstruction sweeps remain separate work.
 
 ## Completed traversal milestones
 
@@ -65,6 +66,10 @@ it off. Record partial progress below without checking the parent item.
   forward takeoff's vertical fallback. Two new independent validation routes
   pass; the earlier turn-goal calibration remains explicitly labelled.
   [Evidence](docs/low-airborne-evidence.md), [tests](game/tests/airborne.rs).
+- [x] Ordinary run-start room-wall stop into the authored standing pose,
+  held-Jump retry and release-before-contact behavior. Two independent
+  validation routes pass. [Evidence](docs/run-start-evidence.md),
+  [tests](game/tests/airborne.rs).
 
 ## Water
 
@@ -123,7 +128,14 @@ it off. Record partial progress below without checking the parent item.
   unrelated formatting/lint differences remain. A separate diagnostic retains
   the grounded run-start wall-stop/held-jump retry mismatch without claiming
   that branch as verified. No engine format or template changes were needed.
-- Next: grounded run-start wall stop and held-jump retry, corner/ceiling
-  airborne wall impacts and unassisted fast-fall/slide landing recovery, then
-  the remaining collision/traversal branches and water. Combat, interactions
-  and appearance remain queued above.
+- 2026-10-18: Run-start room-wall stop and held-jump retry: the unchanged
+  diagnostic is now passing calibration, joined by two fresh independent
+  routes. All 333 additional sampled logic ticks pass across thirteen columns.
+  All 106 full-game MCP pose checks pass across fourteen routes.
+  Workspace tests (189 passed), Clippy, sandbox movement/rendering, and editor
+  sandbox/Home byte-exact save and clip11 preview checks pass. Changed Rust
+  files are formatted; unrelated workspace format/lint differences remain.
+  No engine format or template change was needed.
+- Next: corner/ceiling airborne wall impacts and unassisted fast-fall/slide
+  landing recovery, then the remaining collision/traversal branches and water.
+  Combat, interactions and appearance remain queued above.

@@ -138,3 +138,6 @@ recorded_case!(original_running_jump_hits_a_low_wall, "running_low_wall");
 recorded_case!(heldout_middle_impact_ignores_another_jump_while_airborne, "middle_delay_heldout");
 recorded_case!(calibration_low_impact_exposes_fast_turn_goal_before_its_dispatch_window, "low_cancel_heldout");
 recorded_case!(heldout_low_impact_validates_recovery_and_authored_left_fast_turn, "low_cancel_validation_heldout");
+recorded_case!(original_run_start_wall_stop_retries_a_held_jump, "run_start_retry_probe");
+recorded_case!(heldout_releasing_jump_before_run_start_wall_contact_keeps_lara_grounded, "run_start_release_heldout");
+recorded_case!(heldout_early_held_jump_retries_after_run_start_wall_contact, "run_start_hold_heldout");

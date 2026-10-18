@@ -99,12 +99,14 @@ controller override during impact, otherwise from the authored clip. The
 existing 0.02-source-unit y conversion allowance remains; all other compared
 values are exact. No tolerance was widened.
 
-`run_start_retry_probe` starts at the middle checkpoint with Up[0,12),
-Up+Square[12,30). It hits the wall during run-start before a running jump is
+The original `run_start_retry_probe` diagnostic starts at the middle checkpoint
+with Up[0,12), Up+Square[12,30). It hits the wall during run-start before a running jump is
 ready. The original stops into clip11 and retries the held jump into
 compression; the existing port's grounded run-start stop/held-jump branch
-diverges. Its sidecar marks `diagnostic_only: true`. That branch remains
-pending, and this diagnostic is not presented as a passing regression.
+diverged at this milestone. The subsequent
+[run-start correction](run-start-evidence.md) closes that mismatch and promotes
+the unchanged recording to passing calibration, with two fresh independent
+validation routes. Its sidecar now records that classification.
 
 Remaining airborne work includes corner and ceiling deflection, static
 obstructions, unassisted fast falls, slide landings and backward/sideways
