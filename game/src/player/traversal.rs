@@ -401,14 +401,7 @@ fn jump_motion(
             return true;
         }
         if !motion.grounded && motion.velocity.y <= 0.0 && player.position.y <= hit.height {
-            // Landing damage0x8003E044: no damage through140, quadratic
-            // damage141..154, lethal above154. Preserve the prototype's
-            // health/death behavior when a new jump falls from a high ledge.
-            let impact = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
-            if impact > 140 {
-                let damage = if impact > 154 { MAX_HEALTH } else { (impact - 140).pow(2) * MAX_HEALTH / 196 };
-                player.damage(damage);
-            }
+            landing_damage(player, motion.velocity);
             player.position.y = hit.height;
             motion.velocity.y = 0.0;
             motion.grounded = true;

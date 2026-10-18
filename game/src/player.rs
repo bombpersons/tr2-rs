@@ -20,6 +20,7 @@ use engine::world::{FloorHit, WorldGeometry};
 
 mod traversal;
 pub use traversal::Traversal;
+mod backward;
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -98,6 +99,8 @@ pub enum PlayerMode {
     Back,
     /// State5: a complete backward hop; releasing Down does not cancel it.
     HopBack,
+    /// Hop-back over an edge: authored clip93, then its landing dispatch.
+    FallingBack,
     /// States22/21: finish the current stride and stop pose after release.
     StepLeft {
         stopping: bool,
@@ -176,6 +179,9 @@ pub struct Motion {
     pub turn_frames: f32,
     /// Original airborne animation family, retained through the jump's descent.
     pub air_animation: usize,
+    /// Heading written by the preceding collision pass (0x8008C572). Entry
+    /// into backward movement uses it even after collision forced standing.
+    pub movement_heading: Option<f32>,
 }
 
 impl Default for Motion {
@@ -190,7 +196,18 @@ impl Default for Motion {
             turning: 0,
             turn_frames: 0.0,
             air_animation: 0,
+            movement_heading: None,
         }
+    }
+}
+
+/// Landing damage0x8003E044: no damage through140 units/tick, quadratic
+/// through154 and lethal above154. Threshold runtime sweeps remain pending.
+fn landing_damage(player: &mut Player, velocity: Vec3) {
+    let impact = (-velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
+    if impact > 140 {
+        let damage = if impact > 154 { MAX_HEALTH } else { (impact - 140).pow(2) * MAX_HEALTH / 196 };
+        player.damage(damage);
     }
 }
 
@@ -676,6 +693,7 @@ fn control(
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
             | PlayerMode::Recovering => continue,
+            PlayerMode::FallingBack => continue,
             PlayerMode::Landing { seconds_left, animation, start_frame } if seconds_left > dt => {
                 player.mode = PlayerMode::Landing { seconds_left: seconds_left - dt, animation, start_frame };
                 motion.velocity.x = 0.0;
@@ -764,7 +782,12 @@ fn control(
                 // heading (0x80043248). Entering backward walk or a sidestep
                 // takes one forward step before collision changes the heading
                 // (0x8003B43C/0x8003B5FC); both PSX recordings confirm it.
-                speed.map_or(velocity, |speed| forward * speed)
+                let heading = if matches!(mode, PlayerMode::Back | PlayerMode::HopBack) {
+                    motion.movement_heading.map_or(forward, |yaw| Vec3::new(yaw.sin(), 0.0, yaw.cos()))
+                } else {
+                    forward
+                };
+                speed.map_or(velocity, |speed| heading * speed)
             } else {
                 forward * direction.y * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
             }
@@ -824,6 +847,18 @@ fn integrate(
     let dt = time.delta_secs();
     let geometry = world.as_deref();
     for (mut player, mut motion, weapon, mut animation, mut traversal) in &mut players {
+        if backward::step(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            geometry,
+            clips.as_deref(),
+            &pad,
+            dt,
+        ) {
+            continue;
+        }
         if matches!(player.mode, PlayerMode::Jump | PlayerMode::Fall)
             && !motion.grounded
             && !weapon.drawn
@@ -888,6 +923,9 @@ fn integrate(
             continue;
         }
         let old = player.position;
+        // Ordinary standing/forward collision refreshes the heading. The
+        // backward pass above retains its own heading after a forced stop.
+        motion.movement_heading = Some(player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0);
         let Some(current_floor) = floor(geometry, old, player.room) else {
             continue;
         };
@@ -1133,6 +1171,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
             }
         }
         PlayerMode::HopBack => 88,
+        PlayerMode::FallingBack => 93,
         PlayerMode::StepLeft { stopping } => {
             if stopping {
                 103

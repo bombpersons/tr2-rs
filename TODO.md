@@ -20,6 +20,9 @@ it off. Record partial progress below without checking the parent item.
   original and independent release/turn routes pass. See
   [evidence](docs/traversal-evidence.md) and [tests](game/tests/traversal.rs).
 - [ ] Backward movement against walls, steps, drops and slopes.
+  Ordinary room-wall/ledge/step, shallow-slope and steep uphill rejection
+  routes are done; static obstructions, corner boundaries, low ceilings,
+  steep downhill and airborne deflection remain.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
   Standing/forward jumps and hang drops are done; unassisted/fast falls,
   slide landings and backward/sideways jump collision remain.
@@ -33,6 +36,11 @@ it off. Record partial progress below without checking the parent item.
   both running feet, landing into a run and a second jump through an authored
   cancel window. [Evidence](docs/traversal-evidence.md),
   [tests](game/tests/traversal.rs).
+- [x] Ordinary backward walk/hop collision: wall and ledge stops, one-click
+  step up/down, shallow-slope descent, steep uphill rejection and committed
+  hop-fall/landing recovery. Four independent validation routes pass.
+  [Evidence](docs/backward-collision-evidence.md),
+  [tests](game/tests/backward_collision.rs).
 
 ## Water
 
@@ -67,6 +75,13 @@ it off. Record partial progress below without checking the parent item.
   preserves untouched files byte for byte; no format or template changes were
   required. Existing workspace formatting differences and Clippy warnings
   outside the changed Rust files remain.
-- Next: backward wall/step/drop/slope collision, followed by the remaining
-  traversal branches and water. Combat, interactions and appearance remain
-  queued above; none is marked complete by the traversal work.
+- 2026-10-18: Backward room-collision milestone: fourteen PSX recordings,
+  1870 logic ticks and thirteen compared columns; four independent routes
+  recorded after implementation pass without fitting. All 53 full-game MCP
+  pose checks across eleven routes pass; the workspace tests, Clippy, sandbox
+  run and editor byte-exact save/animation smoke pass. Existing unrelated
+  formatting differences and lint warnings remain. The broad backward
+  collision item remains open for the exceptional branches listed above.
+- Next: airborne wall deflection and fast-fall/slide landing recovery, then
+  the remaining collision/traversal branches and water. Combat, interactions
+  and appearance remain queued above.
