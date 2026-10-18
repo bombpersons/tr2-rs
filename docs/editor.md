@@ -221,3 +221,9 @@ can set `active`, `isolate`, `placement`, `clip`, clip-relative `frame`, `goal`,
 `playing`, and the one-shot `step` flag. The smoke script checks a full
 sandbox dispatch/hold transition and confirms changed viewport pixels while
 the document remains clean.
+
+Backward wall/step/ledge/slope collision and hop-fall recovery remain game
+controller rules over the same sector and authored animation data. This
+milestone adds no editor format or dependency; the existing preview can
+inspect clips61/62/93/82 without simulating Lara's collision or input goals.
+The no-op save/edit/undo/reopen and animation smoke still passes unchanged.

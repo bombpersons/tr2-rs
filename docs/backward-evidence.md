@@ -105,6 +105,10 @@ The engine-only sandbox was built, stepped and visually inspected offscreen.
 Workspace formatting checks still report existing differences in unrelated
 code; those edits were preserved. The new trajectory test is rustfmt-formatted.
 
+The later [backward collision milestone](backward-collision-evidence.md)
+adds ordinary walls, steps, ledges, slopes and hop-fall recovery; the limits
+below describe this earlier clear-ground increment.
+
 Unverified here: wading, backward slope/step and wall collisions, dropping
 off an edge, transitions into these moves from other active movement states,
 and steering with analog input. Holding Down can request another hop once
