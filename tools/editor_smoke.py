@@ -52,10 +52,24 @@ def main():
         command(client, save=True)
         assert copy.read_bytes() == original, 'untouched save changed bytes'
         captures.append(client.capture('opened'))
+        command(client, open=True)
+        captures.append(client.capture('open-dialog'))
+        libraries = ROOT / 'game/assets/levels'
+        if libraries.is_dir():
+            command(client, browse=str(libraries))
+            captures.append(client.capture('level-library'))
+        command(client, cancel=True)
+        command(client, save_copy=True)
+        captures.append(client.capture('save-copy-dialog'))
+        command(client, cancel=True)
         if source.parent.name == 'sandbox':
             command(client, pointer='/placements/1', navigate=True, frame=True)
             client.edit('Editor', 'AnimationPreview', {'active':True, 'isolate':True, 'placement':1, 'clip':0, 'frame':0.0, 'goal':1, 'playing':False})
             captures.append(client.capture('pose-closed'))
+            from PIL import Image
+            with Image.open(out / 'pose-closed.png') as image:
+                rgb = image.convert('RGB').crop((500, 80, 1280, 650)).tobytes()
+                assert sum(rgb[i] > 220 and 150 < rgb[i + 1] < 220 and rgb[i + 2] < 70 for i in range(0, len(rgb), 3)) > 20, 'selection bounding box is missing'
             for _ in range(9):
                 client.edit('Editor', 'AnimationPreview', {'step':True})
                 time.sleep(0.05)
@@ -82,6 +96,11 @@ def main():
         x = before['placements'][1]['position'][0]
         state = command(client, pointer='/placements/1/position/0', json=str(x + 512), apply=True)
         assert state['dirty'] and state['message'] == 'Applied edit', state
+        captures.append(client.capture('object-properties'))
+        command(client, open=True)
+        captures.append(client.capture('unsaved-changes'))
+        state = command(client, cancel=True)
+        assert state['dirty'], 'canceling open lost the edited document'
         state = command(client, undo=True)
         assert not state['dirty'], state
         state = command(client, save=True)

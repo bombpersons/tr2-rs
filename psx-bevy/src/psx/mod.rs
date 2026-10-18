@@ -29,7 +29,7 @@ pub use assets::{
     TmdLoader, TmdSettings, rgba_image,
 };
 
-pub use material::{PsxBlend, PsxDepthCue, PsxMaterial, PsxStp};
+pub use material::{PsxBlend, PsxDepthBias, PsxDepthCue, PsxMaterial, PsxStp};
 pub use material2d::{PsxMaterial2d, PsxSprite, load_indices, psx_indices, psx_palette, rgb15};
 pub use scene::{
     PsxScene, PsxSceneCamera, PsxSceneDepth, PsxSceneElement, PsxSceneRoot, SCENE_BACKGROUND_LAYER, SceneElement,
@@ -359,12 +359,17 @@ fn apply_look(
     mut materials2d: ResMut<Assets<PsxMaterial2d>>,
     mut screen_pass: ResMut<Assets<ScreenPassMaterial>>,
 ) {
-    let stale: Vec<_> =
-        materials.iter().filter(|(_, m)| m.look != *look || m.lighting != *lighting).map(|(id, _)| id).collect();
+    let stale: Vec<_> = materials
+        .iter()
+        .filter(|(_, m)| m.look != *look || (m.use_scene_lighting && m.lighting != *lighting))
+        .map(|(id, _)| id)
+        .collect();
     for id in stale {
         if let Some(mut m) = materials.get_mut(id) {
             m.look = *look;
-            m.lighting = *lighting;
+            if m.use_scene_lighting {
+                m.lighting = *lighting;
+            }
         }
     }
     let stale: Vec<_> = materials2d.iter().filter(|(_, m)| m.look != *look).map(|(id, _)| id).collect();
@@ -384,6 +389,41 @@ fn apply_look(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_item_lighting_survives_scene_and_look_updates() {
+        let mut app = App::new();
+        app.init_resource::<PsxLook>()
+            .init_resource::<PsxLighting>()
+            .init_resource::<Assets<PsxMaterial>>()
+            .init_resource::<Assets<PsxMaterial2d>>()
+            .init_resource::<Assets<ScreenPassMaterial>>()
+            .add_systems(Update, apply_look);
+        let item_light = PsxLighting { ambient: Vec3::splat(0.75), ..default() };
+        let custom = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial {
+            use_scene_lighting: false,
+            lighting: item_light,
+            ..default()
+        });
+        let scene = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial::default());
+        app.update();
+        for intensity in [0.25, 1.5] {
+            app.world_mut().resource_mut::<PsxLighting>().ambient = Vec3::splat(intensity);
+            let dither = app.world().resource::<PsxLook>().dither;
+            app.world_mut().resource_mut::<PsxLook>().dither = !dither;
+            app.update();
+            let materials = app.world().resource::<Assets<PsxMaterial>>();
+            assert_eq!(materials.get(&custom).unwrap().lighting, item_light);
+            assert_eq!(materials.get(&custom).unwrap().look, *app.world().resource::<PsxLook>());
+            assert_eq!(materials.get(&scene).unwrap().lighting, *app.world().resource::<PsxLighting>());
+        }
+        app.world_mut().resource_mut::<Assets<PsxMaterial>>().get_mut(&custom).unwrap().use_scene_lighting = true;
+        app.update();
+        assert_eq!(
+            app.world().resource::<Assets<PsxMaterial>>().get(&custom).unwrap().lighting,
+            *app.world().resource::<PsxLighting>()
+        );
+    }
 
     #[test]
     fn display_fits_without_stretching() {

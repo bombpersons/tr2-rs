@@ -5,6 +5,12 @@ perspective rendering and `StandardMaterial`, with the level's atlas and
 vertex colours. It has no PS1 screen pass, affine texture mapping, vertex
 snapping, dithering or colour quantization. The game retains its PS1 rendering.
 
+Camera-dependent room subdivision is a game-supplied `RoomMeshPolicy` over
+the authored room faces. The editor does not install that policy: room
+vertices, UVs and shades remain editable in their original engine format,
+and its ordinary perspective-correct viewport uses static meshes. No level
+fields or save representation were added for subdivision.
+
 ```sh
 cargo run -p editor
 cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
@@ -19,11 +25,26 @@ game's type table are ignored. The editor never runs the registered controllers.
 
 ## Current authoring surface
 
-The field browser opens every field of `engine::world::format::Level`: rooms,
+The editor starts with an Objects list and a room overview. The **Objects**,
+**Rooms**, **Cameras**, and **Animations** shortcuts jump directly to those
+parts of the scene; the active section is highlighted. Object rows show their
+type name (when registry metadata is supplied) and room. Click an object in
+the list or the viewport to inspect it. **Frame** focuses the selection;
+**Overview** returns to the first room overview.
+
+The object inspector edits position with +/-128-unit buttons or by clicking
+the number, heading with +/-45-degree buttons or a degree value, room with a
+number field, and initial hidden state with a checkbox. Coordinates are the
+level format's units, with Y increasing downward. Edits are validated and
+undoable, including adding an optional hidden field that was absent from the
+original JSON. Scalar numbers and strings use ordinary values; strings need
+no JSON quotes. Boolean fields toggle directly.
+
+**All data** retains the field browser for every field of `engine::world::format::Level`: rooms,
 vertices, faces, portals, sectors and floor data; placements and activation
 flags; models, joints and animations; fixed cameras and navigation; texture
 coordinates and sound tables; and source provenance. Browse nested tables,
-then select a scalar or use Edit JSON on a whole table. Replacing a table also
+then select a scalar or use Edit value on a whole table for advanced JSON editing. Replacing a table also
 allows adding and removing entries. Whole-document validation runs before a
 change is accepted. Unknown JSON properties survive edits and saves.
 
@@ -33,25 +54,57 @@ change is accepted. Unknown JSON properties survive edits and saves.
 | Up / Down | Select a row |
 | Left / Backspace / Parent | Parent table |
 | Page Up / Page Down / Previous / Next | Browse large tables |
-| E / Edit JSON | Edit selected value or table as JSON |
+| E in the field browser / Edit JSON | Edit selected value or table as JSON |
 | Ctrl+A | Select the draft text; typing replaces it |
 | Backspace | Remove the last character or selected draft |
 | Enter / Apply | Validate and apply draft |
 | Escape / Cancel | Discard draft |
 | Ctrl+S / Save | Save |
-| Ctrl+Shift+S / Save as | Save to a new filename |
-| Ctrl+O / Open | Open another level (save or undo changes first) |
+| Ctrl+Shift+S / Save copy | Browse a destination folder and choose a new filename |
+| Ctrl+O / Open | Browse another level; unsaved work offers Save / Discard / Cancel |
+| Click a folder / JSON file in Open | Browse folders / open the file |
+| Type in Open / Up, Down, Enter | Filter names / select and open a result |
+| Ctrl+L in a file dialog | Optionally type a location |
 | Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z | Undo / redo |
 | F / Frame | Frame selected room, placement or camera |
+| Click the 3D view | Select the nearest room or placed model and focus camera controls |
 | Hold right mouse + drag | Look around |
-| Hold right mouse + WASD, Q/E | Fly camera, descend/ascend |
+| Middle mouse + drag / mouse wheel | Pan / zoom |
+| WASD, Q/E with viewport focused | Fly camera, descend/ascend (right mouse is optional) |
 | Shift while flying | Move faster |
-| Ctrl+Q / window close | Quit; unsaved changes block exit |
+| Ctrl+Q / window close | Quit; unsaved work offers Save / Discard / Cancel |
 | Ctrl+Shift+Q | Discard unsaved changes and quit |
+
+The viewport starts focused. Click the field browser to use its keyboard
+navigation; click the viewport to return to flying. E ascends while the
+viewport is focused and opens a JSON draft while the field browser is focused.
+Values, file selection and advanced JSON drafts use modal dialogs that capture
+typing and block camera movement. Open is browse-first: click the current
+folder, Project, Home, a nearby level library, or a recent level. Library
+shortcuts discover `<crate>/assets/levels` folders without a game dependency.
+Recent levels last for the current session. Click breadcrumb folders or Up
+to navigate; search filters names and folders come before files. The results
+are paged, with Up/Down and Enter as keyboard alternatives. Type location /
+Ctrl+L is optional; relative locations resolve inside the browsed folder.
+Invalid files keep the browser open and retain the current document.
+
+Save copy uses the same folder browser and suggests an unused `*-copy.json`
+filename. Enter a name, rather than a full path; `.json` is added when no
+extension is provided. Existing files are protected. Unsaved-work dialogs
+let you save and continue, discard, or cancel. When opening, Discard keeps
+the old document available until another valid level actually opens, so a
+failed or canceled browse still preserves the draft. A failed save also
+keeps the confirmation and document available.
+
+Viewport selection uses the rendered meshes, including posed model parts,
+and opens the corresponding placement or room in the field browser. A yellow
+bounding box marks the selection. Static scenery selects its containing room;
+individual vertices, faces, unrendered placements and fixed camera markers
+remain accessible through the field browser.
 
 Draft input currently supports replacement and appending, rather than a
 full text editor with cursor movement or clipboard integration. Geometry is
-edited through its fields; viewport selection, transform gizmos, dedicated
+edited through its fields; drag gizmos, dedicated
 sector painting and a graphical timeline are future work. Sound tables are
 editable, but audio playback and atlas/image editing belong to future tools.
 There are no authored tuning RON assets in the current port; add an authoring
@@ -96,7 +149,7 @@ unknown game actions or the gameplay meaning of inherited fields.
 
 Save uses a sibling temporary file and an atomic replacement. If the source
 changed on disk after opening, Save reports the conflict and keeps the draft.
-Open again after saving your work elsewhere. Save as requires a new filename
+Open again after saving your work elsewhere. Save copy requires a new filename
 and writes just the JSON; atlas and audio files remain in their level folder.
 Copy that folder first when making a separately playable level. The game
 loads `levels/<name>/level.json`, so use that layout for authored levels.
@@ -130,8 +183,18 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
 checks no-op save, edit, undo, redo, invalid references, save, and reopen in a
 new process, and records real 1280x800 screenshots and the MCP transcript.
-It never edits the source level. Keyboard draft handling also has a headless
-UI test. All 25 baked levels pass the editor validator in `level_assets.rs`.
+It never edits the source level. Headless UI tests cover keyboard drafts and
+mouse hit testing on row and button labels, including Apply, Cancel and Undo.
+The editor enables Bevy's `ui_picking` feature so pointer events reach both
+the field browser and animation controls, and mesh ray casting for viewport
+selection. Tests cover camera focus, draft capture, the file browser and
+selection through model hierarchies, including mirrored geometry and occlusion.
+Smoke screenshots include the object inspector, Open, the level library,
+Save copy, and the unsaved-work confirmation. Input tests exercise real UI hit
+testing for scene navigation and position nudges, search and keyboard paging,
+degree conversion, optional checkbox fields, save copies, cancellation and
+external-file conflicts. All 25 baked levels pass the editor
+validator in `level_assets.rs`.
 
 For automation:
 
@@ -142,7 +205,8 @@ cargo run -p editor --all-features -- --level engine/assets/levels/sandbox/level
 Use `game_query` on the exact entity `Editor` with `EditorStatus`. Set
 `EditorCommand` fields through `game_set_component`, e.g.
 `{"pointer":"/placements/1/position/0","json":"4700","apply":true}`.
-`undo`, `redo`, `save`, and `frame` are one-shot booleans. Set `pointer` and
+`undo`, `redo`, `save`, `frame`, `open`, `save_copy`, and `cancel` are one-shot booleans.
+`browse` is a one-shot folder/file path for an open file dialog. Set `pointer` and
 `navigate: true` to browse a field. These commands use the UI's document
 transactions. Headless `game_screenshot(target="screen")` captures the
 full-resolution editor; use `target="window"` in a desktop session.

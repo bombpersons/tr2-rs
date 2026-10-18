@@ -2,12 +2,14 @@
 //! models, hiding rooms out of view, lighting items, and the 3D camera.
 //!
 //! All geometry comes from the level asset; no captured frame is used.
+pub mod rooms;
 pub mod view;
 
 use std::sync::Arc;
 
 use bevy::{
     asset::RenderAssetUsages,
+    camera::primitives::MeshAabb,
     mesh::PrimitiveTopology,
     pbr::{DistanceFog, FogFalloff},
     prelude::*,
@@ -103,8 +105,8 @@ pub struct ViewSettings {
 }
 
 impl Default for ViewSettings {
-    /// A plain 60° view filling a 320x240 screen. Games set their own with
-    /// [`configure_view`].
+    /// A plain 60° view filling a 320x240 screen. Games insert their own
+    /// settings and pass the matching size to `launcher::Game::screen`.
     fn default() -> Self {
         Self {
             fov: 60f32.to_radians(),
@@ -120,8 +122,9 @@ impl Default for ViewSettings {
 
 /// Use `settings` for the level camera and size the PS1 screen (and the
 /// window, at 3x) to its drawn size. Call after `PsxPlugin` is added, before
-/// the app runs: in the launcher's `add` closure, or after `PsxPlugin` in a
-/// hand-built app. The template's launcher always starts at 320x240.
+/// the app runs. For a launcher app, prefer `launcher::Game::screen` and
+/// insert the matching settings in its `add` closure; this helper also
+/// supports hand-built apps that need to resize an existing screen.
 pub fn configure_view(app: &mut App, settings: ViewSettings) {
     let size = settings.size;
     let world = app.world_mut();
@@ -156,6 +159,8 @@ pub enum LevelSystems {
     /// Pose models, then decide what is visible.
     Pose,
     Visibility,
+    /// Rebuild opt-in camera-dependent room geometry after visibility.
+    Meshes,
 }
 
 pub struct RenderPlugin;
@@ -169,11 +174,15 @@ impl Plugin for RenderPlugin {
             .init_resource::<ObjectTypes>()
             .add_message::<LevelLoaded>()
             .add_message::<PreviewLevel>()
-            .configure_sets(Update, (LevelSystems::Load, LevelSystems::Pose, LevelSystems::Visibility).chain())
+            .configure_sets(
+                Update,
+                (LevelSystems::Load, LevelSystems::Pose, LevelSystems::Visibility, LevelSystems::Meshes).chain(),
+            )
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
             .add_systems(Update, (pose_models, follow_camera).in_set(LevelSystems::Pose))
-            .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility));
+            .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility))
+            .add_systems(Update, rooms::rebuild.in_set(LevelSystems::Meshes));
     }
 }
 
@@ -279,6 +288,7 @@ fn finish_level(
     old: Query<Entity, (With<LevelEntity>, Without<ChildOf>)>,
     mut loaded: MessageWriter<LevelLoaded>,
     mut previews: MessageReader<PreviewLevel>,
+    room_policy: Option<Res<rooms::RoomMeshPolicy>>,
 ) {
     let (name, data, atlas_path) = if let Some(preview) = previews.read().last() {
         (preview.data.name.clone(), preview.data.clone(), preview.atlas.clone())
@@ -298,6 +308,15 @@ fn finish_level(
     let world = WorldGeometry { data: data.clone() };
     let atlas = server.load(atlas_path);
     let material = materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });
+    let underlay_material = room_policy.as_ref().map(|_| {
+        materials.add(PsxMaterial {
+            texture: Some(atlas.clone()),
+            lit: false,
+            double_sided: true,
+            depth_bias: crate::psx::PsxDepthBias::BEHIND,
+            ..default()
+        })
+    });
     for (room_index, room) in data.rooms.iter().enumerate() {
         let vs: Vec<_> = room.vertices.iter().map(|v| position([v[0], v[1], v[2]]).to_array()).collect();
         let light: Vec<_> = room.vertices.iter().map(|v| lighting::room_vertex_shade(v[3])).collect();
@@ -308,15 +327,42 @@ fn finish_level(
         for f in &room.triangles {
             b.face(&f[..3], &data.textures[f[3]], &vs, &light);
         }
-        commands.spawn((
-            Mesh3d(meshes.add(b.finish())),
-            MeshMaterial3d(material.clone()),
-            Transform::from_translation(position(room.origin)),
-            InRoom(room_index),
-            LevelEntity,
-            ChildOf(render_root),
-            Name::new(format!("Room{room_index}")),
-        ));
+        let built = b.finish();
+        let bounds = built.get_aabb();
+        let mesh = meshes.add(built);
+        let entity = commands
+            .spawn((
+                Mesh3d(mesh.clone()),
+                MeshMaterial3d(material.clone()),
+                Transform::from_translation(position(room.origin)),
+                InRoom(room_index),
+                LevelEntity,
+                ChildOf(render_root),
+                Name::new(format!("Room{room_index}")),
+            ))
+            .id();
+        if let Some(material) = &underlay_material {
+            let underlay = commands
+                .spawn((
+                    MeshMaterial3d(material.clone()),
+                    Transform::default(),
+                    Visibility::Inherited,
+                    ChildOf(entity),
+                    Name::new("RoomUnderlay"),
+                ))
+                .id();
+            commands.entity(entity).insert((
+                rooms::RoomMeshSource::new(room, &data, atlas.clone(), mesh, underlay),
+                rooms::RoomMeshStats::default(),
+            ));
+            // All future pieces/fillers remain inside the authored room.
+            // Preserve conservative bounds instead of keeping the first
+            // camera-dependent subset's AABB when the camera moves.
+            if let Some(bounds) = bounds {
+                commands.entity(entity).insert(bounds);
+                commands.entity(underlay).insert(bounds);
+            }
+        }
     }
     let object_meshes: Vec<_> = data
         .meshes
@@ -368,7 +414,13 @@ fn finish_level(
         let model = data.models.iter().enumerate().find(|(_, m)| m.id == placement.kind);
         let t = Transform::from_translation(position(placement.position))
             .with_rotation(Quat::from_rotation_y(angle(placement.rotation)));
-        let lit = model.map(|_| materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: true, double_sided: true, ..default() }));
+        let lit = model.map(|_| materials.add(PsxMaterial {
+            texture: Some(atlas.clone()),
+            lit: true,
+            use_scene_lighting: false,
+            double_sided: true,
+            ..default()
+        }));
         let mut entity = commands.spawn((
             t,
             Visibility::default(),
@@ -460,7 +512,9 @@ fn light_items(
         let light = lighting::item_light(&world.data, room, point);
         let Some(mut material) = materials.get_mut(&lighting.0) else { continue };
         let ambient = (255.0 - light.ambient.clamp(0, 8191) as f32 / 32.0) / lighting::NEUTRAL_SHADE;
-        let k = light.strength as f32 / (4.0 * 32.0 * lighting::NEUTRAL_SHADE);
+        // Normal, light-vector and rotation scales are all 16384 in the
+        // original lighter, so the directional shade is strength * n.L.
+        let k = light.strength as f32 / (32.0 * lighting::NEUTRAL_SHADE);
         let dir = view::render_position(Vec3::new(light.direction.x, -light.direction.y, light.direction.z)).normalize_or_zero();
         let mut l = material.lighting;
         l.ambient = Vec3::splat(ambient);

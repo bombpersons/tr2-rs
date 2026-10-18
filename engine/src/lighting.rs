@@ -28,9 +28,11 @@ pub struct ItemLight {
 impl ItemLight {
     /// Encoded vertex multiplier for a unit normal (original axes) as the
     /// object lighter 0x80064954 computes it: 255 - clamp(ambient +
-    /// strength*(n.L)/4, 0, 8191)/32, with 128 neutral.
+    /// strength*(n.L), 0, 8191)/32, with 128 neutral. Its rotation, normal
+    /// and light vector all use 16384 for one; the >>16 dot product and
+    /// directional denominator cancel those scales (0x80064974..0x80064ABC).
     pub fn shade(&self, normal: Vec3) -> f32 {
-        let v = self.ambient as f32 + self.strength as f32 * normal.dot(self.direction) / 4.0;
+        let v = self.ambient as f32 + self.strength as f32 * normal.dot(self.direction);
         (255.0 - v.clamp(0.0, 8191.0) / 32.0) / NEUTRAL_SHADE
     }
 }

@@ -1,6 +1,10 @@
 //! A full-resolution authoring app over engine formats, with no game dependency.
 mod animation;
+mod dialogs;
+mod files;
+mod inspector;
 mod ui;
+mod viewport;
 use bevy::{
     camera::RenderTarget,
     prelude::*,
@@ -28,6 +32,9 @@ struct Editor {
     revision: u64,
     preview: bool,
     frame: bool,
+    recent: Vec<std::path::PathBuf>,
+    exit_requested: bool,
+    overview: bool,
 }
 
 /// Automation uses the same transactional commands as the UI. The template's
@@ -43,6 +50,10 @@ struct EditorCommand {
     redo: bool,
     save: bool,
     frame: bool,
+    open: bool,
+    save_copy: bool,
+    browse: String,
+    cancel: bool,
 }
 
 #[derive(Component, Reflect, Default)]
@@ -114,11 +125,14 @@ fn main() -> AppExit {
         })
         .init_asset::<PsxMaterial>()
         .init_resource::<CameraState>()
+        .init_resource::<viewport::ViewportFocus>()
+        // Selection casts only on click; the UI backend still handles hover.
+        .insert_resource(bevy::picking::mesh_picking::MeshPickingSettings { require_markers: true, ..default() })
         .insert_resource(engine::render::ViewSettings { far: 10000.0, ..default() })
         .add_plugins(engine::render::RenderPlugin)
         .insert_resource(Editor {
             doc,
-            pointer: String::new(),
+            pointer: "/placements".into(),
             selected: 0,
             page: 0,
             status: "Ready".into(),
@@ -126,11 +140,19 @@ fn main() -> AppExit {
             revision: 0,
             preview: true,
             frame: true,
+            recent: vec![],
+            exit_requested: false,
+            overview: true,
         })
         .add_systems(Startup, setup)
-        .add_systems(Update, (ui::input, automation, preview).chain().before(LevelSystems::Load))
+        .add_systems(Update, (viewport::focus, ui::input, automation, preview).chain().before(LevelSystems::Load))
         .add_systems(Update, (standard_preview, ui::camera, status).chain().after(LevelSystems::Visibility))
-        .add_plugins((ui::UiPlugin, animation::AnimationPreviewPlugin));
+        .add_plugins((ui::UiPlugin, animation::AnimationPreviewPlugin))
+        .add_systems(Update, (dialogs::refresh, inspector::refresh).after(ui::input))
+        .add_systems(
+            PostUpdate,
+            (viewport::select, viewport::highlight).chain().after(bevy::transform::TransformSystems::Propagate),
+        );
     // The MCP's `screen` is an ordinary full-resolution render target here;
     // no PS1 plugin, screen pass, quantization or affine shader is installed.
     let image = app.world_mut().resource_mut::<Assets<Image>>().add({
@@ -207,6 +229,22 @@ fn setup(mut commands: Commands) {
 
 fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>) {
     let Ok(mut c) = command.single_mut() else { return };
+    if c.open {
+        c.open = false;
+        ui::act(&mut editor, ui::Action::Open);
+    }
+    if c.cancel {
+        c.cancel = false;
+        ui::act(&mut editor, ui::Action::Cancel);
+    }
+    if c.save_copy {
+        c.save_copy = false;
+        ui::act(&mut editor, ui::Action::SaveAs);
+    }
+    if !c.browse.is_empty() {
+        let path = std::mem::take(&mut c.browse);
+        ui::act(&mut editor, ui::Action::Browse(path.into()));
+    }
     if c.navigate {
         c.navigate = false;
         if editor.doc.value().pointer(&c.pointer).is_some() {
@@ -316,7 +354,10 @@ fn standard_preview(
                 })
             })
             .clone();
-        commands.entity(entity).remove::<MeshMaterial3d<PsxMaterial>>().insert(MeshMaterial3d(handle));
+        commands
+            .entity(entity)
+            .remove::<MeshMaterial3d<PsxMaterial>>()
+            .insert((MeshMaterial3d(handle), bevy::picking::mesh_picking::ray_cast::RayCastBackfaces));
     }
     for (entity, mut camera) in &mut cameras {
         camera.sub_camera_view = None;

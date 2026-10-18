@@ -63,10 +63,10 @@ fn backwards_and_sidestep_preserve_heading() {
     let (mut app, entity) = app();
     app.run_ticks(8, &[Button::Down]);
     assert!(player(&app, entity).position.z < 0.0);
-    app.run_ticks(8, &[Button::R2]);
+    app.run_ticks(8, &[Button::R2, Button::Right]);
     assert!(player(&app, entity).position.x > 0.0);
     assert_eq!(player(&app, entity).yaw, 0.0);
-    assert_eq!(player(&app, entity).mode, PlayerMode::StepRight);
+    assert_eq!(player(&app, entity).mode, PlayerMode::StepRight { stopping: false });
 }
 
 #[test]
@@ -305,19 +305,27 @@ fn original_wall_entry_falls_slides_and_turns_across_every_recorded_tick() {
 #[cfg(feature = "baked-assets")]
 #[test]
 fn original_turn_run_grab_climb_and_wall_stop_match_every_tick() {
-    use engine::testing::{Alignment, Trajectory};
     // Wall, settled after the entry slide: RIGHT for fields [0,56), then
     // UP+CROSS from field 60. Covers the decaying turn rate after release,
     // running at an oblique heading, the two-click vault (clip50, end command
     // +128/-512), clip51->52 run start up a tilt-1 slope and the clip53 wall
-    // stop. Stops at field 217: standing afterwards, the original settles 6
-    // units higher (4627) for a reason not yet traced.
-    let csv: String = include_str!("data/original/climb_two_click.csv")
-        .lines()
-        .take_while(|l| l.split(',').next().and_then(|f| f.parse::<u32>().ok()).is_none_or(|f| f <= 217))
-        .map(|l| format!("{l}\n"))
-        .collect();
-    let original = Trajectory::parse_psx_samples(&csv, Alignment::new(2, 1)).unwrap();
+    // stop, then repeated blocked run-start attempts. The sampled centre
+    // floor precedes the wall shift, leaving Lara six units higher here.
+    compare_wall_climb(include_str!("data/original/climb_two_click.csv"), &[(60, 260)]);
+}
+
+#[cfg(feature = "baked-assets")]
+#[test]
+fn heldout_wall_stop_release_and_retry_match_every_tick() {
+    // Captured after fixing the floor sampling order. Releasing UP must
+    // settle onto the resolved floor; each retry retains the proposed floor.
+    compare_wall_climb(include_str!("data/original/wall_stop_heldout.csv"), &[(60, 240), (260, 300)]);
+}
+
+#[cfg(feature = "baked-assets")]
+fn compare_wall_climb(csv: &str, forward_windows: &[(usize, usize)]) {
+    use engine::testing::{Alignment, Trajectory};
+    let original = Trajectory::parse_psx_samples(csv, Alignment::new(2, 1)).unwrap();
     let data: Level = serde_json::from_slice(&std::fs::read("assets/levels/wall/level.json").unwrap()).unwrap();
     let clips = game::player::PlayerAnimations::from(&data);
     let starts: Vec<usize> = clips.clips.iter().map(|c| c.frame_start).collect();
@@ -334,7 +342,7 @@ fn original_turn_run_grab_climb_and_wall_stop_match_every_tick() {
     let inputs: Vec<Vec<Button>> = (0..original.ticks() - 1)
         .map(|t| match 2 * t {
             f if f < 56 => vec![Button::Right],
-            f if f >= 60 => vec![Button::Up, Button::Cross],
+            f if forward_windows.iter().any(|&(start, end)| (start..end).contains(&f)) => vec![Button::Up, Button::Cross],
             _ => vec![],
         })
         .collect();

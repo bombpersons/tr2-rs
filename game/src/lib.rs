@@ -15,6 +15,7 @@ pub mod interactions;
 pub mod player;
 pub mod presentation;
 pub mod save;
+pub mod subdivision;
 
 use bevy::prelude::*;
 use engine::psx::Region;
@@ -32,6 +33,10 @@ pub const REGION: Region = Region::Ntsc;
 /// vblank, 2 when it waits for two (Croc PAL: 25 Hz logic on a 50 Hz display).
 pub const FIELDS_PER_TICK: u32 = 2;
 
+/// Display window: the first 368 columns of the 384x240 projection.
+/// Evidence: display setup at 0x80065c48/0x80065c90; docs/original-evidence.md.
+pub const SCREEN: UVec2 = UVec2::new(368, 240);
+
 /// The logic tick rate for a region.
 pub fn tick_rate(region: Region) -> TickRate {
     TickRate::every_nth_field(region, FIELDS_PER_TICK)
@@ -48,6 +53,7 @@ impl Plugin for GamePlugin {
             interactions::InteractionsPlugin,
             presentation::PresentationPlugin,
             audio::GameAudioPlugin,
+            subdivision::SubdivisionPlugin,
         ));
     }
 }

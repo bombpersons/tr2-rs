@@ -24,6 +24,9 @@ levels are behind the game crate's `baked-assets` feature.
 cargo run --features dev-mcp -- --level wall   # start at the Great Wall, no title screen
 python3 tools/port_smoke.py                    # offscreen screenshots vs the original (after a dev-mcp build)
 python3 tools/camera_smoke.py                  # fixed entrance camera through offscreen rendering
+python3 tools/backward_smoke.py                # backward hop/walk against retained PSX motion and cameras
+python3 tools/item_lighting_smoke.py           # per-object lighting in aligned Home and Wall views
+python3 tools/subdivision_smoke.py             # off/split/filled room meshes at two PSX camera poses
 ```
 
 Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/evidence.md);
@@ -37,9 +40,11 @@ cargo run -p editor   # hand-authored sandbox; no game data needed
 cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
 ```
 
-A full-resolution Bevy editor with standard 3D rendering, a field browser for
-the engine's level format, validated edits, undo/redo, exact untouched
-saves, and authored animation playback/stepping with isolated model previews. It depends only on the engine. See [editor controls and workflow](docs/editor.md).
+A full-resolution Bevy editor with standard 3D rendering, searchable file
+browsing, scene shortcuts, an object property inspector, validated edits,
+undo/redo, exact untouched saves, and authored animation playback/stepping
+with isolated model previews. It depends only on the engine. See
+[editor controls and workflow](docs/editor.md).
 Keep it in step with engine formats as the port grows.
 
 ## The template workspace
@@ -65,7 +70,7 @@ cargo build --release                    # shipping build; developer MCP is excl
 
 | Path | Owner | Contents |
 |---|---|---|
-| `psx-bevy/` | psx template | PS1 look, ticks and input, controls menu, testing, viewers, developer MCP, launcher. Replaced by `psx template update`; don't edit ([README](psx-bevy/README.md)) |
+| `psx-bevy/` | psx template | PS1 look, ticks and input, controls menu, testing, viewers, developer MCP, launcher. Updated by `psx template update`; edit sparingly and keep edits mergeable ([README](psx-bevy/README.md), [template notes](docs/template.md)) |
 | `engine/` | this project | This game's engine family: object type and action registries, update-order sets, level and tuning formats, `examples/sandbox.rs`. No names, numbers or assets from this game ([AGENTS.md](engine/AGENTS.md)) |
 | `editor/` | this project | Engine-format authoring, full-resolution UI and standard 3D preview ([guide](docs/editor.md)) |
 | `game/` | this project | This title: per-type controllers, action handlers, HUD, menus, baked assets in `game/assets/`, trajectory tests ([AGENTS.md](game/AGENTS.md)) |

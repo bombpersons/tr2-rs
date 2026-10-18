@@ -3,7 +3,8 @@
 `game/` is this title on top of `engine/`: per-type controllers, action
 handlers, HUD, menus, save format, level order, and the baked content in
 `assets/`. Reusable machinery belongs in `engine/` (read `engine/AGENTS.md`
-for the placement rules); the template's crate `psx-bevy/` is not edited.
+for the placement rules). Game-specific behaviour never goes in the template's
+crate `psx-bevy/`; when the game needs a template change, see `docs/template.md`.
 
 The goal is a Rust/Bevy version of a game that reads like a modern, first-time
 implementation of it: something a person could pick up later and change with
@@ -43,7 +44,7 @@ The game is a library (crate `game`, `src/lib.rs`); `src/main.rs` only calls
 the engine's launcher. So tests in `tests/` can use every game module.
 
 ```
-src/lib.rs            REGION, FIELDS_PER_TICK, TITLE, GamePlugin (EnginePlugin + your feature plugins)
+src/lib.rs            REGION, FIELDS_PER_TICK, SCREEN, TITLE, GamePlugin (EnginePlugin + your feature plugins)
 src/main.rs           engine::launcher::run(...): window, renderer, --flags
 src/<feature>/mod.rs  one plugin per feature: player, stage, enemies, camera, hud...
 src/<feature>/...     rules (components + systems, no rendering) apart from presentation
@@ -92,6 +93,9 @@ Evidence-recording scripts and importers live in the workspace's `tools/`.
   Set both from evidence: the original's main loop and how many vblanks it waits
   per game frame. Croc (PAL) waits for two: 25 Hz. Mega Man 8 (PAL) runs every
   field: 50 Hz. Per-tick constants only mean the same thing at the same rate.
+- `SCREEN` is the original's display size, passed to `launcher::Game::screen`.
+  Read it from the original's display mode and range (some show 368x240 or
+  512x240).
 - Do not run logic every Nth tick by counting `GameClock.frame`: button edges
   (`pressed`) would fall on skipped ticks and be lost. Set the tick rate instead.
 - Input is sampled every rendered frame and handed to the next tick, so a tap

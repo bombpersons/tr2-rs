@@ -133,6 +133,9 @@ fn click(
     mut previews: Query<&mut AnimationPreview>,
     world: Option<Res<WorldGeometry>>,
 ) {
+    if event.button != bevy::picking::pointer::PointerButton::Primary {
+        return;
+    }
     let Ok(action) = actions.get(event.entity) else { return };
     if editor.input.is_some() {
         return;
@@ -273,6 +276,9 @@ mod tests {
             revision: 0,
             preview: false,
             frame: false,
+            recent: vec![],
+            exit_requested: false,
+            overview: false,
         };
         let mut p = AnimationPreview::default();
         select(&mut editor, &mut p).unwrap();

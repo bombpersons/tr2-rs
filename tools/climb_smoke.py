@@ -8,6 +8,8 @@ original fields in FIELDS (field = 1 + 2 * ticks). Original frames come from
 The original screens lag game state by ~4 fields: compare port field N with
 original screen N+4 (docs/braid-evidence.md).
 Run after `cargo build -p tomb-raider-ii --features dev-mcp`.
+With --wall-stop-heldout, releases UP at field240, retries at260, releases
+again at300 and captures through337, matching wall_stop_heldout.csv.
 """
 import argparse
 import json
@@ -19,14 +21,17 @@ FIELDS = [41, 61, 79, 107, 135, 151, 189, 219]
 START = [64176, 5376, 26090]
 
 
-def buttons(tick):
+def buttons(tick, heldout=False):
     field = 2 * tick
+    if heldout and (240 <= field < 260 or field >= 300):
+        return []
     return ['right'] if field < 56 else ['up', 'cross'] if field >= 60 else []
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'validation/climb-smoke')
+    parser.add_argument('--wall-stop-heldout', action='store_true', help='Replay the wall-stop release/retry reference')
     args = parser.parse_args()
     client = Client(ROOT / 'target/debug/tomb-raider-ii', args.out.resolve(), 'wall')
     report = {'cases': []}
@@ -44,10 +49,11 @@ def main():
         position = [round(p['position'][0] * 1024), round(-p['position'][1] * 1024), round(p['position'][2] * 1024)]
         assert position == START, f'port settled at {position}, original {START}'
         tick = 0
-        for field in FIELDS:
+        fields = FIELDS + [241, 261, 281, 301, 337] if args.wall_stop_heldout else FIELDS
+        for field in fields:
             target = (field - 1) // 2
             while tick < target:
-                client.call('game_step', {'frames': 1, 'buttons': buttons(tick)})
+                client.call('game_step', {'frames': 1, 'buttons': buttons(tick, args.wall_stop_heldout)})
                 tick += 1
             state = client.query(components=['Player', 'AnimationState'], resources=['CameraState'])
             report['cases'].append({'field': field, 'state': state, 'image': client.capture(f'f{field:03}', min_colors=16)})
