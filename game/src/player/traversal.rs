@@ -200,6 +200,13 @@ pub(super) fn step(
         mode = PlayerMode::JumpingUp { launch_speed: 0.0 };
         player.mode = mode;
     }
+    if matches!(mode, PlayerMode::JumpingUp { .. }) && state == 2 && !motion.grounded {
+        // A ceiling contact requests stop without cancelling ascent
+        // (0x8003B864..0x8003B888). On the next authored dispatch to31,
+        // standing collision settles the feet after one final airborne move.
+        player.mode = PlayerMode::Recovering;
+        return impact_motion(player, motion, animation, world, clips, dt);
+    }
     match mode {
         PlayerMode::PullingUp => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } if state == 19 => pull_up(player, motion, world, state),
@@ -210,9 +217,9 @@ pub(super) fn step(
     }
 }
 
-/// Low-impact state14 delegates collision to the ordinary standing handler
-/// (0x8003B2FC ->0x8003AA20). Its first animation move still uses the rebound
-/// heading/gravity; collision then settles the feet and clears gravity.
+/// Standing collision settles the feet after the last airborne animation
+/// move and clears gravity (0x8003AA20). Used by low-impact state14 through
+/// 0x8003B2FC and by a vertical ceiling contact dispatching to standing.
 fn impact_motion(
     player: &mut Player,
     motion: &mut Motion,
@@ -414,20 +421,26 @@ fn jump_motion(
     let (quadrant, forward, delta) = cardinal(player.yaw);
     let hits = front(world, proposed, collision_heading, player.room);
     let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == 3;
+    let reach = matches!(mode, PlayerMode::JumpingForward) && state == 11;
+    let vertical_jump = matches!(mode, PlayerMode::JumpingUp { .. });
+    // Jump-up collision uses870 rather than the ordinary762-unit body
+    // probe (0x8003B828). Jump/reach handlers allow192 at the front ceiling
+    // (reach0x8003B1C4..0x8003B1D0).
+    let height = if vertical_jump { units(870.0) } else { PLAYER_HEIGHT };
     let centre = world.floor_at(proposed, player.room);
     // GetCollisionInfo0x8001B768 sets a ceiling contact at the centre
     // without treating the front as a wall: airborne bad_ceiling is192
     // (0x8003AB40). Deflection0x8003C748 then stops ascent, retaining
     // horizontal speed, heading, clip and goal. See ceiling-evidence.md.
-    let ceiling_contact = forward_jump && centre.is_some_and(|hit| proposed.y + PLAYER_HEIGHT >= hit.ceiling);
+    let ceiling_contact =
+        (forward_jump || reach || vertical_jump) && centre.is_some_and(|hit| proposed.y + height >= hit.ceiling);
     let mut blocked = false;
     if let Some(hits) = hits {
         // A descending sweep can cross its floor without turning that floor
         // into a horizontal wall. This is the same upper-endpoint rule used
         // by ordinary locomotion and the retained standing-jump recording.
         let floor_test = if motion.grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) };
-        let height = if matches!(mode, PlayerMode::JumpingUp { .. }) { units(870.0) } else { PLAYER_HEIGHT };
-        let ceiling_margin = if forward_jump { units(192.0) } else { 0.0 };
+        let ceiling_margin = if forward_jump || reach || vertical_jump { units(192.0) } else { 0.0 };
         blocked = hits[0].height > floor_test || hits[0].ceiling + ceiling_margin < proposed.y + height;
         if blocked {
             let (_, collision_forward, _) = cardinal(collision_heading);
@@ -479,8 +492,16 @@ fn jump_motion(
     }
     player.position.y = proposed.y;
     if ceiling_contact && !blocked {
-        player.position.y = centre.unwrap().ceiling - PLAYER_HEIGHT;
-        motion.velocity.y = motion.velocity.y.min(-units(ORIGINAL_FPS));
+        player.position.y = centre.unwrap().ceiling - height;
+        if vertical_jump {
+            // Type8 requests standing but keeps signed speed and fall speed
+            // (0x8003B884..0x8003B8B4); clip28's dispatch owns recovery.
+            traversal.goal = 2;
+        } else {
+            // Reach type8 shares the stop-ascent rule, retaining its clip,
+            // goal and horizontal speed (0x8003C870..0x8003C884).
+            motion.velocity.y = motion.velocity.y.min(-units(ORIGINAL_FPS));
+        }
     }
     if blocked
         && matches!(mode, PlayerMode::JumpingForward)

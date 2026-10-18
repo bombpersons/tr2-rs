@@ -12,6 +12,11 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'run_stop_left_heldout': ('home_runway_start', 200, [event(['UP'], 60)]),
+    'run_stop_right_heldout': ('home_runway_start', 220, [event(['UP'], 80)]),
+    'run_stop_rehold_heldout': ('home_runway_start', 240, [event(['UP'], 56), event(['UP'], 114, 70)]),
+    'run_stop_rehold_validation_heldout': ('home_runway_start', 260, [event(['UP'], 64), event(['UP'], 136, 76)]),
+    'run_stop_restart_heldout': ('home_runway_start', 260, [event(['UP'], 66), event(['UP'], 138, 90)]),
     'middle_wall': ('airborne_mid_wall_start', 200, [event(['UP', 'SQUARE'], 22)]),
     'blocked_takeoff': ('airborne_blocked_wall_start', 200, [event(['UP', 'SQUARE'], 22)]),
     'running_low_wall': ('airborne_wall_start', 220, [event(['UP'], 40),
@@ -88,7 +93,7 @@ def main():
     metadata = {
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
-        'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe'),
+        'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout'),
         'diagnostic_only': False,
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],

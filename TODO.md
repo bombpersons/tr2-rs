@@ -18,7 +18,22 @@ it off. Record partial progress below without checking the parent item.
   speed, stop ascent, then use ordinary authored landing/recovery. Three
   PSX controlled-spawn replays include two independent validation routes.
   [Evidence](docs/ceiling-evidence.md), [tests](game/tests/airborne.rs).
-  Vertical-jump, reach, side/corner and forward-top contacts remain open.
+  Side/corner and forward-top contacts remain open.
+- [x] Vertical jumps under flat low ceilings:870-unit body correction,
+  preserved upward speed on contact, authored standing/landing dispatch and
+  repeated held-Jump recovery. Three controlled-spawn PSX routes include two
+  independent validation recordings. [Evidence](docs/ceiling-evidence.md),
+  [tests](game/tests/airborne.rs).
+
+- [x] Reach against flat room ceilings: preserve clip/goal and forward speed,
+  correct the body height and stop ascent. The early-contact control and four
+  later-contact recordings distinguish calibration from independent validation.
+  [Evidence](docs/ceiling-evidence.md), [tests](game/tests/airborne.rs).
+- [x] Neutral running release and Up re-held during authored braking: retain
+  movement until the stop range, use both braking clips and wait for their
+  end before restarting. Five additional routes, with re-hold calibration
+  explicitly labelled. [Evidence](docs/run-stop-evidence.md),
+  [tests](game/tests/airborne.rs).
 
 ## Traversal
 
@@ -136,6 +151,28 @@ it off. Record partial progress below without checking the parent item.
   sandbox/Home byte-exact save and clip11 preview checks pass. Changed Rust
   files are formatted; unrelated workspace format/lint differences remain.
   No engine format or template change was needed.
-- Next: corner/ceiling airborne wall impacts and unassisted fast-fall/slide
-  landing recovery, then the remaining collision/traversal branches and water.
+- 2026-10-18: Vertical low-ceiling milestone: three new controlled-spawn PSX
+  recordings,333 sampled logic ticks across thirteen columns, including two
+  independent validation routes. The first contact now requests authored
+  landing without shifting Lara sideways or cancelling her upward speed.
+  All63 full-game ceiling poses pass across six forward/vertical routes.
+  Workspace tests (198 passed), Clippy, sandbox movement/rendering and editor
+  sandbox/Home save and clip28 preview checks pass. Changed Rust files are
+  formatted; unrelated workspace format/lint differences remain. No engine
+  format or template change was needed. [Evidence](docs/ceiling-evidence.md).
+- 2026-10-18: Reach-ceiling and authored run-stop milestones: ten new PSX
+  recordings compare1170 sampled ticks across thirteen columns. Reach now
+  corrects centre ceiling contacts without a sideways wall shift. Neutral
+  Up release waits for the authored braking range; re-holding Up keeps the
+  committed brake before restarting. Two recordings used to refine rules
+  retain their original names and are explicitly labelled calibration.
+  Independent validation passes. All208 workspace tests and280 full-game
+  MCP poses pass. Clippy, builds, sandbox movement/rendering and editor
+  sandbox/Home save and clip10 preview checks pass; existing unrelated
+  lint/format differences remain. No engine format or template changes.
+  [Ceiling evidence](docs/ceiling-evidence.md),
+  [run-stop evidence](docs/run-stop-evidence.md).
+- Next: unassisted forward ledge-fall landing into a run (diagnostic route
+  identified in [run-stop-evidence](docs/run-stop-evidence.md)), then corner
+  airborne ceiling impacts, fast-fall/slide recovery, remaining traversal and water.
   Combat, interactions and appearance remain queued above.
