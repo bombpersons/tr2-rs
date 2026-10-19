@@ -3,6 +3,15 @@
 from backward_collision_smoke import main
 
 CAPTURES = {
+    'walk_wall': [2, 20, 80, 102, 170],
+    'walk_ledge': [56, 134, 136, 138, 140, 168, 170, 172, 240],
+    'walk_step_up': [92, 94, 96, 98, 122, 124, 126, 246, 248, 250, 252, 276, 278, 390],
+    'walk_step_down': [66, 68, 70, 72, 94, 96, 98, 322, 354, 356],
+    'walk_step_up_other_heldout': [120, 122, 124, 126, 154, 156, 158, 192, 196, 228, 230],
+    'walk_step_down_release_heldout': [84, 86, 88, 110, 112, 114, 120, 122, 154, 156, 230],
+    'walk_step_down_mid_release_heldout': [86, 98, 100, 110, 112, 114, 122, 154, 156, 230],
+    'walk_step_down_other_heldout': [50, 52, 54, 74, 76, 78, 190, 192, 194, 214, 216, 218, 262, 294, 296],
+    'walk_ledge_jump_request_heldout': [154, 156, 158, 170, 172, 176, 178, 184, 186, 188, 190, 224, 226, 254, 280],
     'vertical_steer_forward': [28, 30, 32, 34, 40, 42, 52, 90, 100, 102, 144, 220],
     'vertical_steer_back_open': [28, 30, 32, 34, 36, 40, 42, 52, 90, 100, 102, 144, 220],
     'vertical_steer_wall': [30, 36, 38, 40, 42, 60, 82, 84, 86, 90, 130, 220],

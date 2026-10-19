@@ -42,6 +42,13 @@ it off. Record partial progress below without checking the parent item.
 
 ## Traversal
 
+- [x] Ordinary forward walking against flat room walls, ledges and one-click
+  steps: blocked starts, collision stops with standing control, both ascending
+  and descending feet, release during steps and an ignored recovery jump.
+  Nine complete PSX routes include five independent recordings.
+  [Evidence](docs/forward-walk-evidence.md), [tests](game/tests/airborne.rs).
+  Angular/static/ceiling/slope and walk/run transition branches remain.
+
 - [ ] Jump, grab and hang: original grab conditions, alignment, animation and
   collision behavior; climb from a hang and release to drop. Include a complete
   recorded route and an independently recorded validation route.
@@ -227,6 +234,12 @@ it off. Record partial progress below without checking the parent item.
   full-game checks preserve foreground pixels and verify translation invariance.
   Workspace tests (229 passed), Clippy, builds, sandbox and editor checks pass.
   No engine format or template change. [Evidence](docs/sky-evidence.md).
-- Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
+- 2026-10-19: Forward walking room collision: nine complete PSX recordings,
+  1309 sampled ticks across thirteen columns, including five fresh independent
+  routes. Both stepping feet and collision-selected standing stops match the
+  original. Workspace tests (238 passed), Clippy, builds,100 full-game MCP
+  poses, sandbox movement/rendering and editor saves/clip60 preview pass.
+  No engine format or template change. [Evidence](docs/forward-walk-evidence.md).
+- Next: authored rolling, dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

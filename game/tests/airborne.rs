@@ -63,6 +63,7 @@ fn compare_case(csv: &str, metadata: &str) {
             PlayerMode::Climbing { .. } => 19,
             PlayerMode::JumpImpact => 14,
             PlayerMode::HitWall { .. } => 12,
+            PlayerMode::WalkStopping => 2,
             _ => states[a.animation],
         };
         vec![
@@ -192,6 +193,18 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 }
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
+recorded_case!(original_walk_wall_retains_standing_before_a_blocked_start, "walk_wall");
+recorded_case!(original_walk_ledge_uses_the_foot_stop_with_standing_control, "walk_ledge");
+recorded_case!(original_walk_steps_up_through_authored_foot_clips, "walk_step_up");
+recorded_case!(original_walk_steps_down_through_authored_foot_clips, "walk_step_down");
+recorded_case!(
+    heldout_walk_release_midway_through_a_descending_step_finishes_the_step,
+    "walk_step_down_mid_release_heldout"
+);
+recorded_case!(heldout_walk_uses_the_other_descending_step_foot, "walk_step_down_other_heldout");
+recorded_case!(heldout_walk_uses_the_other_ascending_step_foot, "walk_step_up_other_heldout");
+recorded_case!(heldout_walk_release_after_a_descending_step_waits_for_authored_stop, "walk_step_down_release_heldout");
+recorded_case!(heldout_walk_ledge_stop_ignores_early_jump_then_refuses_a_restart, "walk_ledge_jump_request_heldout");
 recorded_case!(original_vertical_jump_accelerates_forward_only_during_early_ascent, "vertical_steer_forward");
 recorded_case!(original_vertical_jump_accelerates_backward_with_signed_speed, "vertical_steer_back_open");
 recorded_case!(heldout_vertical_jump_reverses_early_then_ignores_late_steering, "vertical_steer_reverse_heldout");

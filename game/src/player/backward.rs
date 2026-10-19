@@ -119,7 +119,7 @@ pub(super) fn step(
 
 /// GetGridShift0x8001B9EC: push a probe into the reference sector with a
 /// one-unit margin. A probe that has not crossed a grid edge needs no shift.
-fn grid_shift(probe: f32, reference: f32) -> f32 {
+pub(super) fn grid_shift(probe: f32, reference: f32) -> f32 {
     let probe = (probe * 1024.0).round() as i32;
     let reference = (reference * 1024.0).round() as i32;
     let delta = match probe.div_euclid(1024).cmp(&reference.div_euclid(1024)) {
@@ -130,7 +130,7 @@ fn grid_shift(probe: f32, reference: f32) -> f32 {
     units(delta as f32)
 }
 
-fn ground_displacement(velocity: Vec3, dt: f32) -> Vec3 {
+pub(super) fn ground_displacement(velocity: Vec3, dt: f32) -> Vec3 {
     let mut displacement = velocity * dt;
     for axis in [0, 2] {
         let n = displacement[axis] * 1024.0;
@@ -142,7 +142,7 @@ fn ground_displacement(velocity: Vec3, dt: f32) -> Vec3 {
 
 /// GetCollisionInfo's front/left/right cardinal probes, radius100; the front
 /// probe's transverse offset follows the original sine/cosine table.
-fn probes(position: Vec3, yaw: f32) -> [Vec3; 3] {
+pub(super) fn probes(position: Vec3, yaw: f32) -> [Vec3; 3] {
     let angle = (yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
     let quadrant = ((angle + 8192) >> 14).rem_euclid(4);
     let across = |trig| (trig * 100) >> 14;
