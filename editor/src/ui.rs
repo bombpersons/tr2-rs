@@ -1,110 +1,60 @@
-use crate::{Editor, EditorTarget};
-use bevy::{
-    camera::RenderTarget,
-    input::{
-        ButtonState,
-        keyboard::KeyboardInput,
-        mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll, MouseScrollUnit},
-    },
-    prelude::*,
-    window::WindowCloseRequested,
+//! The editor's windows, menus and shortcuts, drawn with egui over the 3D view.
+use crate::{
+    Editor, EditorTarget, Leave,
+    animation::AnimationPreview,
+    edit::{Change, TURN},
+    files::{self, Ask},
 };
-use engine::{
-    editor::{LevelDocument, child_pointer},
-    objects::ObjectTypes,
-    render::{GameCamera, view},
-    world::position,
+use bevy::{camera::RenderTarget, prelude::*, window::WindowCloseRequested};
+use bevy_egui::{
+    EguiContexts, EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext,
+    egui::{self, Key, KeyboardShortcut, Modifiers, RichText},
 };
+use engine::{editor::child_pointer, objects::ObjectTypes, world::WorldGeometry};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
-const ROWS: usize = 6;
-pub(super) const PANEL: f32 = 500.0;
-const INK: Color = Color::srgb(0.86, 0.90, 0.97);
-const MUTED: Color = Color::srgb(0.50, 0.62, 0.74);
-const BACK: Color = Color::srgb(0.055, 0.07, 0.10);
+/// Which windows are open, and how the Objects window lists placements.
+pub struct Windows {
+    pub objects: bool,
+    pub properties: bool,
+    pub data: bool,
+    pub animation: bool,
+    pub group: Group,
+    pub filter: String,
+}
+impl Default for Windows {
+    fn default() -> Self {
+        Self { objects: true, properties: true, data: false, animation: false, group: Group::Room, filter: String::new() }
+    }
+}
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct Input {
-    pub(super) mode: Mode,
-    pub(super) text: String,
-    pub(super) select_all: bool,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Group {
+    Room,
+    Type,
 }
-#[derive(Clone, PartialEq, Eq)]
-pub(super) enum Mode {
-    Field(String),
-    Value(String),
-    Angle(String),
-    File(crate::files::Picker),
-    ConfirmLeave { quit: bool },
-    Find(Vec<(String, String)>),
-}
-#[derive(Component)]
-struct Header;
-#[derive(Component)]
-struct Footer;
-#[derive(Component)]
-struct Prompt;
-#[derive(Component)]
-struct Breadcrumb;
-#[derive(Component)]
-struct FieldRow(usize);
-#[derive(Component, Clone)]
-pub(super) enum Action {
-    Up,
-    Previous,
-    Next,
-    Edit,
-    Save,
-    SaveAs,
-    Undo,
-    Redo,
-    Open,
-    Frame,
-    Overview,
-    Find,
-    Pick(String),
-    Apply,
-    Cancel,
-    Row(usize),
-    Browse(std::path::PathBuf),
-    Files(bool),
-    Location,
-    Navigate(String),
-    EditValue(String),
-    EditAngle(String),
-    Nudge(String, i64),
-    Toggle(String),
-    SaveContinue,
-    DiscardContinue,
-}
+
+/// Drafts larger than this are edited field by field instead of as one JSON text.
+const LARGEST_DRAFT: usize = 256 * 1024;
 
 pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(Update, (refresh.after(camera), hover, tabs.after(hover)));
+        app.add_plugins(EguiPlugin::default())
+            .add_systems(Startup, setup)
+            .add_systems(Update, quit)
+            .add_systems(EguiPrimaryContextPass, ui);
+        app.world_mut().resource_mut::<EguiGlobalSettings>().auto_create_primary_context = false;
     }
 }
 
-pub(super) fn label(text: impl Into<String>, size: f32, color: Color) -> impl Bundle {
-    (Text::new(text), TextFont { font_size: bevy::text::FontSize::Px(size), ..default() }, TextColor(color))
-}
-pub(super) fn button(parent: &mut ChildSpawnerCommands, text: &str, action: Action) {
-    parent
-        .spawn((
-            action,
-            bevy::picking::hover::Hovered::default(),
-            ControlColor(Color::srgb(0.12, 0.17, 0.24)),
-            Node { padding: UiRect::axes(px(9), px(6)), ..default() },
-            BackgroundColor(Color::srgb(0.12, 0.17, 0.24)),
-        ))
-        .observe(clicked)
-        .with_child(label(text, 14.0, INK));
-}
 fn setup(mut commands: Commands, target: Res<EditorTarget>) {
     let camera = commands
         .spawn((
             Camera2d,
-            // UI uses UiTargetCamera; world selection lines belong to the 3D camera.
+            PrimaryEguiContext,
+            // The 3D camera alone draws the level and its selection lines.
             bevy::camera::visibility::RenderLayers::layer(1),
             bevy::core_pipeline::tonemapping::Tonemapping::None,
             Camera { order: 1, clear_color: ClearColorConfig::None, ..default() },
@@ -114,1126 +64,604 @@ fn setup(mut commands: Commands, target: Res<EditorTarget>) {
     if target.headless {
         commands.entity(camera).insert(RenderTarget::Image(target.image.clone().into()));
     }
-    commands
-        .spawn((
-            UiTargetCamera(camera),
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(0),
-                top: px(0),
-                bottom: px(0),
-                width: px(PANEL),
-                padding: UiRect::all(px(14)),
-                flex_direction: FlexDirection::Column,
-                row_gap: px(4),
-                overflow: Overflow::clip(),
-                ..default()
-            },
-            BackgroundColor(BACK),
-        ))
-        .with_children(|root| {
-            root.spawn(label("Level editor", 23.0, INK));
-            root.spawn((
-                Header,
-                label("", 13.0, MUTED),
-                Node { height: px(32), overflow: Overflow::clip(), flex_shrink: 0.0, ..default() },
-            ));
-            root.spawn(Node {
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: px(5),
-                row_gap: px(5),
-                flex_shrink: 0.0,
-                ..default()
+}
+
+fn quit(mut editor: ResMut<Editor>, mut close: MessageReader<WindowCloseRequested>, mut exit: MessageWriter<AppExit>) {
+    if close.read().next().is_some() {
+        editor.request_leave(Leave::Quit);
+    }
+    if editor.exit_requested {
+        exit.write(AppExit::Success);
+    }
+}
+
+fn ui(
+    mut contexts: EguiContexts,
+    mut editor: ResMut<Editor>,
+    types: Option<Res<ObjectTypes>>,
+    mut previews: Query<&mut AnimationPreview>,
+    world: Option<Res<WorldGeometry>>,
+) -> Result {
+    let ctx = contexts.ctx_mut()?;
+    let editor = &mut *editor;
+    let empty = ObjectTypes::default();
+    let types = types.as_deref().unwrap_or(&empty);
+    shortcuts(ctx, editor);
+    let top = menu_bar(ctx, editor);
+    status_bar(ctx, editor);
+    let area = ctx.viewport_rect();
+    let mut windows = std::mem::take(&mut editor.windows);
+    egui::Window::new("Objects")
+        .open(&mut windows.objects)
+        .default_pos([8.0, top + 8.0])
+        .default_size([270.0, 460.0])
+        .show(ctx, |ui| objects(ui, editor, types, &mut windows.group, &mut windows.filter));
+    let mut show_data = false;
+    egui::Window::new("Properties")
+        .open(&mut windows.properties)
+        .default_pos([area.right() - 318.0, top + 8.0])
+        .default_width(310.0)
+        .show(ctx, |ui| show_data = properties(ui, editor, types));
+    windows.data |= show_data;
+    egui::Window::new("Data")
+        .open(&mut windows.data)
+        .default_pos([290.0, top + 8.0])
+        .default_size([480.0, 420.0])
+        .show(ctx, |ui| data(ui, editor));
+    if let Ok(mut preview) = previews.single_mut() {
+        egui::Window::new("Animation")
+            .open(&mut windows.animation)
+            .default_pos([290.0, area.bottom() - 190.0])
+            .default_width(560.0)
+            .show(ctx, |ui| crate::animation::window(ui, editor, &mut preview, world.as_deref()));
+    }
+    editor.windows = windows;
+    leave_question(ctx, editor);
+    Ok(())
+}
+
+const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
+const SAVE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::S);
+const SAVE_AS: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::S);
+const UNDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Z);
+const REDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
+const REDO_SHIFT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Z);
+const SELECT_ALL: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::A);
+const QUIT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Q);
+const DISCARD_QUIT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Q);
+
+fn shortcuts(ctx: &egui::Context, editor: &mut Editor) {
+    if editor.leaving.is_some() {
+        return;
+    }
+    // Text fields keep their own undo and select-all while typing.
+    let typing = ctx.egui_wants_keyboard_input();
+    ctx.input_mut(|input| {
+        // Shifted shortcuts first: plain ones also match with Shift held.
+        if input.consume_shortcut(&DISCARD_QUIT) {
+            editor.exit_requested = true;
+        } else if input.consume_shortcut(&QUIT) {
+            editor.request_leave(Leave::Quit);
+        } else if input.consume_shortcut(&SAVE_AS) {
+            editor.ask = Some(Ask::SaveAs);
+        } else if input.consume_shortcut(&SAVE) {
+            editor.save();
+        } else if input.consume_shortcut(&OPEN) {
+            editor.request_leave(Leave::Open(None));
+        } else if typing {
+        } else if input.consume_shortcut(&REDO_SHIFT) || input.consume_shortcut(&REDO) {
+            editor.redo();
+        } else if input.consume_shortcut(&UNDO) {
+            editor.undo();
+        } else if input.consume_shortcut(&SELECT_ALL) {
+            select_all(editor);
+        }
+    });
+}
+
+fn select_all(editor: &mut Editor) {
+    let count = editor.doc.value()["placements"].as_array().map_or(0, Vec::len);
+    editor.selection = (0..count).collect();
+}
+
+fn shortcut(ui: &mut egui::Ui, text: &str, shortcut: &KeyboardShortcut, enabled: bool) -> bool {
+    ui.add_enabled(enabled, egui::Button::new(text).shortcut_text(ui.ctx().format_shortcut(shortcut))).clicked()
+}
+
+/// The File / Edit / View bar; returns its height.
+fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
+    let width = ctx.viewport_rect().width();
+    egui::Area::new("menu bar".into())
+        .fixed_pos([0.0, 0.0])
+        .order(egui::Order::Middle)
+        .show(ctx, |ui| {
+            egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
+                ui.set_width(width - 16.0);
+                egui::MenuBar::new().ui(ui, |ui| {
+                    ui.menu_button("File", |ui| file_menu(ui, editor));
+                    ui.menu_button("Edit", |ui| {
+                        if shortcut(ui, "Undo", &UNDO, editor.doc.can_undo()) {
+                            editor.undo();
+                        }
+                        if shortcut(ui, "Redo", &REDO, editor.doc.can_redo()) {
+                            editor.redo();
+                        }
+                        ui.separator();
+                        if shortcut(ui, "Select all objects", &SELECT_ALL, true) {
+                            select_all(editor);
+                        }
+                        if ui.add_enabled(!editor.selection.is_empty(), egui::Button::new("Deselect all")).clicked() {
+                            editor.click(None, false);
+                        }
+                    });
+                    ui.menu_button("View", |ui| {
+                        let windows = &mut editor.windows;
+                        ui.checkbox(&mut windows.objects, "Objects");
+                        ui.checkbox(&mut windows.properties, "Properties");
+                        ui.checkbox(&mut windows.data, "Data");
+                        ui.checkbox(&mut windows.animation, "Animation");
+                        ui.separator();
+                        if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
+                            editor.frame = true;
+                        }
+                        if ui.button("Overview").clicked() {
+                            editor.frame = true;
+                            editor.overview = true;
+                        }
+                    });
+                    let name = editor.doc.value()["name"].as_str().unwrap_or("Untitled level").to_owned();
+                    let dirty = if editor.doc.is_dirty() { "  (unsaved)" } else { "" };
+                    ui.add_space(16.0);
+                    ui.label(RichText::new(format!("{name}{dirty}")).weak());
+                });
             })
-            .with_children(|bar| {
-                for (text, action) in [
-                    ("Open", Action::Open),
-                    ("Save", Action::Save),
-                    ("Save copy", Action::SaveAs),
-                    ("Undo", Action::Undo),
-                    ("Redo", Action::Redo),
-                    ("Frame", Action::Frame),
-                    ("Overview", Action::Overview),
-                ] {
-                    button(bar, text, action);
+            .response
+            .rect
+            .height()
+        })
+        .inner
+}
+
+fn file_menu(ui: &mut egui::Ui, editor: &mut Editor) {
+    if shortcut(ui, "Open...", &OPEN, true) {
+        editor.request_leave(Leave::Open(None));
+    }
+    ui.menu_button("Open project level", |ui| {
+        let levels = files::libraries(editor.doc.path());
+        if levels.is_empty() {
+            ui.label("No assets/levels folders found");
+        }
+        egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
+            for (name, path) in levels {
+                if ui.button(name).clicked() {
+                    editor.request_leave(Leave::Open(Some(path)));
                 }
+            }
+        });
+    });
+    ui.add_enabled_ui(!editor.recent.is_empty(), |ui| {
+        ui.menu_button("Open recent", |ui| {
+            for path in editor.recent.clone() {
+                if ui.button(path.display().to_string()).clicked() {
+                    editor.request_leave(Leave::Open(Some(path)));
+                }
+            }
+        });
+    });
+    ui.separator();
+    if shortcut(ui, "Save", &SAVE, true) {
+        editor.save();
+    }
+    if shortcut(ui, "Save As...", &SAVE_AS, true) {
+        editor.ask = Some(Ask::SaveAs);
+    }
+    ui.separator();
+    if shortcut(ui, "Quit", &QUIT, true) {
+        editor.request_leave(Leave::Quit);
+    }
+}
+
+fn status_bar(ctx: &egui::Context, editor: &Editor) {
+    let rect = ctx.viewport_rect();
+    egui::Area::new("status bar".into())
+        .fixed_pos([0.0, rect.bottom() - 26.0])
+        .order(egui::Order::Middle)
+        .show(ctx, |ui| {
+            egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
+                ui.set_width(rect.width() - 16.0);
+                ui.horizontal(|ui| {
+                    ui.label(&editor.status);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(RichText::new(editor.doc.path().display().to_string()).weak());
+                        if !editor.selection.is_empty() {
+                            ui.label(format!("{} selected  |", editor.selection.len()));
+                        }
+                    });
+                });
             });
-            root.spawn(label("SCENE", 12.0, MUTED));
-            root.spawn(Node { flex_wrap: FlexWrap::Wrap, column_gap: px(5), row_gap: px(5), ..default() })
-                .with_children(|bar| {
-                    for (name, pointer) in [
-                        ("Objects", "/placements"),
-                        ("Rooms", "/rooms"),
-                        ("Cameras", "/cameras"),
-                        ("Animations", "/animations"),
-                        ("All data", ""),
-                    ] {
-                        button(bar, name, Action::Navigate(pointer.into()));
+        });
+}
+
+fn leave_question(ctx: &egui::Context, editor: &mut Editor) {
+    let Some(leave) = editor.leaving.clone() else { return };
+    let file = editor.doc.path().file_name().unwrap_or_default().to_string_lossy().into_owned();
+    egui::Modal::new("unsaved changes".into()).show(ctx, |ui| {
+        ui.heading("Save your changes?");
+        ui.label(format!("{file} has unsaved changes."));
+        if editor.status.contains("changed on disk") {
+            ui.colored_label(ui.visuals().warn_fg_color, &editor.status);
+        }
+        ui.horizontal(|ui| {
+            if ui.button("Save").clicked() {
+                editor.save();
+                if !editor.doc.is_dirty() {
+                    editor.leave(leave.clone());
+                }
+            }
+            if ui.button("Discard changes").clicked() {
+                editor.leave(leave.clone());
+            }
+            if ui.button("Cancel").clicked() {
+                editor.leaving = None;
+            }
+        });
+    });
+}
+
+fn type_name(types: &ObjectTypes, kind: u64) -> String {
+    types.get(kind as u16).map_or_else(|| format!("Type {kind}"), |t| t.name.clone())
+}
+
+fn objects(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes, group: &mut Group, filter: &mut String) {
+    ui.horizontal(|ui| {
+        ui.label("Group by");
+        ui.selectable_value(group, Group::Room, "Room");
+        ui.selectable_value(group, Group::Type, "Type");
+    });
+    ui.add(egui::TextEdit::singleline(filter).hint_text("Filter by name or number"));
+    ui.separator();
+    let query = filter.trim().to_lowercase();
+    let mut groups = BTreeMap::<(u64, String), Vec<(usize, String)>>::new();
+    for (index, object) in editor.doc.value()["placements"].as_array().into_iter().flatten().enumerate() {
+        let kind = object["kind"].as_u64().unwrap_or(0);
+        let room = object["room"].as_u64().unwrap_or(0);
+        let name = type_name(types, kind);
+        if !query.is_empty() && index.to_string() != query && !name.to_lowercase().contains(&query) {
+            continue;
+        }
+        let (key, label) = match group {
+            Group::Room => ((room, String::new()), format!("{index}  {name}")),
+            Group::Type => ((0, name.clone()), format!("{index}  room {room}")),
+        };
+        groups.entry(key).or_default().push((index, label));
+    }
+    let mut clicked = None;
+    egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+        for ((room, name), items) in groups {
+            let title = if *group == Group::Room { format!("Room {room}") } else { name };
+            egui::CollapsingHeader::new(format!("{title}  ({})", items.len()))
+                .id_salt((*group == Group::Room, room, &title))
+                .default_open(true)
+                .show(ui, |ui| {
+                    for (index, label) in items {
+                        let selected = editor.selection.contains(&index);
+                        let text = if editor.active() == Some(index) { RichText::new(label).strong() } else { label.into() };
+                        let response = ui.selectable_label(selected, text);
+                        if response.clicked() {
+                            let modifiers = ui.input(|i| i.modifiers);
+                            clicked = Some((index, modifiers.shift || modifiers.command));
+                        }
+                        if response.double_clicked() {
+                            editor.frame = true;
+                        }
                     }
                 });
-            root.spawn((
-                Breadcrumb,
-                label("/", 15.0, Color::srgb(0.4, 0.8, 1.0)),
-                Node { height: px(28), overflow: Overflow::clip(), flex_shrink: 0.0, ..default() },
-            ));
-            root.spawn(Node { column_gap: px(5), ..default() }).with_children(|bar| {
-                for (text, action) in [
-                    ("Find", Action::Find),
-                    ("Parent", Action::Up),
-                    ("Previous", Action::Previous),
-                    ("Next", Action::Next),
-                    ("Edit value", Action::Edit),
-                ] {
-                    button(bar, text, action);
-                }
-            });
-            for row in 0..ROWS {
-                root.spawn((
-                    Action::Row(row),
-                    FieldRow(row),
-                    Node {
-                        height: px(27),
-                        width: percent(100),
-                        flex_shrink: 0.0,
-                        padding: UiRect::axes(px(7), px(3)),
-                        overflow: Overflow::clip(),
-                        ..default()
-                    },
-                    BackgroundColor(BACK),
-                ))
-                .observe(clicked)
-                .with_child(label("", 14.0, INK));
-            }
-            root.spawn((
-                crate::inspector::Panel,
-                Node { flex_direction: FlexDirection::Column, row_gap: px(4), flex_shrink: 0.0, ..default() },
-            ));
-            root.spawn((
-                Prompt,
-                label("", 14.0, INK),
-                Node { max_height: px(46), overflow: Overflow::clip(), flex_shrink: 0.0, ..default() },
-            ));
-            root.spawn((Footer, label("", 13.0, MUTED), Node { overflow: Overflow::clip(), ..default() }));
-        });
-    commands.spawn((UiTargetCamera(camera), Node { position_type: PositionType::Absolute, left: px(PANEL + 16.0), top: px(16), padding: UiRect::all(px(10)), ..default() }, BackgroundColor(BACK)))
-        .with_child(label("Scene   |   Click an object to inspect it\nWheel: zoom   Middle drag: pan   Right drag: look\nWASD: fly   Q/E: down/up   F: focus", 14.0, INK));
-}
-
-#[derive(Component)]
-pub(super) struct ControlColor(pub Color);
-
-fn hover(
-    mut buttons: Query<
-        (&bevy::picking::hover::Hovered, &ControlColor, &mut BackgroundColor),
-        Changed<bevy::picking::hover::Hovered>,
-    >,
-) {
-    for (hovered, normal, mut background) in &mut buttons {
-        background.0 = if hovered.get() { Color::srgb(0.20, 0.34, 0.46) } else { normal.0 };
+        }
+    });
+    if let Some((index, extend)) = clicked {
+        editor.click(Some(index), extend);
     }
 }
 
-fn tabs(
-    editor: Res<Editor>,
-    mut controls: Query<(&Action, &bevy::picking::hover::Hovered, &mut ControlColor, &mut BackgroundColor)>,
-) {
-    for (action, hovered, mut normal, mut background) in &mut controls {
-        let Action::Navigate(pointer) = action else { continue };
-        let selected = if pointer.is_empty() {
-            editor.pointer.is_empty()
+/// A number field of every selected object: drag it to move them all by the
+/// same amount, or type a value to set them all to it.
+fn number(ui: &mut egui::Ui, editor: &mut Editor, field: &str, speed: f64, range: Option<(f64, f64)>) {
+    let Some(index) = editor.active() else { return };
+    let pointer = format!("/placements/{index}/{field}");
+    let degrees = field == "rotation";
+    let scale = if degrees { 360.0 / TURN as f64 } else { 1.0 };
+    let saved = editor.doc.value().pointer(&pointer).and_then(Value::as_f64).unwrap_or(0.0);
+    let mut shown = editor.value(&pointer).and_then(Value::as_f64).unwrap_or(0.0) * scale;
+    let mut drag = egui::DragValue::new(&mut shown).speed(speed).update_while_editing(false);
+    drag = if degrees { drag.suffix(" deg").fixed_decimals(1) } else { drag.fixed_decimals(0) };
+    if let Some((low, high)) = range {
+        drag = drag.range(low..=high);
+    }
+    let response = ui.add(drag);
+    if response.changed() {
+        let units = (shown / scale).round() as i64;
+        if response.dragged() {
+            editor.edit_selected(field, Change::Add(units - saved as i64), true);
         } else {
-            editor.pointer == *pointer || editor.pointer.starts_with(&format!("{pointer}/"))
-        };
-        normal.0 = if selected { Color::srgb(0.12, 0.32, 0.46) } else { Color::srgb(0.12, 0.17, 0.24) };
-        if !hovered.get() {
-            background.0 = normal.0;
+            let units = if degrees { units.rem_euclid(TURN) } else { units };
+            editor.edit_selected(field, Change::Set(&Value::from(units)), false);
         }
     }
-}
-
-/// Child browsing is bounded even for very large vertex/animation tables.
-fn entries(editor: &Editor) -> Vec<(String, String)> {
-    let Some(value) = editor.doc.value().pointer(&editor.pointer) else { return vec![] };
-    match value {
-        Value::Object(map) => map
-            .iter()
-            .map(|(key, value)| {
-                (child_pointer(&editor.pointer, key), format!("{}   {}", humanize(key), summary(value)))
-            })
-            .collect(),
-        Value::Array(array) => array
-            .iter()
-            .enumerate()
-            .map(|(i, value)| (child_pointer(&editor.pointer, &i.to_string()), format!("[{i}]   {}", summary(value))))
-            .collect(),
-        value => vec![(editor.pointer.clone(), summary(value))],
+    if response.drag_stopped() {
+        editor.commit();
     }
 }
-pub(super) fn humanize(key: &str) -> String {
+
+fn flag(ui: &mut egui::Ui, editor: &mut Editor, field: &str, label: &str) {
+    let Some(index) = editor.active() else { return };
+    let mut value = editor.value(&format!("/placements/{index}/{field}")).and_then(Value::as_bool).unwrap_or(false);
+    if ui.checkbox(&mut value, label).changed() {
+        editor.edit_selected(field, Change::Set(&Value::Bool(value)), false);
+    }
+}
+
+const PLACEMENT_FIELDS: [&str; 8] = ["kind", "room", "position", "rotation", "code", "inverted", "invisible", "other_flags"];
+
+/// The active object's fields; returns whether to show it in the Data window.
+fn properties(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes) -> bool {
+    let Some(index) = editor.active() else {
+        ui.label("Click an object in the 3D view or the Objects window. Shift-click selects more.");
+        return false;
+    };
+    let base = format!("/placements/{index}");
+    let Some(object) = editor.doc.value().pointer(&base).cloned() else { return false };
+    let kind = object["kind"].as_u64().unwrap_or(0);
+    ui.heading(format!("Object {index}: {}", type_name(types, kind)));
+    if editor.selection.len() > 1 {
+        ui.label(
+            RichText::new(format!("{} selected. Edits apply to all; drags move them together.", editor.selection.len()))
+                .weak(),
+        );
+    }
+    ui.separator();
+    egui::Grid::new("properties").num_columns(2).spacing([12.0, 6.0]).striped(true).show(ui, |ui| {
+        ui.label("Type");
+        ui.horizontal(|ui| {
+            if types.iter().next().is_some() {
+                egui::ComboBox::from_id_salt("kind").selected_text(type_name(types, kind)).height(400.0).show_ui(ui, |ui| {
+                    for (id, info) in types.iter() {
+                        if ui.selectable_label(u64::from(id) == kind, format!("{id}  {}", info.name)).clicked() {
+                            editor.edit_selected("kind", Change::Set(&Value::from(id)), false);
+                        }
+                    }
+                });
+            }
+            number(ui, editor, "kind", 0.05, Some((0.0, u16::MAX as f64)));
+        });
+        ui.end_row();
+        ui.label("Room");
+        number(ui, editor, "room", 0.05, Some((0.0, f64::MAX)));
+        ui.end_row();
+        ui.label("Position").on_hover_text("Level units: 1024 per sector, Y increases downward. Drag to move.");
+        ui.horizontal(|ui| {
+            for (axis, name) in ["X", "Y", "Z"].iter().enumerate() {
+                ui.label(*name);
+                number(ui, editor, &format!("position/{axis}"), 8.0, None);
+            }
+        });
+        ui.end_row();
+        ui.label("Heading");
+        number(ui, editor, "rotation", 1.0, None);
+        ui.end_row();
+        ui.label("Activation code").on_hover_text("Code bits the object starts with; all five start it active.");
+        number(ui, editor, "code", 0.05, Some((0.0, 31.0)));
+        ui.end_row();
+        ui.label("Starts");
+        ui.horizontal(|ui| {
+            flag(ui, editor, "inverted", "Inverted");
+            flag(ui, editor, "invisible", "Hidden");
+        });
+        ui.end_row();
+        ui.label("Other flags");
+        number(ui, editor, "other_flags", 0.05, Some((0.0, u16::MAX as f64)));
+        ui.end_row();
+        for (key, value) in object.as_object().into_iter().flatten() {
+            if !PLACEMENT_FIELDS.contains(&key.as_str()) {
+                ui.label(humanize(key));
+                ui.label(summary(value));
+                ui.end_row();
+            }
+        }
+    });
+    ui.separator();
+    ui.horizontal(|ui| {
+        if ui.button("Frame (F)").clicked() {
+            editor.frame = true;
+        }
+        let show = ui.button("Show in Data").clicked();
+        if show {
+            editor.navigate(base);
+        }
+        show
+    })
+    .inner
+}
+
+pub fn humanize(key: &str) -> String {
     let text = key.replace('_', " ");
     let mut chars = text.chars();
     chars.next().map_or_else(String::new, |first| first.to_uppercase().collect::<String>() + chars.as_str())
 }
+
 fn summary(value: &Value) -> String {
     match value {
-        Value::Object(map) => {
-            if let Some(kind) = map.get("kind") {
-                format!("object type {kind}  ({} fields)", map.len())
-            } else {
-                format!("{{ {} fields }}", map.len())
-            }
+        Value::Object(map) => match map.get("kind") {
+            Some(kind) => format!("object type {kind}  ({} fields)", map.len()),
+            None => format!("{{ {} fields }}", map.len()),
+        },
+        Value::Array(array) if array.len() <= 5 && array.iter().all(|v| !v.is_array() && !v.is_object()) => {
+            value.to_string()
         }
-        Value::Array(array) => {
-            if array.len() <= 5 && array.iter().all(|v| !v.is_array() && !v.is_object()) {
-                value.to_string()
-            } else {
-                format!("[ {} entries ]", array.len())
-            }
-        }
+        Value::Array(array) => format!("[ {} entries ]", array.len()),
         _ => value.to_string().chars().take(100).collect(),
     }
 }
-pub(super) fn selected_pointer(editor: &Editor) -> String {
-    entries(editor).get(editor.page + editor.selected).map_or_else(|| editor.pointer.clone(), |(p, _)| p.clone())
-}
-pub(super) fn begin_find(editor: &mut Editor, types: Option<&ObjectTypes>) {
-    let table = editor
-        .pointer
-        .split('/')
-        .nth(1)
-        .filter(|table| matches!(*table, "placements" | "rooms" | "cameras" | "animations"))
-        .unwrap_or("placements");
-    let name = if table == "placements" { "Object" } else { table.trim_end_matches('s') };
-    let candidates = editor
-        .doc
-        .value()
-        .get(table)
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .enumerate()
-                .map(|(index, item)| {
-                    let detail = item
-                        .get("kind")
-                        .and_then(Value::as_u64)
-                        .map(|kind| {
-                            types
-                                .and_then(|types| types.get(kind as u16))
-                                .map_or_else(|| format!("Type {kind}"), |kind| kind.name.clone())
-                        })
-                        .unwrap_or_default();
-                    (format!("/{table}/{index}"), format!("{} {index}  {detail}", humanize(name)))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    editor.input = Some(Input { mode: Mode::Find(candidates), text: String::new(), select_all: true });
-    editor.status.clear();
-}
-pub(super) fn find_matches<'a>(candidates: &'a [(String, String)], text: &str) -> Vec<&'a (String, String)> {
-    let query = text.trim().to_lowercase();
-    candidates
-        .iter()
-        .filter(|(pointer, name)| {
-            if query.parse::<usize>().is_ok() {
-                pointer.rsplit('/').next() == Some(query.as_str())
-            } else {
-                name.to_lowercase().contains(&query)
-            }
-        })
-        .collect()
-}
-fn enter(editor: &mut Editor) {
-    let pointer = selected_pointer(editor);
-    match editor.doc.value().pointer(&pointer) {
-        Some(Value::Array(_) | Value::Object(_)) => {
-            editor.pointer = pointer;
-            editor.page = 0;
-            editor.selected = 0;
-        }
-        Some(_) => begin_edit(editor),
-        None => (),
-    }
-}
-fn begin_edit(editor: &mut Editor) {
-    let pointer = selected_pointer(editor);
-    edit_value(editor, pointer);
-}
-fn edit_value(editor: &mut Editor, pointer: String) {
-    if let Some(value) = editor.doc.value().pointer(&pointer) {
-        if let Some(value) = value.as_bool() {
-            let result = editor.doc.replace(&pointer, &(!value).to_string());
-            editor.result(result, "Updated checkbox");
-        } else {
-            let text = value.as_str().map_or_else(|| value.to_string(), str::to_owned);
-            let mode = if value.is_array() || value.is_object() { Mode::Field(pointer) } else { Mode::Value(pointer) };
-            editor.input = Some(Input { mode, text, select_all: true });
-        }
-    }
-}
-pub(super) fn begin_file(editor: &mut Editor, save: bool) {
-    let (picker, text) = crate::files::Picker::new(editor.doc.path(), save);
-    editor.status.clear();
-    editor.input = Some(Input { mode: Mode::File(picker), text, select_all: true });
-}
-pub(super) fn request_leave(editor: &mut Editor, quit: bool) {
-    if editor.doc.is_dirty() {
-        editor.input = Some(Input { mode: Mode::ConfirmLeave { quit }, text: String::new(), select_all: false });
-        editor.status.clear();
-    } else if quit {
-        editor.exit_requested = true;
-    } else {
-        begin_file(editor, false);
-    }
-}
-pub(super) fn act(editor: &mut Editor, action: Action) {
-    if editor.input.is_some()
-        && !matches!(
-            action,
-            Action::Apply
-                | Action::Cancel
-                | Action::Browse(_)
-                | Action::Files(_)
-                | Action::Location
-                | Action::SaveContinue
-                | Action::DiscardContinue
-                | Action::Pick(_)
-        )
-    {
-        return;
-    }
-    match action {
-        Action::Up => {
-            editor.pointer = editor.pointer.rsplit_once('/').map_or("", |(p, _)| p).into();
-            editor.page = 0;
-            editor.selected = 0;
-        }
-        Action::Previous => {
-            editor.page = editor.page.saturating_sub(ROWS);
-            editor.selected = 0;
-        }
-        Action::Next => {
-            if editor.page + ROWS < entries(editor).len() {
-                editor.page += ROWS;
-                editor.selected = 0;
-            }
-        }
-        Action::Edit => begin_edit(editor),
-        Action::Find => begin_find(editor, None),
-        Action::Pick(pointer) => {
-            if matches!(editor.input.as_ref().map(|input| &input.mode), Some(Mode::Find(_))) {
-                editor.input = None;
-                editor.pointer = pointer;
-                editor.page = 0;
-                editor.selected = 0;
-                editor.frame = true;
-            }
-        }
-        Action::Row(row) => {
-            if editor.page + row < entries(editor).len() {
-                editor.selected = row;
-                enter(editor);
-            }
-        }
-        Action::Save => {
-            let result = editor.doc.save();
-            editor.status = result.err().unwrap_or_else(|| "Saved".into());
-        }
-        Action::SaveAs => begin_file(editor, true),
-        Action::Open => request_leave(editor, false),
-        Action::Browse(path) => {
-            let Some(Input { mode: Mode::File(picker), .. }) = &editor.input else { return };
-            if path.is_dir() {
-                let save = picker.save;
-                let location = picker.focus == crate::files::Focus::Location;
-                let input = editor.input.as_mut().unwrap();
-                if !save || location {
-                    input.text = if save { "level-copy.json".into() } else { String::new() };
-                }
-                input.mode = Mode::File(crate::files::Picker {
-                    directory: path,
-                    page: 0,
-                    selected: 0,
-                    save,
-                    focus: if save { crate::files::Focus::Filename } else { crate::files::Focus::Search },
-                });
-                input.select_all = true;
-                editor.status.clear();
-            } else if !picker.save {
-                open_file(editor, &path);
-            } else {
-                editor.status = "Choose a new filename. Existing files are never overwritten by Save copy.".into();
-            }
-        }
-        Action::Files(next) => {
-            if let Some(input) = &mut editor.input
-                && let Mode::File(picker) = &mut input.mode
-            {
-                let count = picker.entries(&input.text).map_or(0, |paths| paths.len());
-                picker.page = if next && (picker.page + 1) * crate::files::PAGE_SIZE < count {
-                    picker.page + 1
-                } else if !next {
-                    picker.page.saturating_sub(1)
-                } else {
-                    picker.page
-                };
-                picker.selected = picker.page * crate::files::PAGE_SIZE;
-            }
-        }
-        Action::Location => {
-            if let Some(input) = &mut editor.input
-                && let Mode::File(picker) = &mut input.mode
-            {
-                picker.focus = crate::files::Focus::Location;
-                input.text = picker.directory.display().to_string();
-                input.select_all = true;
-            }
-        }
-        Action::Navigate(pointer) => {
-            editor.pointer = pointer;
-            editor.page = 0;
-            editor.selected = 0;
-        }
-        Action::EditValue(pointer) => edit_value(editor, pointer),
-        Action::EditAngle(pointer) => {
-            if let Some(angle) = editor.doc.value().pointer(&pointer).and_then(Value::as_u64) {
-                editor.input = Some(Input {
-                    mode: Mode::Angle(pointer),
-                    text: format!("{:.6}", angle as f64 * 360.0 / 65536.0),
-                    select_all: true,
-                });
-            }
-        }
-        Action::Nudge(pointer, delta) => {
-            if let Some(value) = editor.doc.value().pointer(&pointer).and_then(Value::as_i64) {
-                let value = if pointer.ends_with("/rotation") {
-                    (value + delta).rem_euclid(65536)
-                } else {
-                    value.saturating_add(delta)
-                };
-                let result = editor.doc.replace(&pointer, &value.to_string());
-                editor.result(result, "Updated property - Ctrl+Z to undo");
-            }
-        }
-        Action::Toggle(pointer) => {
-            let result = if let Some(value) = editor.doc.value().pointer(&pointer).and_then(Value::as_bool) {
-                editor.doc.replace(&pointer, &(!value).to_string())
-            } else if let Some((parent, key)) = pointer.rsplit_once('/') {
-                let mut value = editor.doc.value().pointer(parent).cloned().unwrap_or(Value::Null);
-                if let Some(object) = value.as_object_mut() {
-                    object.insert(key.into(), Value::Bool(true));
-                    editor.doc.replace(parent, &value.to_string())
-                } else {
-                    Err("This property is not available.".into())
-                }
-            } else {
-                Err("This property is not available.".into())
-            };
-            editor.result(result, "Updated checkbox");
-        }
-        Action::SaveContinue | Action::DiscardContinue => {
-            let Some(Input { mode: Mode::ConfirmLeave { quit }, .. }) = &editor.input else { return };
-            let quit = *quit;
-            if matches!(action, Action::SaveContinue)
-                && let Err(error) = editor.doc.save()
-            {
-                editor.status = error;
-                return;
-            }
-            editor.input = None;
-            if quit {
-                editor.exit_requested = true;
-            } else {
-                begin_file(editor, false);
-            }
-        }
-        Action::Undo => editor.undo(),
-        Action::Redo => editor.redo(),
-        Action::Frame => editor.frame = true,
-        Action::Overview => {
-            editor.frame = true;
-            editor.overview = true;
-        }
-        Action::Apply => apply(editor),
-        Action::Cancel => editor.input = None,
-    }
-}
-fn open_file(editor: &mut Editor, path: &std::path::Path) {
-    match LevelDocument::open(path) {
-        Ok(doc) => {
-            let old = editor.doc.path().to_path_buf();
-            editor.recent.retain(|p| p != &old && p != doc.path());
-            editor.recent.insert(0, old);
-            editor.recent.truncate(5);
-            editor.doc = doc;
-            editor.pointer = "/placements".into();
-            editor.page = 0;
-            editor.selected = 0;
-            editor.frame = true;
-            editor.overview = true;
-            editor.input = None;
-            editor.changed("Opened level");
-        }
-        Err(error) => editor.status = format!("Could not open {}: {error}", path.display()),
-    }
-}
-fn apply(editor: &mut Editor) {
-    let Some(input) = editor.input.take() else { return };
-    if let Mode::Find(candidates) = &input.mode {
-        let target = find_matches(candidates, &input.text).first().map(|(pointer, _)| pointer.clone());
-        editor.input = Some(input);
-        if let Some(pointer) = target {
-            act(editor, Action::Pick(pointer));
-        } else {
-            editor.status = "No matches. Try an item number or a name.".into();
-        }
-        return;
-    }
-    if let Mode::File(picker) = &input.mode {
-        let target = if picker.focus == crate::files::Focus::Location {
-            let path = std::path::PathBuf::from(&input.text);
-            if path.is_absolute() { path } else { picker.directory.join(path) }
-        } else if picker.save {
-            // A filename is one component; use Location to change folders.
-            let mut components = std::path::Path::new(&input.text).components();
-            if !matches!(components.next(), Some(std::path::Component::Normal(_)))
-                || components.next().is_some()
-                || input.text.trim().is_empty()
-            {
-                editor.status = "Enter a filename, such as level-copy.json.".into();
-                editor.input = Some(input);
-                return;
-            }
-            let mut filename = std::path::PathBuf::from(&input.text);
-            if filename.extension().is_none() {
-                filename.set_extension("json");
-            }
-            picker.directory.join(filename)
-        } else {
-            match picker.entries(&input.text).ok().and_then(|paths| paths.get(picker.selected).cloned()) {
-                Some(path) => path,
-                None => {
-                    editor.status = "Choose a file or folder from the list.".into();
-                    editor.input = Some(input);
-                    return;
-                }
-            }
-        };
-        let save = picker.save;
-        let location = picker.focus == crate::files::Focus::Location;
-        editor.input = Some(input);
-        if target.is_dir() {
-            act(editor, Action::Browse(target));
-        } else if save && !location {
-            let result = if target.exists() {
-                Err("Choose a new filename for the copy; this file already exists.".into())
-            } else {
-                editor.doc.save_to(target)
-            };
-            if result.is_ok() {
-                editor.input = None;
-            }
-            editor.result(result, "Saved copy");
-        } else if !save {
-            open_file(editor, &target);
-        } else {
-            editor.status = "Choose an existing folder for the location.".into();
-        }
-        return;
-    }
-    let result = match &input.mode {
-        Mode::Field(pointer) => editor.doc.replace(pointer, &input.text),
-        Mode::Value(pointer) => {
-            if editor.doc.value().pointer(pointer).is_some_and(Value::is_string) {
-                editor.doc.replace(pointer, &Value::String(input.text.clone()).to_string())
-            } else if editor.doc.value().pointer(pointer).is_some_and(Value::is_number) {
-                match serde_json::from_str::<Value>(&input.text) {
-                    Ok(value @ Value::Number(_)) => editor.doc.replace(pointer, &value.to_string()),
-                    _ => Err("Enter a number, such as 128 or -64.".into()),
-                }
-            } else {
-                editor.doc.replace(pointer, &input.text)
-            }
-        }
-        Mode::Angle(pointer) => {
-            input.text.parse::<f64>().map_err(|_| "Enter an angle in degrees.".to_string()).and_then(|angle| {
-                if !angle.is_finite() {
-                    return Err("Enter a finite angle in degrees.".into());
-                }
-                editor.doc.replace(
-                    pointer,
-                    &(((angle.rem_euclid(360.0) * 65536.0 / 360.0).round() as u32) % 65536).to_string(),
-                )
-            })
-        }
-        Mode::File(_) | Mode::ConfirmLeave { .. } | Mode::Find(_) => {
-            editor.input = Some(input);
-            return;
-        }
-    };
-    if result.is_err() {
-        editor.input = Some(input);
-    }
-    editor.result(result, "Applied");
-}
-pub(super) fn clicked(
-    mut click: On<bevy::picking::events::PointerClick>,
-    mut editor: ResMut<Editor>,
-    actions: Query<&Action>,
-    types: Option<Res<ObjectTypes>>,
-) {
-    if click.button != bevy::picking::pointer::PointerButton::Primary {
-        return;
-    }
-    if let Ok(action) = actions.get(click.entity) {
-        if matches!(action, Action::Find) && editor.input.is_none() {
-            begin_find(&mut editor, types.as_deref());
-        } else {
-            act(&mut editor, action.clone());
-        }
-        click.propagate(false);
-    }
-}
 
-pub fn input(
-    mut editor: ResMut<Editor>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    mut events: MessageReader<KeyboardInput>,
-    mut close: MessageReader<WindowCloseRequested>,
-    mut exit: MessageWriter<AppExit>,
-    focus: Res<crate::viewport::ViewportFocus>,
-    types: Option<Res<ObjectTypes>>,
-) {
-    let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::SuperRight]);
-    let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
-    let quit = close.read().next().is_some() || (ctrl && keys.just_pressed(KeyCode::KeyQ));
-    if quit {
-        if ctrl && shift {
-            editor.exit_requested = true;
-        } else {
-            request_leave(&mut editor, true);
+/// Every field of the level, browsed table by table.
+fn data(ui: &mut egui::Ui, editor: &mut Editor) {
+    let mut go = None;
+    ui.horizontal_wrapped(|ui| {
+        if ui.link("Level").clicked() {
+            go = Some(String::new());
         }
-    }
-    if editor.exit_requested {
-        exit.write(AppExit::Success);
-        return;
-    }
-    if editor.input.is_some() {
-        for event in events.read().filter(|e| e.state == ButtonState::Pressed) {
-            if ctrl && event.key_code == KeyCode::KeyL {
-                act(&mut editor, Action::Location);
-                continue;
-            }
-            if let Some(Input { mode: Mode::File(picker), text, .. }) = &mut editor.input {
-                if matches!(event.key_code, KeyCode::ArrowDown | KeyCode::ArrowUp) {
-                    let count = picker.entries(text).map_or(0, |paths| paths.len());
-                    picker.selected = if event.key_code == KeyCode::ArrowDown {
-                        (picker.selected + 1).min(count.saturating_sub(1))
-                    } else {
-                        picker.selected.saturating_sub(1)
-                    };
-                    picker.page = picker.selected / crate::files::PAGE_SIZE;
-                    continue;
-                }
-                if event.key_code == KeyCode::Backspace && text.is_empty() {
-                    if let Some(parent) = picker.directory.parent() {
-                        let parent = parent.to_path_buf();
-                        act(&mut editor, Action::Browse(parent));
-                    }
-                    continue;
-                }
-            }
-            if matches!(editor.input.as_ref().map(|i| &i.mode), Some(Mode::ConfirmLeave { .. }))
-                && event.key_code != KeyCode::Escape
-            {
-                continue;
-            }
-            match event.key_code {
-                KeyCode::Escape => {
-                    editor.input = None;
-                    break;
-                }
-                KeyCode::Enter if !shift => {
-                    apply(&mut editor);
-                    break;
-                }
-                KeyCode::KeyA if ctrl => {
-                    if let Some(input) = &mut editor.input {
-                        input.select_all = true;
-                    }
-                }
-                KeyCode::Backspace | KeyCode::Delete => {
-                    if let Some(input) = &mut editor.input {
-                        if input.select_all {
-                            input.text.clear();
-                        } else {
-                            input.text.pop();
-                        }
-                        input.select_all = false;
-                    }
-                }
-                _ if !ctrl => {
-                    if let (Some(input), Some(text)) = (&mut editor.input, &event.text) {
-                        if input.select_all {
-                            input.text.clear();
-                            input.select_all = false;
-                        }
-                        input.text.extend(text.chars().filter(|c| !c.is_control()));
-                    }
-                }
-                _ => (),
-            }
-            if let Some(Input { mode: Mode::File(picker), .. }) = &mut editor.input
-                && !matches!(event.key_code, KeyCode::ArrowDown | KeyCode::ArrowUp)
-            {
-                picker.page = 0;
-                picker.selected = 0;
+        let mut pointer = String::new();
+        for part in editor.pointer.split('/').skip(1) {
+            pointer = format!("{pointer}/{part}");
+            ui.label("/");
+            let name = if part == "placements" { "Objects".into() } else { humanize(part) };
+            if ui.link(name).clicked() {
+                go = Some(pointer.clone());
             }
         }
-        return;
-    }
-    events.clear();
-    if ctrl {
-        if keys.just_pressed(KeyCode::KeyF) {
-            begin_find(&mut editor, types.as_deref());
-        }
-        for (key, action) in [
-            (KeyCode::KeyS, if shift { Action::SaveAs } else { Action::Save }),
-            (KeyCode::KeyO, Action::Open),
-            (KeyCode::KeyZ, if shift { Action::Redo } else { Action::Undo }),
-            (KeyCode::KeyY, Action::Redo),
-        ] {
-            if keys.just_pressed(key) {
-                act(&mut editor, action);
-            }
-        }
-        return;
-    }
-    if mouse.pressed(MouseButton::Right) || focus.active {
-        if keys.just_pressed(KeyCode::KeyF) {
-            editor.frame = true;
-        }
-        return;
-    }
-    if keys.just_pressed(KeyCode::ArrowDown) && editor.page + editor.selected + 1 < entries(&editor).len() {
-        editor.selected += 1;
-        if editor.selected == ROWS {
-            editor.page += ROWS;
-            editor.selected = 0;
-        }
-    }
-    if keys.just_pressed(KeyCode::ArrowUp) {
-        if editor.selected > 0 {
-            editor.selected -= 1;
-        } else if editor.page > 0 {
-            editor.page = editor.page.saturating_sub(ROWS);
-            editor.selected = ROWS - 1;
-        }
-    }
-    for (key, action) in [
-        (KeyCode::ArrowLeft, Action::Up),
-        (KeyCode::Backspace, Action::Up),
-        (KeyCode::PageDown, Action::Next),
-        (KeyCode::PageUp, Action::Previous),
-        (KeyCode::KeyE, Action::Edit),
-        (KeyCode::KeyF, Action::Frame),
-    ] {
-        if keys.just_pressed(key) {
-            act(&mut editor, action);
-        }
-    }
-    if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::ArrowRight) {
-        enter(&mut editor);
-    }
-}
-
-#[allow(clippy::type_complexity)]
-fn refresh(
-    editor: Res<Editor>,
-    types: Res<ObjectTypes>,
-    mut texts: ParamSet<(
-        Query<&mut Text, With<Header>>,
-        Query<&mut Text, With<Breadcrumb>>,
-        Query<&mut Text, With<Prompt>>,
-        Query<&mut Text, With<Footer>>,
-        Query<(&FieldRow, &Children, &mut BackgroundColor)>,
-        Query<&mut Text>,
-    )>,
-) {
-    if !editor.is_changed() {
-        return;
-    }
-    for mut text in &mut texts.p0() {
-        **text = format!(
-            "{}{} ({})\n{}",
-            if editor.doc.is_dirty() { "* UNSAVED  " } else { "" },
-            editor.doc.value()["name"].as_str().unwrap_or("Untitled level"),
-            editor.doc.path().file_name().unwrap().to_string_lossy(),
-            editor
-                .doc
-                .path()
-                .parent()
-                .unwrap()
-                .display()
-                .to_string()
-                .chars()
-                .rev()
-                .take(60)
-                .collect::<String>()
-                .chars()
-                .rev()
-                .collect::<String>()
-        );
-    }
-    let entries = entries(&editor);
-    for mut text in &mut texts.p1() {
-        **text = format!(
-            "{}  |  {} entries  |  page {}",
-            if editor.pointer.is_empty() {
-                "All data".into()
-            } else {
-                editor
-                    .pointer
-                    .trim_start_matches('/')
-                    .split('/')
-                    .map(|part| if part == "placements" { "Objects".into() } else { humanize(part) })
-                    .collect::<Vec<_>>()
-                    .join(" / ")
-            },
-            entries.len(),
-            editor.page / ROWS + 1
-        );
-    }
-    let prompt = match &editor.input {
-        Some(_) => "Dialog open - Escape returns to the scene.".into(),
-        None => {
-            let pointer = selected_pointer(&editor);
-            let mut owner = pointer.as_str();
-            let kind = loop {
-                if let Some(kind) =
-                    editor.doc.value().pointer(owner).and_then(|v| v.get("kind")).and_then(Value::as_u64)
-                {
-                    break Some(kind);
-                }
-                match owner.rsplit_once('/') {
-                    Some((parent, _)) => owner = parent,
-                    None => break None,
-                }
-            };
-            let metadata = kind
-                .map(|id| types.get(id as u16).map_or_else(|| format!("Type {id} (unregistered)"), |t| t.name.clone()))
-                .unwrap_or_default();
-            if metadata.is_empty() {
-                "Click to inspect. F focuses the selection.\nAll data contains every engine field.".into()
-            } else {
-                metadata
-            }
-        }
-    };
-    for mut text in &mut texts.p2() {
-        **text = prompt.clone();
-    }
-    for mut text in &mut texts.p3() {
-        **text =
-            format!("{}\nCtrl+S save   Ctrl+Z undo   Ctrl+Y redo\nCtrl+O open   Ctrl+Shift+S save copy", editor.status);
-    }
-    let mut updates = vec![];
-    for (row, children, mut background) in &mut texts.p4() {
-        let value = entries.get(editor.page + row.0).map_or(String::new(), |(pointer, text)| {
-            if editor.pointer == "/placements" {
-                let object = editor.doc.value().pointer(pointer).unwrap();
-                let kind = object["kind"].as_u64().unwrap_or(0) as u16;
-                let name = types.get(kind).map_or_else(|| format!("Type {kind}"), |t| t.name.clone());
-                format!("{}  {name}  |  Room {}", pointer.rsplit('/').next().unwrap_or(""), object["room"])
-            } else if editor.pointer == "/rooms" {
-                format!(
-                    "Room {}  |  {} x {} sectors",
-                    pointer.rsplit('/').next().unwrap_or(""),
-                    editor.doc.value().pointer(pointer).unwrap()["x_sectors"],
-                    editor.doc.value().pointer(pointer).unwrap()["z_sectors"]
-                )
-            } else {
-                text.clone()
-            }
-        });
-        *background = BackgroundColor(if row.0 == editor.selected && !value.is_empty() {
-            Color::srgb(0.13, 0.25, 0.36)
-        } else {
-            BACK
-        });
-        if let Some(&child) = children.first() {
-            updates.push((child, value));
-        }
-    }
-    for (entity, value) in updates {
-        if let Ok(mut text) = texts.p5().get_mut(entity) {
-            **text = value;
-        }
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn camera(
-    mut editor: ResMut<Editor>,
-    mut cameras: Query<(&mut Transform, &mut Camera), With<GameCamera>>,
-    windows: Query<&Window>,
-    time: Res<Time>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    motion: Res<AccumulatedMouseMotion>,
-    scroll: Res<AccumulatedMouseScroll>,
-    target: Res<EditorTarget>,
-    focus: Res<crate::viewport::ViewportFocus>,
-) {
-    let Ok((mut transform, mut camera)) = cameras.single_mut() else { return };
-    let (width, height, scale) =
-        windows.single().map_or((1280, 800, 1.0), |w| (w.physical_width(), w.physical_height(), w.scale_factor()));
-    let left = ((PANEL * scale) as u32).min(width.saturating_sub(1));
-    camera.viewport = Some(bevy::camera::Viewport {
-        physical_position: UVec2::new(left, 0),
-        physical_size: UVec2::new(width - left, height.max(1)),
-        ..default()
     });
-    if target.headless {
-        camera.viewport = Some(bevy::camera::Viewport {
-            physical_position: UVec2::new(PANEL as u32, 0),
-            physical_size: UVec2::new(1280 - PANEL as u32, 800),
-            ..default()
+    ui.separator();
+    let mut draft = None;
+    let mut select = None;
+    {
+        let pointer = editor.pointer.as_str();
+        let current = editor.doc.value().pointer(pointer);
+        let count = match current {
+            Some(Value::Object(map)) => map.len(),
+            Some(Value::Array(array)) => array.len(),
+            _ => 0,
+        };
+        let child = |i: usize| match current {
+            Some(Value::Object(map)) => map.iter().nth(i).map(|(k, v)| (k.clone(), humanize(k), v)),
+            Some(Value::Array(array)) => array.get(i).map(|v| (i.to_string(), format!("[{i}]"), v)),
+            _ => None,
+        };
+        if count > 0 {
+            let height = ui.text_style_height(&egui::TextStyle::Body) + 4.0;
+            egui::ScrollArea::vertical().max_height(320.0).auto_shrink([false, true]).show_rows(ui, height, count, |ui, rows| {
+                egui::Grid::new("data rows").num_columns(2).striped(true).show(ui, |ui| {
+                    for i in rows {
+                        let Some((key, name, value)) = child(i) else { continue };
+                        if ui.selectable_label(false, name).clicked() {
+                            let pointer = child_pointer(pointer, &key);
+                            if value.is_array() || value.is_object() {
+                                go = Some(pointer);
+                            } else {
+                                draft = Some((pointer, value.as_str().map_or_else(|| value.to_string(), str::to_owned)));
+                            }
+                        }
+                        ui.label(summary(value));
+                        ui.end_row();
+                    }
+                });
+            });
+        } else if let Some(value) = current {
+            ui.label(summary(value));
+        }
+        ui.horizontal(|ui| {
+            let text = current.map(Value::to_string).unwrap_or_default();
+            let fits = text.len() <= LARGEST_DRAFT;
+            let edit = ui.add_enabled(fits, egui::Button::new("Edit as JSON"));
+            let edit = edit.on_disabled_hover_text("This table is too large to edit as one text; open its entries.");
+            if edit.clicked() {
+                let text = if count > 0 { serde_json::to_string_pretty(current.unwrap()).unwrap_or(text) } else { text };
+                draft = Some((pointer.to_string(), text));
+            }
+            if pointer.starts_with("/placements/")
+                && let Some(index) = pointer.split('/').nth(2).and_then(|i| i.parse().ok())
+                && ui.button("Select object").clicked()
+            {
+                select = Some(index);
+            }
         });
     }
-    if editor.frame {
-        editor.frame = false;
-        let pointer = if editor.overview {
-            editor.overview = false;
-            "/rooms/0".into()
-        } else {
-            selected_pointer(&editor)
-        };
-        let mut parts = pointer.split('/').skip(1);
-        let table = parts.next().unwrap_or("");
-        let index: usize = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
-        let value = editor.doc.value();
-        let (center, distance) = if table == "placements" || table == "cameras" {
-            let p: [i32; 3] = serde_json::from_value(value[table][index]["position"].clone()).unwrap_or([0; 3]);
-            (position(p), 4.0)
-        } else {
-            let room = &value["rooms"][if table == "rooms" { index } else { 0 }];
-            let origin: [i32; 3] = serde_json::from_value(room["origin"].clone()).unwrap_or([0; 3]);
-            let x = room["x_sectors"].as_u64().unwrap_or(4) as f32;
-            let z = room["z_sectors"].as_u64().unwrap_or(4) as f32;
-            let y = -(room["top"].as_i64().unwrap_or(0) + room["bottom"].as_i64().unwrap_or(0)) as f32 / 2048.0;
-            (
-                Vec3::new(origin[0] as f32 / 1024.0 + x / 2.0, y, origin[2] as f32 / 1024.0 + z / 2.0),
-                x.max(z) * 0.9 + 2.0,
-            )
-        };
-        *transform =
-            view::camera_transform(center + Vec3::new(distance * 0.7, distance * 0.8, -distance * 0.7), center);
+    if let Some(pointer) = go {
+        editor.navigate(pointer);
     }
-    if editor.input.is_some()
-        || !focus.active
-        || keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::SuperRight])
-    {
-        return;
+    if let Some(index) = select {
+        editor.click(Some(index), false);
     }
-    if mouse.pressed(MouseButton::Right) {
-        let (mut yaw, mut pitch, _) = transform.rotation.to_euler(EulerRot::YXZ);
-        yaw -= motion.delta.x * 0.003;
-        pitch = (pitch - motion.delta.y * 0.003).clamp(-1.54, 1.54);
-        transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
+    if draft.is_some() {
+        editor.draft = draft;
     }
-    if mouse.pressed(MouseButton::Middle) {
-        let pan = (*transform.right() * -motion.delta.x + *transform.up() * motion.delta.y) * 0.015;
-        transform.translation += pan;
+    let Some((pointer, mut text)) = editor.draft.take() else { return };
+    ui.separator();
+    ui.label(RichText::new(format!("Editing {}", if pointer.is_empty() { "/" } else { &pointer })).strong());
+    let multiline = text.contains('\n');
+    if multiline {
+        egui::ScrollArea::vertical().id_salt("draft").max_height(240.0).show(ui, |ui| {
+            ui.add(egui::TextEdit::multiline(&mut text).code_editor().desired_width(f32::INFINITY));
+        });
+    } else {
+        ui.add(egui::TextEdit::singleline(&mut text).desired_width(f32::INFINITY));
     }
-    let scroll_scale = if scroll.unit == MouseScrollUnit::Pixel { 0.01 } else { 0.75 };
-    let zoom = *transform.forward() * (scroll.delta.y * scroll_scale).clamp(-20.0, 20.0);
-    transform.translation += zoom;
-    let forward = *transform.forward();
-    let right = *transform.right();
-    let mut delta = Vec3::ZERO;
-    for (key, vector) in [
-        (KeyCode::KeyW, forward),
-        (KeyCode::KeyS, -forward),
-        (KeyCode::KeyA, -right),
-        (KeyCode::KeyD, right),
-        (KeyCode::KeyQ, -Vec3::Y),
-        (KeyCode::KeyE, Vec3::Y),
-    ] {
-        if keys.pressed(key) {
-            delta += vector;
+    let enter = !multiline && ui.input(|i| i.key_pressed(Key::Enter));
+    let mut keep = true;
+    ui.horizontal(|ui| {
+        if ui.button("Apply").clicked() || enter {
+            let result = apply_text(editor, &pointer, &text);
+            keep = result.is_err();
+            editor.result(result, "Applied");
         }
+        if ui.button("Cancel").clicked() {
+            keep = false;
+        }
+    });
+    if keep {
+        editor.draft = Some((pointer, text));
     }
-    let speed = if keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) { 30.0 } else { 6.0 };
-    transform.translation += delta.normalize_or_zero() * time.delta_secs() * speed;
+}
+
+/// Strings are typed without quotes and numbers must stay numbers; anything
+/// else is JSON.
+fn apply_text(editor: &mut Editor, pointer: &str, text: &str) -> Result<(), String> {
+    match editor.doc.value().pointer(pointer) {
+        Some(Value::String(_)) => editor.doc.replace(pointer, &Value::String(text.into()).to_string()),
+        Some(Value::Number(_)) => match serde_json::from_str::<Value>(text) {
+            Ok(value @ Value::Number(_)) => editor.doc.replace(pointer, &value.to_string()),
+            _ => Err("Enter a number, such as 128 or -64.".into()),
+        },
+        _ => editor.doc.replace(pointer, text),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::input::keyboard::Key;
-
-    fn app() -> App {
-        let mut app = App::new();
-        app.add_plugins((MinimalPlugins, bevy::input::InputPlugin))
-            .add_message::<WindowCloseRequested>()
-            .insert_resource(crate::viewport::ViewportFocus { active: false })
-            .insert_resource(Editor {
-                doc: LevelDocument::open(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/../engine/assets/levels/sandbox/level.json"
-                ))
-                .unwrap(),
-                pointer: "/placements/1/position".into(),
-                selected: 0,
-                page: 0,
-                status: String::new(),
-                input: None,
-                revision: 0,
-                preview: false,
-                frame: false,
-                recent: vec![],
-                exit_requested: false,
-                overview: false,
-            })
-            .add_systems(Update, input);
-        app
-    }
-
-    fn tap(app: &mut App, code: KeyCode, text: Option<&str>) {
-        for state in [ButtonState::Pressed, ButtonState::Released] {
-            app.world_mut().write_message(KeyboardInput {
-                key_code: code,
-                logical_key: Key::Character(text.unwrap_or("").into()),
-                state,
-                text: text.map(Into::into),
-                repeat: false,
-                window: Entity::PLACEHOLDER,
-            });
-            app.update();
-        }
-    }
 
     #[test]
-    fn keyboard_field_edit_applies_to_the_document_and_escape_discards_the_draft() {
-        let mut app = app();
-        tap(&mut app, KeyCode::KeyE, Some("e"));
-        assert!(app.world().resource::<Editor>().input.is_some());
-        tap(&mut app, KeyCode::Digit4, Some("4700"));
-        tap(&mut app, KeyCode::Enter, None);
-        let editor = app.world().resource::<Editor>();
+    fn typed_values_keep_their_json_types_and_invalid_edits_are_rejected() {
+        let mut editor = crate::sandbox();
+        apply_text(&mut editor, "/name", "A level with \"quotes\"").unwrap();
+        assert_eq!(editor.doc.value()["name"], "A level with \"quotes\"");
+        assert!(apply_text(&mut editor, "/placements/1/position/0", "east").is_err());
+        apply_text(&mut editor, "/placements/1/position/0", "4700").unwrap();
         assert_eq!(editor.doc.level().unwrap().placements[1].position[0], 4700);
-        assert!(editor.doc.is_dirty());
-        tap(&mut app, KeyCode::KeyE, Some("e"));
-        tap(&mut app, KeyCode::Digit1, Some("123"));
-        tap(&mut app, KeyCode::Escape, None);
-        assert_eq!(app.world().resource::<Editor>().doc.level().unwrap().placements[1].position[0], 4700);
-        app.world_mut().resource_mut::<Editor>().undo();
-        assert!(!app.world().resource::<Editor>().doc.is_dirty());
+        assert!(apply_text(&mut editor, "/placements/1/room", "9999").is_err());
+        apply_text(&mut editor, "/placements/1/position", "[1, 2, 3]").unwrap();
+        assert_eq!(editor.doc.level().unwrap().placements[1].position, [1, 2, 3]);
     }
 
     #[test]
-    fn viewport_keys_move_the_camera_without_starting_a_draft() {
-        let mut app = app();
-        app.insert_resource(EditorTarget { headless: true, image: Handle::default() })
-            .insert_resource(crate::viewport::ViewportFocus { active: true })
-            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(std::time::Duration::from_millis(100)))
-            .add_systems(Update, camera.after(input));
-        let entity = app.world_mut().spawn((GameCamera, Camera::default(), Transform::default())).id();
-        app.update();
-        tap(&mut app, KeyCode::KeyW, Some("w"));
-        let transform = *app.world().get::<Transform>(entity).unwrap();
-        assert!(transform.translation.z < -0.1, "W should fly without holding right mouse");
-        tap(&mut app, KeyCode::KeyE, Some("e"));
-        assert!(app.world().get::<Transform>(entity).unwrap().translation.y > 0.1);
-        assert!(app.world().resource::<Editor>().input.is_none(), "E in the viewport must not edit JSON");
-        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().press(MouseButton::Right);
-        app.world_mut().write_message(bevy::input::mouse::MouseMotion { delta: Vec2::new(50.0, -20.0) });
-        app.update();
-        assert_ne!(app.world().get::<Transform>(entity).unwrap().rotation, Quat::IDENTITY);
-        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().release(MouseButton::Right);
-        app.update();
-        let before_pan = *app.world().get::<Transform>(entity).unwrap();
-        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().press(MouseButton::Middle);
-        app.world_mut().write_message(bevy::input::mouse::MouseMotion { delta: Vec2::new(20.0, 10.0) });
-        app.update();
-        assert_ne!(app.world().get::<Transform>(entity).unwrap().translation, before_pan.translation);
-        assert_eq!(app.world().get::<Transform>(entity).unwrap().rotation, before_pan.rotation);
-        app.world_mut().resource_mut::<ButtonInput<MouseButton>>().release(MouseButton::Middle);
-        let before_zoom = app.world().get::<Transform>(entity).unwrap().translation;
-        app.world_mut().write_message(bevy::input::mouse::MouseWheel {
-            unit: MouseScrollUnit::Line,
-            x: 0.0,
-            y: 2.0,
-            window: Entity::PLACEHOLDER,
-            phase: bevy::input::touch::TouchPhase::Moved,
-        });
-        app.update();
-        assert_ne!(app.world().get::<Transform>(entity).unwrap().translation, before_zoom);
-        app.world_mut().resource_mut::<crate::viewport::ViewportFocus>().active = false;
-        let before = *app.world().get::<Transform>(entity).unwrap();
-        tap(&mut app, KeyCode::KeyW, Some("w"));
-        assert_eq!(*app.world().get::<Transform>(entity).unwrap(), before);
-        tap(&mut app, KeyCode::KeyE, Some("e"));
-        assert!(app.world().resource::<Editor>().input.is_some());
-        app.world_mut().resource_mut::<crate::viewport::ViewportFocus>().active = true;
-        tap(&mut app, KeyCode::KeyW, Some("w"));
-        assert_eq!(*app.world().get::<Transform>(entity).unwrap(), before, "draft must capture typing");
-        tap(&mut app, KeyCode::Escape, None);
-        tap(&mut app, KeyCode::KeyW, Some("w"));
-        assert_ne!(*app.world().get::<Transform>(entity).unwrap(), before);
-    }
-
-    #[test]
-    fn open_browses_directories_and_reports_errors_without_losing_the_document() {
-        let mut app = app();
-        let editor = &mut *app.world_mut().resource_mut::<Editor>();
-        let original = editor.doc.path().to_path_buf();
-        act(editor, Action::Open);
-        let directory = original.parent().unwrap().to_path_buf();
-        act(editor, Action::Browse(directory.clone()));
-        assert!(matches!(&editor.input.as_ref().unwrap().mode, Mode::File(picker) if picker.directory == directory));
-        act(editor, Action::Location);
-        editor.input.as_mut().unwrap().text = directory.join("missing.json").display().to_string();
-        act(editor, Action::Apply);
-        assert!(editor.input.is_some());
-        assert_eq!(editor.doc.path(), original);
-        act(editor, Action::Browse(original.clone()));
-        assert!(editor.input.is_none());
-        assert_eq!(editor.doc.path(), original);
-        assert!(!editor.doc.is_dirty());
-        assert!(editor.frame);
-        let temporary = std::env::temp_dir().join(format!(
-            "editor-open-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
-        ));
-        std::fs::create_dir(&temporary).unwrap();
-        let copy = temporary.join("another-level.json");
-        std::fs::copy(&original, &copy).unwrap();
-        act(editor, Action::Open);
-        act(editor, Action::Browse(temporary.clone()));
-        act(editor, Action::Browse(copy.clone()));
-        assert_eq!(editor.doc.path(), copy);
-        assert!(editor.input.is_none());
-        std::fs::remove_file(copy).unwrap();
-        std::fs::remove_dir(temporary).unwrap();
+    fn leaving_with_unsaved_work_asks_first_and_cancel_keeps_the_document() {
+        let mut editor = crate::sandbox();
+        editor.selection = vec![1];
+        editor.edit_selected("position/0", Change::Add(128), false);
+        let changed = editor.doc.value().clone();
+        editor.request_leave(Leave::Quit);
+        assert_eq!(editor.leaving, Some(Leave::Quit));
+        assert!(!editor.exit_requested);
+        editor.leaving = None;
+        assert_eq!(editor.doc.value(), &changed);
+        editor.request_leave(Leave::Open(None));
+        editor.leave(Leave::Open(None));
+        assert_eq!(editor.ask, Some(Ask::Open), "discarding asks for a level before replacing this one");
+        assert_eq!(editor.doc.value(), &changed);
+        editor.undo();
+        editor.request_leave(Leave::Quit);
+        assert!(editor.exit_requested, "a saved document leaves without asking");
     }
 
     struct Temporary(std::path::PathBuf);
-    impl Temporary {
-        fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "editor-usability-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
-            ));
-            std::fs::create_dir(&path).unwrap();
-            Self(path)
-        }
-    }
     impl Drop for Temporary {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
@@ -1241,217 +669,33 @@ mod tests {
     }
 
     #[test]
-    fn file_search_keyboard_paging_and_save_copy_need_no_typed_paths() {
-        let mut app = app();
-        let temporary = Temporary::new();
-        let original = std::fs::read(app.world().resource::<Editor>().doc.path()).unwrap();
-        for index in 0..12 {
-            std::fs::write(temporary.0.join(format!("level-{index:02}.json")), &original).unwrap();
-        }
-        std::fs::write(temporary.0.join("ignore.txt"), "not a level").unwrap();
-        {
-            let editor = &mut *app.world_mut().resource_mut::<Editor>();
-            act(editor, Action::Open);
-            act(editor, Action::Browse(temporary.0.clone()));
-            act(editor, Action::Files(true));
-            assert!(matches!(&editor.input.as_ref().unwrap().mode, Mode::File(p) if p.page == 1));
-        }
-        // Typing searches, resets paging, and Enter opens the matching file.
-        tap(&mut app, KeyCode::KeyL, Some("level-09"));
-        tap(&mut app, KeyCode::Enter, None);
-        let editor = &mut *app.world_mut().resource_mut::<Editor>();
-        assert_eq!(editor.doc.path(), temporary.0.join("level-09.json"));
-        assert!(editor.input.is_none());
-        assert_eq!(editor.recent.len(), 1);
-        act(editor, Action::SaveAs);
-        let copies = temporary.0.join("copies");
-        std::fs::create_dir(&copies).unwrap();
-        act(editor, Action::Browse(copies.clone()));
-        act(editor, Action::Apply);
-        let saved = copies.join("level-09-copy.json");
-        assert_eq!(editor.doc.path(), saved);
-        assert_eq!(std::fs::read(saved).unwrap(), original);
-        act(editor, Action::SaveAs);
-        editor.input.as_mut().unwrap().text = "level-09-copy.json".into();
-        act(editor, Action::Apply);
-        assert!(editor.input.is_some());
-        assert!(editor.status.contains("new filename"));
-        assert_eq!(std::fs::read(temporary.0.join("level-09.json")).unwrap(), original);
-    }
-
-    #[test]
-    fn unsaved_choices_keep_the_document_until_a_successful_open_and_never_overwrite_conflicts() {
-        let mut app = app();
-        let temporary = Temporary::new();
-        let editor = &mut *app.world_mut().resource_mut::<Editor>();
-        let copy = temporary.0.join("level.json");
+    fn save_as_replaces_a_confirmed_file_brings_the_atlas_and_reopens() {
+        let folder = Temporary(std::env::temp_dir().join(format!(
+            "editor-save-as-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        )));
+        std::fs::create_dir(&folder.0).unwrap();
+        let mut editor = crate::sandbox();
         let original = std::fs::read(editor.doc.path()).unwrap();
-        std::fs::write(&copy, &original).unwrap();
-        editor.doc = LevelDocument::open(&copy).unwrap();
-        act(editor, Action::Nudge("/placements/1/position/0".into(), 128));
-        let changed = editor.doc.value().clone();
-        act(editor, Action::Open);
-        assert!(matches!(editor.input.as_ref().unwrap().mode, Mode::ConfirmLeave { quit: false }));
-        act(editor, Action::Cancel);
-        assert_eq!(editor.doc.value(), &changed);
-        act(editor, Action::Open);
-        act(editor, Action::DiscardContinue);
-        act(editor, Action::Browse(temporary.0.join("missing.json")));
-        assert_eq!(editor.doc.value(), &changed);
-        assert!(editor.doc.is_dirty());
-        act(editor, Action::Cancel);
-        act(editor, Action::Open);
-        act(editor, Action::SaveContinue);
+        let target = folder.0.join("copy.json");
+        std::fs::write(&target, "not a level").unwrap();
+        editor.save_as(folder.0.join("copy"));
+        assert_eq!(editor.doc.path(), target);
+        assert_eq!(std::fs::read(&target).unwrap(), original, "an untouched Save As keeps every byte");
+        assert!(folder.0.join("atlas.png").exists());
+        editor.selection = vec![1];
+        editor.edit_selected("position/0", Change::Add(256), false);
+        editor.save();
         assert!(!editor.doc.is_dirty());
-        assert!(matches!(editor.input.as_ref().unwrap().mode, Mode::File(_)));
-        act(editor, Action::Cancel);
-        act(editor, Action::Nudge("/placements/1/position/0".into(), 128));
-        std::fs::write(&copy, &original).unwrap(); // external modification
-        act(editor, Action::Open);
-        act(editor, Action::SaveContinue);
-        assert!(matches!(editor.input.as_ref().unwrap().mode, Mode::ConfirmLeave { .. }));
-        assert!(editor.doc.is_dirty());
-        assert!(editor.status.contains("changed on disk"));
-        assert_eq!(std::fs::read(copy).unwrap(), original);
-        act(editor, Action::Cancel);
-        request_leave(editor, true);
-        act(editor, Action::Cancel);
-        assert!(!editor.exit_requested);
-        request_leave(editor, true);
-        act(editor, Action::DiscardContinue);
-        assert!(editor.exit_requested);
-    }
-
-    #[test]
-    fn common_properties_use_numbers_degrees_and_plain_text_with_validation_and_undo() {
-        let mut app = app();
-        let editor = &mut *app.world_mut().resource_mut::<Editor>();
-        let before = editor.doc.value().clone();
-        act(editor, Action::Nudge("/placements/1/position/0".into(), 128));
+        let other = folder.0.join("other.json");
+        std::fs::write(&other, &original).unwrap();
+        editor.open(&other);
+        assert_eq!(editor.recent, std::slice::from_ref(&target));
+        editor.open(&target);
         assert_eq!(
-            editor.doc.value()["placements"][1]["position"][0].as_i64(),
-            Some(before["placements"][1]["position"][0].as_i64().unwrap() + 128)
+            editor.doc.level().unwrap().placements[1].position[0],
+            serde_json::from_slice::<Value>(&original).unwrap()["placements"][1]["position"][0].as_i64().unwrap() as i32 + 256
         );
-        act(editor, Action::Undo);
-        assert_eq!(editor.doc.value(), &before);
-        editor.doc.replace("/placements/1/rotation", "9999").unwrap();
-        act(editor, Action::EditAngle("/placements/1/rotation".into()));
-        act(editor, Action::Apply);
-        assert_eq!(editor.doc.value()["placements"][1]["rotation"], 9999);
-        act(editor, Action::EditAngle("/placements/1/rotation".into()));
-        editor.input.as_mut().unwrap().text = "90".into();
-        act(editor, Action::Apply);
-        assert_eq!(editor.doc.value()["placements"][1]["rotation"], 16384);
-        act(editor, Action::Toggle("/placements/1/invisible".into()));
-        assert_eq!(editor.doc.value()["placements"][1]["invisible"], true);
-        act(editor, Action::Undo);
-        assert!(editor.doc.value()["placements"][1].get("invisible").is_none());
-        act(editor, Action::EditValue("/placements/1/room".into()));
-        editor.input.as_mut().unwrap().text = "9999".into();
-        act(editor, Action::Apply);
-        assert!(editor.input.is_some());
-        assert_eq!(editor.doc.value()["placements"][1]["room"], 0);
-        act(editor, Action::Cancel);
-        act(editor, Action::EditValue("/name".into()));
-        editor.input.as_mut().unwrap().text = "A level with \"quotes\"".into();
-        act(editor, Action::Apply);
-        assert_eq!(editor.doc.value()["name"], "A level with \"quotes\"");
-    }
-
-    // Exercise layout, hit testing and event bubbling from the label to its
-    // control. Triggering PointerClick directly would miss a disabled backend.
-    #[test]
-    fn mouse_clicks_browse_rows_and_apply_and_cancel_edits() {
-        use bevy::{
-            camera::{ComputedCameraValues, RenderTargetInfo},
-            picking::pointer::{Location, PointerAction, PointerButton, PointerId, PointerInput},
-            ui::UiGlobalTransform,
-        };
-
-        let mut app = app();
-        app.add_plugins((
-            bevy::asset::AssetPlugin::default(),
-            bevy::transform::TransformPlugin,
-            WindowPlugin::default(),
-            bevy::image::ImagePlugin::default(),
-            bevy::image::TextureAtlasPlugin,
-            bevy::mesh::MeshPlugin,
-            bevy::text::TextPlugin,
-            bevy::camera::CameraPlugin,
-            bevy::ui::UiPlugin,
-            bevy::picking::DefaultPickingPlugins,
-            UiPlugin,
-        ))
-        .add_systems(Update, (crate::dialogs::refresh, crate::inspector::refresh).after(input))
-        .insert_resource(EditorTarget { headless: false, image: Handle::default() })
-        .init_resource::<ObjectTypes>();
-        app.update();
-        let camera = app.world_mut().query_filtered::<Entity, With<Camera2d>>().single(app.world()).unwrap();
-        app.world_mut().get_mut::<Camera>(camera).unwrap().computed = ComputedCameraValues {
-            target_info: Some(RenderTargetInfo { physical_size: UVec2::new(1280, 800), scale_factor: 1.0 }),
-            ..default()
-        };
-        // Font loading and layout settle without a renderer or OS window.
-        for _ in 0..5 {
-            app.update();
-        }
-
-        let click = |app: &mut App, matches: fn(&Action) -> bool| {
-            let control = app
-                .world_mut()
-                .query::<(Entity, &Action)>()
-                .iter(app.world())
-                .find(|(_, action)| matches(action))
-                .unwrap()
-                .0;
-            let label = app.world().get::<Children>(control).unwrap()[0];
-            let position = app.world().get::<UiGlobalTransform>(label).unwrap().translation;
-            assert!(app.world().get::<ComputedNode>(label).unwrap().size().min_element() > 0.0);
-            let target = RenderTarget::default()
-                .normalize(Some(
-                    app.world_mut()
-                        .query_filtered::<Entity, With<bevy::window::PrimaryWindow>>()
-                        .single(app.world())
-                        .unwrap(),
-                ))
-                .unwrap();
-            let location = Location { target, position };
-            for action in [
-                PointerAction::Move { delta: Vec2::ZERO },
-                PointerAction::Press(PointerButton::Primary),
-                PointerAction::Release(PointerButton::Primary),
-            ] {
-                app.world_mut().write_message(PointerInput::new(PointerId::Mouse, location.clone(), action));
-                app.update();
-            }
-        };
-        click(&mut app, |a| matches!(a, Action::Up));
-        assert_eq!(app.world().resource::<Editor>().pointer, "/placements/1");
-        click(&mut app, |a| matches!(a, Action::Row(0)));
-        assert!(app.world().resource::<Editor>().input.is_some());
-        click(&mut app, |a| matches!(a, Action::Cancel));
-        assert!(app.world().resource::<Editor>().input.is_none());
-
-        app.world_mut().resource_mut::<Editor>().pointer = "/placements/1/position".into();
-        app.update();
-        click(&mut app, |a| matches!(a, Action::Row(0)));
-        assert!(app.world().resource::<Editor>().input.is_some());
-        app.world_mut().resource_mut::<Editor>().input.as_mut().unwrap().text = "4700".into();
-        click(&mut app, |a| matches!(a, Action::Apply));
-        assert_eq!(app.world().resource::<Editor>().doc.level().unwrap().placements[1].position[0], 4700);
-        click(&mut app, |a| matches!(a, Action::Undo));
-        assert!(!app.world().resource::<Editor>().doc.is_dirty());
-        click(&mut app, |a| matches!(a, Action::Open));
-        assert!(app.world_mut().query::<&crate::dialogs::Dialog>().single(app.world()).is_ok());
-        assert!(matches!(app.world().resource::<Editor>().input.as_ref().unwrap().mode, Mode::File(_)));
-        click(&mut app, |a| matches!(a, Action::Browse(p) if p.file_name().is_some_and(|n| n == "level.json")));
-        assert!(app.world().resource::<Editor>().input.is_none());
-        click(&mut app, |a| matches!(a, Action::Navigate(p) if p == "/placements"));
-        click(&mut app, |a| matches!(a, Action::Row(1)));
-        let before = app.world().resource::<Editor>().doc.value()["placements"][1]["position"][0].as_i64().unwrap();
-        click(&mut app, |a| matches!(a, Action::Nudge(p, 128) if p == "/placements/1/position/0"));
-        assert_eq!(app.world().resource::<Editor>().doc.value()["placements"][1]["position"][0], before + 128);
-        click(&mut app, |a| matches!(a, Action::Undo));
-        assert!(!app.world().resource::<Editor>().doc.is_dirty());
     }
 }

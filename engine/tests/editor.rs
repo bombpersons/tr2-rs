@@ -92,3 +92,47 @@ fn animation_links_are_validated_and_authored_edits_survive_save_reopen() {
     let reopened = LevelDocument::open(&path).unwrap();
     assert_eq!(reopened.level().unwrap().animations[1].poses[1].root[1], -384);
 }
+
+#[test]
+fn multi_field_edits_are_one_validated_undo_step_and_can_add_optional_fields() {
+    let path = fixture("multi");
+    let bytes = fs::read(&path).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let edits = |x: i64, room: i64| {
+        vec![
+            ("/placements/0/position/0".to_string(), serde_json::json!(x)),
+            ("/placements/1/invisible".to_string(), serde_json::json!(true)),
+            ("/placements/1/room".to_string(), serde_json::json!(room)),
+        ]
+    };
+    // One invalid field rejects every change.
+    assert!(doc.apply(edits(4096, 99999)).is_err());
+    assert!(!doc.is_dirty());
+    assert!(doc.value()["placements"][1].get("invisible").is_none());
+    doc.apply(edits(4096, 0)).unwrap();
+    assert_eq!(doc.value()["placements"][0]["position"][0], 4096);
+    assert_eq!(doc.value()["placements"][1]["invisible"], true);
+    assert!(doc.undo());
+    assert!(!doc.can_undo());
+    assert!(doc.value()["placements"][1].get("invisible").is_none(), "undo removes an added field");
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(doc.redo());
+    assert_eq!(doc.value()["placements"][1]["invisible"], true);
+    assert!(doc.apply([("/no/such/table".to_string(), serde_json::json!(1))]).is_err());
+}
+
+#[test]
+fn save_replacing_overwrites_a_confirmed_destination_atomically() {
+    let path = fixture("replace");
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let target = path.with_file_name("existing.json");
+    fs::write(&target, "old contents").unwrap();
+    assert!(doc.save_to(&target).is_err(), "plain Save As never replaces");
+    assert_eq!(fs::read(&target).unwrap(), b"old contents");
+    doc.replace("/name", "\"replaced\"").unwrap();
+    doc.save_replacing(&target).unwrap();
+    assert_eq!(doc.path(), fs::canonicalize(&target).unwrap());
+    assert_eq!(LevelDocument::open(&target).unwrap().level().unwrap().name, "replaced");
+    assert!(!doc.is_dirty());
+}

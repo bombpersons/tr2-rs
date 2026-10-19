@@ -30,100 +30,108 @@ game's type table are ignored. The editor never runs the registered controllers.
 
 ## Current authoring surface
 
-The editor starts with an Objects list and a room overview. The **Objects**,
-**Rooms**, **Cameras**, and **Animations** shortcuts jump directly to those
-parts of the scene; the active section is highlighted. Object rows show their
-type name (when registry metadata is supplied) and room. Click an object in
-the list or the viewport to inspect it. **Frame** focuses the selection;
-**Overview** returns to the first room overview.
+The 3D view fills the window. A **File / Edit / View** menu bar sits on top,
+a status bar along the bottom, and the tool windows float over the view.
+Windows can be moved, resized, collapsed or closed; **View** reopens them.
+The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
 
-The object inspector edits position with +/-128-unit buttons or by clicking
-the number, heading with +/-45-degree buttons or a degree value, room with a
-number field, and initial hidden state with a checkbox. Coordinates are the
-level format's units, with Y increasing downward. Edits are validated and
-undoable, including adding an optional hidden field that was absent from the
-original JSON. Scalar numbers and strings use ordinary values; strings need
-no JSON quotes. Boolean fields toggle directly.
+- **Objects** lists every placement, grouped by room or by type (registry
+  names when `--types` is given). Type in the filter to match a name or an
+  exact placement number. Click selects, Shift- or Ctrl-click adds or
+  removes, and double-click frames the selection.
+- **Properties** shows the active (last selected) object: type, room,
+  position, heading in degrees, activation code, inverted and hidden flags,
+  and other flag bits. Unknown properties are listed read-only. With several
+  objects selected, a typed value is set on all of them, and dragging a
+  number moves all of them by the same amount. Click a number to type it.
+- **Data** browses every field of `engine::world::format::Level`: rooms,
+  vertices, faces, portals, sectors and floor data; placements; models,
+  joints and animations; fixed cameras and navigation; texture coordinates
+  and sound tables; and source provenance. Click a table to open it, or a
+  value to edit it. **Edit as JSON** edits the open table or field as text,
+  which also allows adding and removing entries. Tables over 256 KB of JSON
+  are edited entry by entry instead. Strings need no quotes, and numbers stay
+  numbers.
+- **Animation** previews authored clips (see below).
 
-**All data** retains the field browser for every field of `engine::world::format::Level`: rooms,
-vertices, faces, portals, sectors and floor data; placements and activation
-flags; models, joints and animations; fixed cameras and navigation; texture
-coordinates and sound tables; and source provenance. Browse nested tables,
-then select a scalar or use Edit value on a whole table for advanced JSON editing. Replacing a table also
-allows adding and removing entries. Whole-document validation runs before a
-change is accepted. Unknown JSON properties survive edits and saves.
+In the 3D view, click an object to select it. Shift- or Ctrl-click adds it
+to the selection, or removes it. Clicking a room or empty space clears the
+selection. Selected objects get boxes drawn through walls; the active one is
+yellow. Room shells cull their outward faces, so from outside a room you
+look and click straight into it. Objects without a rendered model can still
+be selected through the Objects window.
+
+The selection's centre carries a handle. Drag an arrow to move every selected
+object along level X (red), height (green, up is negative Y) or Z (blue).
+Drag the ring to turn the selection about its centre, which also turns each
+object's heading. Hold Ctrl while dragging to snap to 256 units (a quarter
+sector) or 15 degrees. A drag shows live and becomes one undo step when you
+let go. Moves and turns update the objects in place; other edits rebuild the
+preview.
+
+All edits are validated against the whole document before they are kept,
+and an edit that is invalid for any selected object changes none of them.
+Undo and redo restore optional fields that an edit added. Coordinates are
+the level format's units, with Y increasing downward.
 
 | Control | Action |
 |---|---|
-| Click a row / Enter / Right | Open a table or edit a scalar |
-| Up / Down | Select a row |
-| Left / Backspace / Parent | Parent table |
-| Page Up / Page Down / Previous / Next | Browse large tables |
-| E in the field browser / Edit JSON | Edit selected value or table as JSON |
-| Ctrl+A | Select the draft text; typing replaces it |
-| Backspace | Remove the last character or selected draft |
-| Enter / Apply | Validate and apply draft |
-| Escape / Cancel | Discard draft |
-| Ctrl+S / Save | Save |
-| Ctrl+Shift+S / Save copy | Browse a destination folder and choose a new filename |
-| Ctrl+O / Open | Browse another level; unsaved work offers Save / Discard / Cancel |
-| Click a folder / JSON file in Open | Browse folders / open the file |
-| Type in Open / Up, Down, Enter | Filter names / select and open a result |
-| Ctrl+L in a file dialog | Optionally type a location |
-| Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z | Undo / redo |
-| F / Frame | Frame selected room, placement or camera |
-| Click the 3D view | Select the nearest room or placed model and focus camera controls |
+| Ctrl+O / File > Open... | Native file dialog; unsaved work asks Save / Discard / Cancel first |
+| File > Open project level | Levels found under any `<crate>/assets/levels` in the workspace |
+| File > Open recent | Levels opened earlier in this session |
+| Ctrl+S / File > Save | Save |
+| Ctrl+Shift+S / File > Save As... | Native save dialog; continue editing the new file |
+| Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z | Undo / redo (also under Edit) |
+| Ctrl+A / Edit > Select all objects | Select every placement |
+| Click / Shift-click / Ctrl-click | Select / add or remove (viewport and Objects window) |
+| F / View > Frame selection | Frame the selection (or the Data window's room) |
+| View > Overview | Frame the first room |
 | Hold right mouse + drag | Look around |
 | Middle mouse + drag / mouse wheel | Pan / zoom |
-| WASD, Q/E with viewport focused | Fly camera, descend/ascend (right mouse is optional) |
-| Shift while flying | Move faster |
-| Ctrl+Q / window close | Quit; unsaved work offers Save / Discard / Cancel |
+| WASD, Q/E (after clicking the view) | Fly, descend/ascend; Shift moves faster |
+| Ctrl+Q / window close | Quit; unsaved work asks Save / Discard / Cancel |
 | Ctrl+Shift+Q | Discard unsaved changes and quit |
 
-The viewport starts focused. Click the field browser to use its keyboard
-navigation; click the viewport to return to flying. E ascends while the
-viewport is focused and opens a JSON draft while the field browser is focused.
-Values, file selection and advanced JSON drafts use modal dialogs that capture
-typing and block camera movement. Open is browse-first: click the current
-folder, Project, Home, a nearby level library, or a recent level. Library
-shortcuts discover `<crate>/assets/levels` folders without a game dependency.
-Recent levels last for the current session. Click breadcrumb folders or Up
-to navigate; search filters names and folders come before files. The results
-are paged, with Up/Down and Enter as keyboard alternatives. Type location /
-Ctrl+L is optional; relative locations resolve inside the browsed folder.
-Invalid files keep the browser open and retain the current document.
+Clicking a window gives it the keyboard; click the 3D view to fly again.
+While a text field has focus, Ctrl+Z and Ctrl+A act on the text.
 
-Save copy uses the same folder browser and suggests an unused `*-copy.json`
-filename. Enter a name, rather than a full path; `.json` is added when no
-extension is provided. Existing files are protected. Unsaved-work dialogs
-let you save and continue, discard, or cancel. When opening, Discard keeps
-the old document available until another valid level actually opens, so a
-failed or canceled browse still preserves the draft. A failed save also
-keeps the confirmation and document available.
+Native dialogs run on their own thread so the view keeps drawing. Save As can
+replace an existing file once the dialog has asked about it. When the chosen
+folder has no `atlas.png`, the level's atlas is copied there so the copy still
+shows its textures. Discarding unsaved work to open another level keeps the
+current document until a valid level actually opens; canceling the dialog,
+or a level that fails to open, leaves the current work in place.
 
-Viewport selection uses the rendered meshes, including posed model parts,
-and opens the corresponding placement or room in the field browser. A yellow
-bounding box marks the selection. Static scenery selects its containing room;
-individual vertices, faces, unrendered placements and fixed camera markers
-remain accessible through the field browser.
-
-Draft input currently supports replacement and appending, rather than a
-full text editor with cursor movement or clipboard integration. Geometry is
-edited through its fields; drag gizmos, dedicated
-sector painting and a graphical timeline are future work. Sound tables are
+Static scenery belongs to its room. Individual vertices, faces, unrendered
+placements and fixed camera markers are reached through the Data window.
+Geometry editing (vertex and face selection, extrusion and texture painting)
+is the next planned mode; see "Mesh editing" below. Sound tables are
 editable, but audio playback and atlas/image editing belong to future tools.
 There are no authored tuning RON assets in the current port; add an authoring
 surface when those formats become used, rather than inventing a controller
 schema for the editor.
 
+## Mesh editing (planned)
+
+Rooms hold two layers: the render mesh (`vertices`, `quads`, `triangles`)
+and the sector grid (`sectors`, floor data and `portals`) used for collision.
+Geometry editing will keep them in step rather than move vertices freely.
+Selection works on grid-aligned quads and vertices: x and z stay on sector
+corners and heights move in 256-unit steps. Each edit re-derives the touched
+sectors' floor and ceiling heights and slopes, and rebuilds portals where a
+room's boundary changes. Extrude raises or lowers a floor region, or pushes
+a wall out to add sectors. A Texture window assigns texture-table entries to
+faces. Rooms that are not touched keep saving byte for byte.
+
 ## Animation preview
 
-Select an entry under `animations` (or a placement with authored clips), then
-click **Preview selection** beneath the viewport. The editor frames the first
+Open an entry under `animations` in the Data window, or select a placement
+with authored clips, then click **Preview selection** in the Animation window
+(View > Animation). The editor frames the first
 placed model using that clip and isolates it. **Play / Pause** runs authored
 frames at 30 Hz; **Step** advances one frame including dispatch/end links;
 **Frame -** seeks backward within the current clip. **Next goal** cycles the
-states of the selected model. **Scene / Isolate** restores the surrounding
+states of the selected model. **Isolate** toggles the surrounding
 level, and **Stop** restores the level's initial preview poses. The caption
 shows the current clip, absolute frame, current state and requested goal.
 
@@ -146,7 +154,7 @@ and final newline. Edit followed by undo does too. Changed files use pretty
 JSON. Unknown properties are kept because the document holds a JSON tree,
 not just a deserialized `Level`. The preview receives a validated typed level
 through `engine::render::PreviewLevel`; no temporary saved file is needed.
-Undo/redo records field replacements.
+Each undo step holds every field one action changed, such as a group move.
 
 Validation checks typed fields and format version, mesh indices, sector grid
 sizes, room/floor/navigation references, skeleton parents, placements,
@@ -159,10 +167,11 @@ unknown game actions or the gameplay meaning of inherited fields.
 
 Save uses a sibling temporary file and an atomic replacement. If the source
 changed on disk after opening, Save reports the conflict and keeps the draft.
-Open again after saving your work elsewhere. Save copy requires a new filename
-and writes just the JSON; atlas and audio files remain in their level folder.
-Copy that folder first when making a separately playable level. The game
-loads `levels/<name>/level.json`, so use that layout for authored levels.
+Open again after saving your work elsewhere. Save As writes the JSON and, when
+the destination folder has none, a copy of the atlas; audio files remain in
+their level folder. Copy that folder first when making a separately playable
+level. The game loads `levels/<name>/level.json`, so use that layout for
+authored levels.
 
 The tick-order port changes simulation phases only; it adds no engine asset
 fields. Level authoring and standard-rendering preview remain independent of
@@ -191,20 +200,16 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 ```
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
-checks no-op save, edit, undo, redo, invalid references, save, and reopen in a
-new process, and records real 1280x800 screenshots and the MCP transcript.
-It never edits the source level. Headless UI tests cover keyboard drafts and
-mouse hit testing on row and button labels, including Apply, Cancel and Undo.
-The editor enables Bevy's `ui_picking` feature so pointer events reach both
-the field browser and animation controls, and mesh ray casting for viewport
-selection. Tests cover camera focus, draft capture, the file browser and
-selection through model hierarchies, including mirrored geometry and occlusion.
-Smoke screenshots include the object inspector, Open, the level library,
-Save copy, and the unsaved-work confirmation. Input tests exercise real UI hit
-testing for scene navigation and position nudges, search and keyboard paging,
-degree conversion, optional checkbox fields, save copies, cancellation and
-external-file conflicts. All 25 baked levels pass the editor
-validator in `level_assets.rs`.
+checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
+references, the unsaved-changes question, save, and reopen in a new process,
+and records real 1280x800 screenshots and the MCP transcript. It never edits
+the source level. Unit tests cover click and Shift-click selection in the
+viewport (through posed model hierarchies, rooms and empty space) and in the
+shared selection model; relative drags and absolute typed values across
+several objects as one undo step; gizmo axis moves, snapping and ring turns
+about the centre; JSON drafts keeping their types; Save As replacing a file
+and copying the atlas; and the unsaved-work question. All 25 baked levels
+pass the editor validator in `level_assets.rs`.
 
 For automation:
 
@@ -215,9 +220,11 @@ cargo run -p editor --all-features -- --level engine/assets/levels/sandbox/level
 Use `game_query` on the exact entity `Editor` with `EditorStatus`. Set
 `EditorCommand` fields through `game_set_component`, e.g.
 `{"pointer":"/placements/1/position/0","json":"4700","apply":true}`.
-`undo`, `redo`, `save`, `frame`, `open`, `save_copy`, and `cancel` are one-shot booleans.
-`browse` is a one-shot folder/file path for an open file dialog. Set `pointer` and
-`navigate: true` to browse a field. These commands use the UI's document
+`undo`, `redo`, `save`, `frame` and `cancel` (dismiss the unsaved-changes
+question) are one-shot booleans. `open` and `save_as` take a file path in place
+of the native dialogs; `select` takes placement numbers such as `"1,2"`, or
+`"none"`. Set `pointer` and `navigate: true` to open a field in the Data
+window. `EditorStatus` reports `selection` and `asking_to_save`. These commands use the UI's document
 transactions. Headless `game_screenshot(target="screen")` captures the
 full-resolution editor; use `target="window"` in a desktop session.
 

@@ -52,18 +52,20 @@ def main():
         command(client, save=True)
         assert copy.read_bytes() == original, 'untouched save changed bytes'
         captures.append(client.capture('opened'))
-        command(client, open=True)
-        captures.append(client.capture('open-dialog'))
-        libraries = ROOT / 'game/assets/levels'
-        if libraries.is_dir():
-            command(client, browse=str(libraries))
-            captures.append(client.capture('level-library'))
-        command(client, cancel=True)
-        command(client, save_copy=True)
-        captures.append(client.capture('save-copy-dialog'))
-        command(client, cancel=True)
+        # Save As writes the untouched bytes to the new file and continues there.
+        save_as = out / 'level-save-as.json'
+        save_as.unlink(missing_ok=True)
+        state = command(client, save_as=str(save_as))
+        assert save_as.read_bytes() == original, 'untouched Save As changed bytes'
+        assert Path(state['file']) == save_as.resolve(), state
+        state = command(client, open=str(copy))
+        assert Path(state['file']) == copy.resolve(), state
+        state = command(client, select='0,1', frame=True)
+        assert state['selection'] == [0, 1], state
+        captures.append(client.capture('multi-select'))
+        command(client, select='none')
         if source.parent.name == 'sandbox':
-            command(client, pointer='/placements/1', navigate=True, frame=True)
+            command(client, select='1', frame=True)
             client.edit('Editor', 'AnimationPreview', {'active':True, 'isolate':True, 'placement':1, 'clip':0, 'frame':0.0, 'goal':1, 'playing':False})
             captures.append(client.capture('pose-closed'))
             from PIL import Image
@@ -84,7 +86,7 @@ def main():
         before = json.loads(original)
         if args.pose_placement is not None:
             assert args.pose_clip is not None
-            command(client,pointer=f'/placements/{args.pose_placement}',navigate=True,frame=True)
+            command(client,select=str(args.pose_placement),frame=True)
             client.edit('Editor','AnimationPreview',{'active':True,'isolate':True,'placement':args.pose_placement,'clip':args.pose_clip,'frame':0.0,'goal':before['animations'][args.pose_clip]['state'],'playing':False})
             captures.append(client.capture('model-start'))
             for _ in range(args.pose_steps):
@@ -97,7 +99,8 @@ def main():
         state = command(client, pointer='/placements/1/position/0', json=str(x + 512), apply=True)
         assert state['dirty'] and state['message'] == 'Applied edit', state
         captures.append(client.capture('object-properties'))
-        command(client, open=True)
+        state = command(client, open=str(copy))
+        assert state['asking_to_save'], state
         captures.append(client.capture('unsaved-changes'))
         state = command(client, cancel=True)
         assert state['dirty'], 'canceling open lost the edited document'
@@ -114,7 +117,7 @@ def main():
         saved = json.loads(copy.read_bytes())
         before['placements'][1]['position'][0] += 512
         assert saved == before, 'save lost unrelated data'
-        state = command(client, pointer='/placements/1', navigate=True, frame=True)
+        state = command(client, select='1', frame=True)
         captures.append(client.capture('edited'))
     finally:
         client.close()
