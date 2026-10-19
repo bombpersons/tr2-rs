@@ -11,6 +11,12 @@ it off. Record partial progress below without checking the parent item.
 
 ## Recent rendering and collision fixes
 
+- [ ] Oblique Home room-wall contact after a left turn: the full-game
+  `winston_nav_turn_heldout` route exposes an avatar Z95536 vs PSX95550
+  settling difference. The item-only navigation route matches; correct the
+  avatar branch and retain independent collision validation.
+
+
 - [x] Missing room geometry at the Wall entrance and Home training course:
   mesh/material restoration and portal traversal ordering, with pixel-checked
   camera-return regressions. [Notes](docs/room-visibility-fix.md).
@@ -126,7 +132,9 @@ it off. Record partial progress below without checking the parent item.
   start/stop and turning now match1260 PSX ticks across four ordinary routes,
   including three independent recordings. [Evidence](docs/winston-evidence.md),
   [tests](game/tests/winston.rs). Cross-box navigation, room obstacles and
-  blocked-world contact and unusual player modes remain. Ordinary animated
+  blocked-world contact and unusual player modes remain. Adjacent flat-floor
+  corridor targets now match1950 additional ticks across four complete routes
+  (three independent); general multi-box/zone navigation remains. Ordinary animated
   contact/pushing now matches285 additional ticks, with three independent
   routes and retained native sphere-output fixtures.
 

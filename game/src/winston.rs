@@ -1,8 +1,8 @@
 //! Home's attendant: authored local follow, turn, start and stop.
 //!
 //! State decisions and free-space motion come from PSX0x800500A0 and
-//! 0x800166F8. Navigation between boxes and obstacle avoidance remain pending;
-//! the current target is Lara's position, verified for the recorded local route.
+//! 0x800166F8. Same-box and adjacent flat-corridor targets are verified;
+//! multi-box search, height transitions and obstacle avoidance remain pending.
 use bevy::prelude::*;
 use engine::{
     animation::{AnimationGoal, ObjectAnimation},
@@ -25,6 +25,8 @@ pub struct WinstonTuning {
     pub follow_distance: i32,
     /// Creature slot initialization0x80048F40:182 angle units/tick.
     pub max_turn: i32,
+    /// Navigation target clearance0x80015DD4: half a sector.
+    pub path_margin: i32,
 }
 
 #[derive(Component, Reflect, Debug, Clone, Default)]
@@ -34,6 +36,8 @@ pub struct Winston {
     pub speed: i32,
     /// Mesh contacts from the avatar collision pass; read by the next item tick.
     pub contact_mask: u32,
+    /// Current local path target, in ordinary level-space coordinates.
+    pub target: Vec3,
 }
 
 pub struct WinstonRulesPlugin;
@@ -63,12 +67,12 @@ fn follow(
     tuning: Res<WinstonTuning>,
     players: Query<&Player>,
     mut attendants: Query<
-        (&Winston, &WorldObject, &mut Transform, &ObjectAnimation, &mut AnimationGoal),
+        (&mut Winston, &WorldObject, &mut Transform, &ObjectAnimation, &mut AnimationGoal),
         Without<Player>,
     >,
 ) {
     let (Some(world), Ok(player)) = (world, players.single()) else { return };
-    for (actor, object, mut transform, animation, mut goal) in &mut attendants {
+    for (mut actor, object, mut transform, animation, mut goal) in &mut attendants {
         if object.consumed {
             continue;
         }
@@ -88,9 +92,16 @@ fn follow(
         } else if distance < i64::from(tuning.follow_distance).pow(2) && ahead {
             goal.state = 1;
         }
+        actor.target = world
+            .adjacent_path_target(transform.translation, object.room, player.position, player.room, tuning.path_margin)
+            .unwrap_or(player.position);
         if actor.speed == 0 || tuning.max_turn == 0 {
             continue;
         }
+        let target_delta = ((actor.target - transform.translation) * 1024.0).round();
+        let (dx, dz) = (target_delta.x as i32, target_delta.z as i32);
+        let angle = (heading(dx, dz) - old_yaw) as i16 as i32;
+        let distance = i64::from(dx).pow(2) + i64::from(dz).pow(2);
         let mut cap = tuning.max_turn;
         let turn_radius = actor.speed * 16384 / cap;
         if angle.abs() > 16384 && distance < i64::from(turn_radius).pow(2) {

@@ -49,7 +49,11 @@ fn compare_case(csv: &str, metadata: &str) {
             WorldObject::new(9, 260, at(start, "actor_room") as usize, 0),
             Transform::from_translation(pos(start, "actor"))
                 .with_rotation(Quat::from_rotation_y(angle(at(start, "actor_yaw")))),
-            Winston { speed: at(start, "actor_speed"), contact_mask: at(start, "actor_contact_mask") as u32 },
+            Winston {
+                speed: at(start, "actor_speed"),
+                contact_mask: at(start, "actor_contact_mask") as u32,
+                ..default()
+            },
             ObjectAnimation {
                 animation: clip,
                 frame: (at(start, "actor_animation_frame") - data.animations[clip].frame_start as i32) as f32,

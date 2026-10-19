@@ -44,7 +44,8 @@ pub struct Level {
     pub cameras: Vec<FixedCamera>,
     /// Navigation boxes: open floor areas the camera keeps its eye inside.
     pub boxes: Vec<NavBox>,
-    /// Box overlaps and zones for creature navigation (not yet used).
+    /// Authored adjacency and zones for creature navigation. Local corridor
+    /// queries use overlaps; full per-creature zone search remains unported.
     #[serde(default)]
     pub overlaps: Vec<u16>,
     #[serde(default)]
@@ -397,7 +398,7 @@ pub struct FixedCamera {
     pub other_flags: u16,
 }
 
-/// An open floor area in sector numbers: `x_min..=x_max`, `z_min..=z_max`.
+/// An open floor rectangle in sector numbers: `x_min..x_max`, `z_min..z_max`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct NavBox {
     pub z_min: i32,
