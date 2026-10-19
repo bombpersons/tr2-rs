@@ -22,6 +22,7 @@ mod traversal;
 pub use traversal::Traversal;
 mod backward;
 mod forward;
+mod rolling;
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -161,8 +162,9 @@ pub enum PlayerMode {
         animation: usize,
         frames_left: f32,
     },
+    /// A committed authored roll; entry starts clip146 at its third frame.
     Rolling {
-        seconds_left: f32,
+        entering: bool,
     },
     Swimming,
     Dead,
@@ -623,6 +625,14 @@ fn control(
             // Provisional pistol cadence; not yet measured from the PS1 weapon controller.
             weapon.cooldown_seconds = 0.2;
         }
+        if motion.grounded
+            && pad.held(Button::Circle)
+            && (player.mode == PlayerMode::WalkStopping
+                || (player.mode == PlayerMode::Recovering
+                    && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(2)))
+        {
+            player.mode = PlayerMode::Rolling { entering: true };
+        }
         if matches!(
             player.mode,
             PlayerMode::Back | PlayerMode::HopBack | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
@@ -714,13 +724,7 @@ fn control(
                 motion.velocity.z = 0.0;
                 continue;
             }
-            PlayerMode::Rolling { seconds_left } if seconds_left > dt => {
-                player.mode = PlayerMode::Rolling { seconds_left: seconds_left - dt };
-                continue;
-            }
-            PlayerMode::Rolling { .. } => {
-                player.yaw += std::f32::consts::PI;
-            }
+            PlayerMode::Rolling { .. } => continue,
             _ => {}
         }
         let walk = controls.walk;
@@ -742,8 +746,12 @@ fn control(
         if !motion.grounded {
             continue;
         }
-        if pad.pressed(Button::Circle) {
-            player.mode = PlayerMode::Rolling { seconds_left: 0.7 };
+        // Standing and run controllers force roll146 at+2 on held Roll
+        // (0x800389D4 and0x800387CC); walking control has no roll request.
+        if pad.held(Button::Circle)
+            && clips.as_deref().is_none_or(|c| matches!(c.state(animation.animation), Some(1 | 2)))
+        {
+            player.mode = PlayerMode::Rolling { entering: true };
             motion.velocity = forward * units(50.0 * ORIGINAL_FPS);
             continue;
         }
@@ -886,6 +894,9 @@ fn integrate(
     let dt = time.delta_secs();
     let geometry = world.as_deref();
     for (mut player, mut motion, weapon, mut animation, mut traversal) in &mut players {
+        if rolling::step(&mut player, &mut motion, &mut animation, &mut traversal, geometry, clips.as_deref(), dt) {
+            continue;
+        }
         if backward::step(
             &mut player,
             &mut motion,

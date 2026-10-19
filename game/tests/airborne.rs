@@ -197,6 +197,16 @@ recorded_case!(original_walk_wall_retains_standing_before_a_blocked_start, "walk
 recorded_case!(original_walk_ledge_uses_the_foot_stop_with_standing_control, "walk_ledge");
 recorded_case!(original_walk_steps_up_through_authored_foot_clips, "walk_step_up");
 recorded_case!(original_walk_steps_down_through_authored_foot_clips, "walk_step_down");
+recorded_case!(original_roll_on_an_oblique_runway_uses_authored_motion_and_turn, "roll_runway");
+recorded_case!(original_roll_steps_up_without_cancelling_the_authored_second_half, "roll_step_up");
+recorded_case!(original_roll_steps_down_then_completes_authored_recovery, "roll_step_down");
+recorded_case!(original_roll_wall_keeps_its_speed_and_pose_while_position_is_blocked, "roll_wall");
+recorded_case!(heldout_delayed_roll_ignores_turn_input_until_recovery, "roll_runway_delay_heldout");
+recorded_case!(heldout_held_roll_repeats_from_the_authored_standing_recovery, "roll_wall_hold_heldout");
+recorded_case!(heldout_roll_recovery_hands_a_walk_request_to_its_authored_dispatch, "roll_recovery_walk_heldout");
+recorded_case!(heldout_roll_near_a_ledge_finishes_before_departing, "roll_ledge_heldout");
+recorded_case!(heldout_roll_departure_uses_backward_fall_and_landing, "roll_ledge_fall_heldout");
+recorded_case!(heldout_circle_during_walking_does_not_force_a_roll, "roll_during_walk_heldout");
 recorded_case!(
     heldout_walk_release_midway_through_a_descending_step_finishes_the_step,
     "walk_step_down_mid_release_heldout"
