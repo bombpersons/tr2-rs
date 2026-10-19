@@ -114,7 +114,11 @@ it off. Record partial progress below without checking the parent item.
 
 - [ ] Distance darkening: original room/object depth shading and boundaries.
 - [ ] Distant texture LOD: original >=8192 room policy and texture selection.
-- [ ] Home sky: extract and render with the original placement and behavior.
+- [x] Home sky: render the baked model with original rotation-only placement,
+  texture modulation and camera-relative movement. Runtime mesh/pose checks,
+  independent projected-vertex validation and full-game on/off/translation
+  checks pass. Pixel raster and unusual portal clipping remain unverified.
+  [Evidence](docs/sky-evidence.md), [tests](game/tests/sky.rs).
 
 ## Progress
 
@@ -217,6 +221,12 @@ it off. Record partial progress below without checking the parent item.
   and rendering, editor byte-exact saves and clip28 preview pass. Full-game MCP
   checks64 poses. A separate diagnostic retains item260 pushing at Home.
   [Evidence](docs/vertical-steering-evidence.md).
+- 2026-10-19: Home sky: independently verified the existing baked model against
+  PSX RAM and draw code. Two native GPU views validate72 projected cloud-band
+  corners. The game renders a rotation-only background behind world geometry;
+  full-game checks preserve foreground pixels and verify translation invariance.
+  Workspace tests (229 passed), Clippy, builds, sandbox and editor checks pass.
+  No engine format or template change. [Evidence](docs/sky-evidence.md).
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

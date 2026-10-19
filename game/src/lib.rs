@@ -15,6 +15,7 @@ pub mod interactions;
 pub mod player;
 pub mod presentation;
 pub mod save;
+pub mod sky;
 pub mod subdivision;
 
 use bevy::prelude::*;
@@ -54,6 +55,7 @@ impl Plugin for GamePlugin {
             presentation::PresentationPlugin,
             audio::GameAudioPlugin,
             subdivision::SubdivisionPlugin,
+            sky::SkyPlugin,
         ));
     }
 }

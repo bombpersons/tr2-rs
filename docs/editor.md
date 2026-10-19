@@ -11,6 +11,11 @@ vertices, UVs and shades remain editable in their original engine format,
 and its ordinary perspective-correct viewport uses static meshes. No level
 fields or save representation were added for subdivision.
 
+Camera-relative backdrops are a game rendering rule over ordinary model and
+mesh assets. They add no level field or synthetic placement. The existing
+data browser can inspect their model, mesh, pose and texture data; the editor
+keeps its ordinary scene rendering.
+
 ```sh
 cargo run -p editor
 cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json

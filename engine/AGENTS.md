@@ -66,6 +66,12 @@ The skeleton is a starting point; reshape it to match `docs/engine-model.md`.
 
 ## Formats
 
+Camera-relative geometry uses `render::backdrop::Backdrop` and its isolated
+render layer. The background camera copies the world view rotation, FOV and
+crop with zero translation, then the world draws with fresh depth. Games
+select their models, visibility and materials; the engine knows no sky type
+ids or level names. `render::object_mesh` reuses authored mesh construction.
+
 Camera-dependent room rendering is opt-in through
 `render::rooms::RoomMeshPolicy` / `RoomTessellator`. The engine owns cached
 source faces, writable mesh assets, visibility and scheduling; the game
