@@ -12,6 +12,13 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'roll_first_half_fall': ('airborne_walk_ledge', 240, [event(['CIRCLE'], 2)]),
+    'roll_first_half_walk_heldout': ('airborne_walk_ledge', 300, [event(['CIRCLE'], 20, 18),
+                                                             event(['R1'], 64, 24),
+                                                             event(['UP', 'R1'], 154, 110)]),
+    'roll_first_half_run_heldout': ('airborne_walk_ledge', 280, [event(['CIRCLE'], 14, 12),
+                                                            event(['SQUARE'], 30, 20),
+                                                            event(['UP'], 126, 90)]),
     'roll_runway': ('home_runway_start', 220, [event(['CIRCLE'], 2)]),
     'roll_step_up': ('backward_step_down_start', 220, [event(['CIRCLE'], 2)]),
     'roll_step_down': ('backward_rolled_start', 220, [event(['CIRCLE'], 2)]),
@@ -242,6 +249,14 @@ def main():
             'source': source,
             'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
             'frames': 160, 'input': [event(['UP', 'R1'], 60)], 'output': checkpoint, 'pokes': [],
+        }
+    if start == 'airborne_walk_ledge':
+        source = '.psx/forward_ledge_start/state.bin'
+        metadata['checkpoint_preparation'] = {
+            'source': source,
+            'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
+            'frames': 280, 'input': [event(['UP', 'R1'], 220)], 'output': checkpoint, 'pokes': [],
+            'recorded_route': 'game/tests/data/original/airborne_walk_ledge.csv',
         }
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))

@@ -67,3 +67,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Authored rolling](rolling-evidence.md): entry offset, turn effect, authored speed and recovery, wall/step correction, held repetition and second-half backward departure;1220 sampled ticks including six independent routes.
 
 - [Fast-fall damage and fatal pose](fall-damage-evidence.md): controlled-motion thresholds, lethal sentinel and authored death goal/terminal pose;513 sampled ticks, five independent fixtures, with native first-death wait retained separately as a timing diagnostic.
+
+- [First-half roll departures](rolling-evidence.md#first-half-departure-verification): three post-implementation no-poke routes verify forward flight, unchanged yaw and landing/recovery;413 additional sampled ticks and44 full-game poses.

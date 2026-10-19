@@ -6,7 +6,8 @@ movement, turn and recovery. Verified routes cover ordinary flat/oblique motion,
 one-click steps, a cardinal room wall, repetition while Roll stays held,
 recovery into walking, walking's refusal of Roll, and a second-half departure
 into backward fall/landing. Static/dynamic objects, corner/ceiling boundaries,
-steep slopes, first-half departures and other launch states remain unverified.
+steep slopes and other launch states remain unverified. The later first-half
+departure verification is recorded below.
 
 ## Binary rules
 
@@ -35,8 +36,8 @@ Those control handlers do not interrupt their committed clips for input.
 - Second-half centre-floor drops above200 enter93/state/goal29 and seed
   gravity (0x8003BD9C..0x8003BDE4), retaining that tick's speed. The existing
   backward-fall controller owns subsequent descent and landing. First-half
-  collision calls the existing >384 forward ledge-fall test, but no first-half
-  departure is claimed as independently verified here.
+  collision calls the existing >384 forward ledge-fall test. The later
+  first-half departure recordings below verify that branch without changing it.
 
 The game keeps a small ECS `Rolling` mode with an entry flag, advances the
 engine's ordinary authored clips/cues, and applies the existing verified sine
@@ -93,3 +94,29 @@ Engine sandbox movement/rendering passes30 ticks. Editor sandbox and Home
 checks preserve untouched bytes, exercise undo/redo and save/reopen, and preview
 clip146 through its authored link into147. No engine format, editor or template
 change was required.
+
+## First-half departure verification
+
+Three additional no-poke recordings were made after the rolling controller was
+implemented. All pass unchanged; none was used to fit its rules. Their checkpoint
+is the end of the earlier `walk_ledge` route: Up+R1[0,220),280 fields from
+`forward_ledge_start`, settled at [19968,2048,88987], yaw0. The new sidecars
+retain this preparation, checkpoint/source/sample hashes and full toolkit identity.
+
+- `roll_first_half_fall`: roll enters146 at field2, crosses the edge into
+  34/state/goal3 at6 with speed50 and no vertical movement on that tick. The
+  subsequent flight uses35 at16, lands into82 at38, links11 at74 and103 at76.
+  Yaw stays0: leaving before147 skips its authored turn.
+- `roll_first_half_walk_heldout`: independent delayed roll, R1 during flight
+  requests goal52 without interrupting34/35. Landing resets goal2; later
+  Up+R1 starts the existing authored walk and stop.
+- `roll_first_half_run_heldout`: independent delayed entry ignores a second
+  Jump while airborne, completes landing, then runs and brakes through the
+  existing authored clips.
+
+All413 sampled ticks compare the same thirteen columns exactly except the
+existing0.02 y allowance. The full-game MCP checks44 poses, including the edge
+crossing, descent, landing and both recoveries. Paired original and port images
+are retained under `validation/first-half-roll/airborne/`. All261 workspace
+tests, all-target builds and Clippy pass. This step adds evidence, regressions
+and replay coverage; it changes no game/engine/editor runtime code or format.

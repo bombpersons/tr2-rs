@@ -266,6 +266,12 @@ it off. Record partial progress below without checking the parent item.
   pass. The original first-death wait is retained as a timing diagnostic; its
   exact cause and display-field transition parity remain unverified.
   [Evidence](docs/fall-damage-evidence.md).
+- 2026-10-19: First-half roll departures: three fresh post-implementation
+  no-poke recordings pass without rule changes,413 sampled ticks across thirteen
+  columns and44 full-game MCP poses. Forward flight, skipped turn, landing,
+  flight goal52 and walk/run recovery match. Workspace tests (261 passed),
+  all-target builds and Clippy pass. No runtime or format change was needed.
+  [Evidence](docs/rolling-evidence.md#first-half-departure-verification).
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
