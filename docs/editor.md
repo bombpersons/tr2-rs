@@ -253,3 +253,8 @@ and tread clips. Preview placement8 with clip86 or108 in the Home level.
 The new rules add per-type tuning fields in the existing object-type JSON,
 without changing persistent level data or making the editor depend on the
 game. The preview remains an animation inspector rather than a swim simulator.
+
+Underwater palettes are game presentation policy over the existing atlas and
+room water flag. The engine offers optional per-mesh texture overrides while
+keeping source lighting; the editor retains ordinary authored materials and
+unchanged level files. Home stroke preview and untouched save were checked.

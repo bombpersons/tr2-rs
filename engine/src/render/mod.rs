@@ -4,6 +4,7 @@
 //! All geometry comes from the level asset; no captured frame is used.
 pub mod backdrop;
 pub mod rooms;
+pub mod textures;
 pub mod view;
 
 use std::sync::Arc;
@@ -162,6 +163,8 @@ pub enum LevelSystems {
     Visibility,
     /// Rebuild opt-in camera-dependent room geometry after visibility.
     Meshes,
+    /// Apply per-mesh texture overrides after lighting and mesh restoration.
+    Textures,
 }
 
 pub struct RenderPlugin;
@@ -174,17 +177,26 @@ impl Plugin for RenderPlugin {
             .init_resource::<LevelRequest>()
             .init_resource::<ViewSettings>()
             .init_resource::<ObjectTypes>()
+            .init_resource::<textures::TextureVariants>()
             .add_message::<LevelLoaded>()
             .add_message::<PreviewLevel>()
             .configure_sets(
                 Update,
-                (LevelSystems::Load, LevelSystems::Pose, LevelSystems::Visibility, LevelSystems::Meshes).chain(),
+                (
+                    LevelSystems::Load,
+                    LevelSystems::Pose,
+                    LevelSystems::Visibility,
+                    LevelSystems::Meshes,
+                    LevelSystems::Textures,
+                )
+                    .chain(),
             )
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
             .add_systems(Update, (pose_models, follow_camera).in_set(LevelSystems::Pose))
             .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility))
-            .add_systems(Update, rooms::rebuild.in_set(LevelSystems::Meshes));
+            .add_systems(Update, rooms::rebuild.in_set(LevelSystems::Meshes))
+            .add_systems(Update, textures::apply.in_set(LevelSystems::Textures));
     }
 }
 

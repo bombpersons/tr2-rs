@@ -1,0 +1,407 @@
+{
+  "source": "Supplied USA Rev3 disc, psx native runtime VRAM and code",
+  "rule": "Underwater red5=floor(normal red5/2); green5, blue5 and STP preserved",
+  "selection": "Room water flag OR camera room water flag; caustics separate and unported",
+  "captures": [
+    {
+      "name": "dry",
+      "checkpoint": ".psx/home_start/state.bin",
+      "command": [
+        "psx",
+        "run",
+        "--from-state",
+        ".psx/home_start/state.bin",
+        "--frames",
+        "2",
+        "--gpu-frame",
+        "1",
+        "--trace",
+        "--trace-range",
+        "6D1F4-6D220",
+        "--watch",
+        "8c250",
+        "--sample",
+        "8b264:i16:camera_room",
+        "--sample",
+        "8c250:i32:camera_water",
+        "--out",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--summary"
+      ],
+      "checkpoint_sha256": "107cbc05042a79927bb322bb82773eb2e3db6f28a95304d1cd90c11b0e18cd01",
+      "vram_sha256": "b42d2facc7534e6ea133dc4bbcea2facf947529f46eafc21240f730e8840854b",
+      "palette_pairs": 8192,
+      "pairs_sha256": "0a2655d95f9b2cd92cd8eef224b65c5f5d274f3548d7984ca41ababffcef82f3"
+    },
+    {
+      "name": "underwater",
+      "checkpoint": "validation/swim/level_start/state.bin",
+      "command": [
+        "psx",
+        "run",
+        "--from-state",
+        "validation/swim/level_start/state.bin",
+        "--frames",
+        "2",
+        "--gpu-frame",
+        "1",
+        "--trace",
+        "--trace-range",
+        "6D1F4-6D220",
+        "--watch",
+        "8c250",
+        "--sample",
+        "8b264:i16:camera_room",
+        "--sample",
+        "8c250:i32:camera_water",
+        "--out",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/underwater",
+        "--summary"
+      ],
+      "checkpoint_sha256": "18ead4dd8d07139dcd68dbc0a8a6a92a8548641d2493271a37f6668c3614391e",
+      "vram_sha256": "319571c71357ce5d6d73ac05b4706bf29b784c55d110547e496ea57597cb05ab",
+      "palette_pairs": 8192,
+      "pairs_sha256": "0a2655d95f9b2cd92cd8eef224b65c5f5d274f3548d7984ca41ababffcef82f3"
+    }
+  ],
+  "code": [
+    {
+      "start": "0x23f14",
+      "end_exclusive": "0x23f24",
+      "sha256": "c8a908a41b3970189f2e9b0e589e4addb4780dc15d9dea33d3fefbfc29ed13c7",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x23f14",
+        "--count",
+        "4",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x24060",
+      "end_exclusive": "0x240b0",
+      "sha256": "75d4028c8c7af6a741c12a727f151375913ce0baab5175d92d2cf305464c1213",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x24060",
+        "--count",
+        "20",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x24fd0",
+      "end_exclusive": "0x25004",
+      "sha256": "21c565bdd172316a4a07814f8bf1eb4948c7c0eeb6322103408c2422ac969435",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x24fd0",
+        "--count",
+        "13",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x251bc",
+      "end_exclusive": "0x251f0",
+      "sha256": "993d8af197f00f1d8413888b731a0fcbb61554c97b72596d151ee264ff467eda",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x251bc",
+        "--count",
+        "13",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x6d1f4",
+      "end_exclusive": "0x6d220",
+      "sha256": "a92df15748dc379554bd2172d5e839af0ba99ea826ca4768b99fe1295f1b36cf",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x6d1f4",
+        "--count",
+        "11",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x617b0",
+      "end_exclusive": "0x61808",
+      "sha256": "f7f5a6023d1af0a3974181a1a305725e12adde4c3bae237a60107c224c2a3338",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x617b0",
+        "--count",
+        "22",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x61934",
+      "end_exclusive": "0x61960",
+      "sha256": "e066043f3ea7b282c7aa7d2e5400f15dc659e46c738da890c15cd7da2f3b1d8b",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/underwater-color/dry",
+        "--addr",
+        "0x61934",
+        "--count",
+        "11",
+        "--text"
+      ]
+    }
+  ],
+  "representatives": [
+    {
+      "x": 989,
+      "normal_y": 387,
+      "underwater_y": 259,
+      "normal": 0,
+      "underwater": 0
+    },
+    {
+      "x": 992,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 37985,
+      "underwater": 37984
+    },
+    {
+      "x": 968,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33858,
+      "underwater": 33857
+    },
+    {
+      "x": 967,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 34979,
+      "underwater": 34977
+    },
+    {
+      "x": 965,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 37124,
+      "underwater": 37122
+    },
+    {
+      "x": 964,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 39301,
+      "underwater": 39298
+    },
+    {
+      "x": 981,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 40326,
+      "underwater": 40323
+    },
+    {
+      "x": 990,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33095,
+      "underwater": 33091
+    },
+    {
+      "x": 966,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 39240,
+      "underwater": 39236
+    },
+    {
+      "x": 971,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33129,
+      "underwater": 33124
+    },
+    {
+      "x": 983,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 40298,
+      "underwater": 40293
+    },
+    {
+      "x": 969,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33195,
+      "underwater": 33189
+    },
+    {
+      "x": 960,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33228,
+      "underwater": 33222
+    },
+    {
+      "x": 963,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 41389,
+      "underwater": 41382
+    },
+    {
+      "x": 961,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 39374,
+      "underwater": 39367
+    },
+    {
+      "x": 974,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33359,
+      "underwater": 33351
+    },
+    {
+      "x": 991,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 33360,
+      "underwater": 33352
+    },
+    {
+      "x": 962,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 43537,
+      "underwater": 43528
+    },
+    {
+      "x": 975,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 34258,
+      "underwater": 34249
+    },
+    {
+      "x": 998,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 51859,
+      "underwater": 51849
+    },
+    {
+      "x": 965,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 42516,
+      "underwater": 42506
+    },
+    {
+      "x": 964,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 43605,
+      "underwater": 43594
+    },
+    {
+      "x": 977,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 47766,
+      "underwater": 47755
+    },
+    {
+      "x": 994,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 55159,
+      "underwater": 55147
+    },
+    {
+      "x": 997,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 50936,
+      "underwater": 50924
+    },
+    {
+      "x": 995,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 54041,
+      "underwater": 54028
+    },
+    {
+      "x": 962,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 43674,
+      "underwater": 43661
+    },
+    {
+      "x": 996,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 52123,
+      "underwater": 52109
+    },
+    {
+      "x": 970,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 47836,
+      "underwater": 47822
+    },
+    {
+      "x": 1007,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 34237,
+      "underwater": 34222
+    },
+    {
+      "x": 1007,
+      "normal_y": 384,
+      "underwater_y": 256,
+      "normal": 64478,
+      "underwater": 64463
+    },
+    {
+      "x": 974,
+      "normal_y": 385,
+      "underwater_y": 257,
+      "normal": 46815,
+      "underwater": 46799
+    }
+  ]
+}
