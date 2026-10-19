@@ -158,7 +158,11 @@ it off. Record partial progress below without checking the parent item.
   per-mesh textures preserving live lighting and HUD. Native palettes cover
   all 32 red levels; fresh visual comparison and restoration checks pass.
   [Evidence](docs/underwater-palette-evidence.md).
-- [ ] Underwater caustics and water-surface rendering.
+- [x] Wet-room caustic vertex shades before subdivision, including authored
+  vertex phase, animated field clock and dry-room isolation. All 64 wave-table
+  entries exercised by native corner observations.
+  [Evidence](docs/caustics-evidence.md), [tests](game/tests/caustics.rs).
+- [ ] Water-surface rendering, distortion and bubbles.
 - [ ] Distance darkening: original room/object depth shading and boundaries.
 - [ ] Distant texture LOD: original >=8192 room policy and texture selection.
 - [x] Home sky: render the baked model with original rotation-only placement,

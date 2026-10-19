@@ -258,3 +258,8 @@ Underwater palettes are game presentation policy over the existing atlas and
 room water flag. The engine offers optional per-mesh texture overrides while
 keeping source lighting; the editor retains ordinary authored materials and
 unchanged level files. Home stroke preview and untouched save were checked.
+
+Room policies now receive stable authored corner indices and room identity
+for optional animated vertex shading. This metadata is generated in memory
+from existing level geometry. The editor keeps static authored shades; Home
+tread preview and byte-exact untouched save/reopen still pass.

@@ -1,0 +1,1780 @@
+{
+  "source": "Supplied USA Rev3 disc via psx native",
+  "independent": false,
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "validation/swim/level_start/state.bin",
+    "--frames",
+    "8",
+    "--trace",
+    "--trace-range",
+    "62734-62790",
+    "--trace-range",
+    "6d1f4-6d210",
+    "--watch",
+    "89cd0",
+    "--sample",
+    "89cd0:i32:phase",
+    "--snapshot-every",
+    "2",
+    "--max-events",
+    "100000",
+    "--out",
+    "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+    "--summary"
+  ],
+  "pokes": null,
+  "code": [
+    {
+      "start": "0x21024",
+      "end_exclusive": "0x2105c",
+      "sha256": "58c0857bc618d3d2d2273349bf9d309a872415dc57574da2687826c8fe67c4d8",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x21024",
+        "--count",
+        "14",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x6d178",
+      "end_exclusive": "0x6d220",
+      "sha256": "d4223b8ae8ef325fba97238c24720f90dce3b645b5f1891e1e3b9c848ef420a4",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x6d178",
+        "--count",
+        "42",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x6d234",
+      "end_exclusive": "0x6d248",
+      "sha256": "285c77487aa04ce8cd5f629660de69b4a311c2c633b97b6681b102ca6f7b4da2",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x6d234",
+        "--count",
+        "5",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x6e54c",
+      "end_exclusive": "0x6e580",
+      "sha256": "a8a91286ae9bc94f1a8ecd4cb04236c53f811950bef79d3ca0c6a39758ac1f0c",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x6e54c",
+        "--count",
+        "13",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x62734",
+      "end_exclusive": "0x62794",
+      "sha256": "5ff6b888f8c92a3f2d8f5ad57ea034bfb6f5e169d89f430f80510a47382bf2d2",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x62734",
+        "--count",
+        "24",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x61a08",
+      "end_exclusive": "0x61a18",
+      "sha256": "812ea3c6fa5a80492a4b01ffc67636509f78c74e261c2f5cd239f66feb495fa1",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x61a08",
+        "--count",
+        "4",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x61d34",
+      "end_exclusive": "0x61d44",
+      "sha256": "3d166c4573c1b5a482f99daca035bf70d541c8a56003593c701f1d0b5c6fcf2a",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/calibration",
+        "--addr",
+        "0x61d34",
+        "--count",
+        "4",
+        "--text"
+      ]
+    }
+  ],
+  "table_sha256": "c87ff1a20cf702b322263a22aaefa3e6cc78f5637a1b99536808b95365586b79",
+  "wave": [
+    0,
+    2,
+    4,
+    6,
+    9,
+    11,
+    13,
+    15,
+    16,
+    18,
+    19,
+    21,
+    22,
+    22,
+    23,
+    23,
+    24,
+    23,
+    23,
+    22,
+    22,
+    21,
+    19,
+    18,
+    16,
+    15,
+    13,
+    11,
+    9,
+    6,
+    4,
+    2,
+    0,
+    -3,
+    -5,
+    -7,
+    -10,
+    -12,
+    -14,
+    -16,
+    -17,
+    -19,
+    -20,
+    -22,
+    -23,
+    -23,
+    -24,
+    -24,
+    -24,
+    -24,
+    -24,
+    -23,
+    -23,
+    -22,
+    -20,
+    -19,
+    -17,
+    -16,
+    -14,
+    -12,
+    -10,
+    -7,
+    -5,
+    -3
+  ],
+  "vertex_phase": [
+    44,
+    15,
+    42,
+    41,
+    18,
+    54,
+    13,
+    7,
+    2,
+    36,
+    22,
+    11,
+    4,
+    34,
+    48,
+    24,
+    29,
+    19,
+    10,
+    5,
+    32,
+    55,
+    28,
+    40,
+    15,
+    32,
+    14,
+    28,
+    30,
+    33,
+    44,
+    58,
+    2,
+    55,
+    59,
+    13,
+    35,
+    40,
+    35,
+    61,
+    34,
+    26,
+    45,
+    53,
+    51,
+    37,
+    32,
+    60,
+    21,
+    21,
+    48,
+    7,
+    30,
+    48,
+    10,
+    11,
+    34,
+    42,
+    50,
+    56,
+    48,
+    18,
+    1,
+    60
+  ],
+  "native_observations": 628,
+  "observations": [
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 23,
+      "base": 112,
+      "shaded": 100
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 22,
+      "base": 98,
+      "shaded": 113
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 27,
+      "base": 112,
+      "shaded": 127
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 26,
+      "base": 98,
+      "shaded": 119
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 31,
+      "base": 104,
+      "shaded": 85
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 30,
+      "base": 93,
+      "shaded": 74
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 8,
+      "base": 98,
+      "shaded": 95
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 6,
+      "base": 104,
+      "shaded": 123
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 7,
+      "base": 117,
+      "shaded": 126
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 9,
+      "base": 107,
+      "shaded": 104
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 35,
+      "base": 93,
+      "shaded": 112
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 34,
+      "base": 87,
+      "shaded": 70
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 10,
+      "base": 90,
+      "shaded": 112
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 32,
+      "base": 108,
+      "shaded": 105
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 36,
+      "base": 95,
+      "shaded": 95
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 11,
+      "base": 95,
+      "shaded": 111
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 38,
+      "base": 98,
+      "shaded": 98
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 39,
+      "base": 107,
+      "shaded": 93
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 46,
+      "base": 126,
+      "shaded": 132
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 48,
+      "base": 126,
+      "shaded": 149
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 50,
+      "base": 112,
+      "shaded": 89
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 52,
+      "base": 98,
+      "shaded": 109
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 54,
+      "base": 104,
+      "shaded": 119
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 55,
+      "base": 117,
+      "shaded": 133
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 63,
+      "base": 255,
+      "shaded": 239
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 47,
+      "base": 255,
+      "shaded": 239
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 61,
+      "base": 168,
+      "shaded": 191
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 45,
+      "base": 168,
+      "shaded": 163
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 62,
+      "base": 126,
+      "shaded": 121
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 64,
+      "base": 126,
+      "shaded": 107
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 66,
+      "base": 112,
+      "shaded": 96
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 68,
+      "base": 98,
+      "shaded": 121
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 70,
+      "base": 104,
+      "shaded": 123
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 71,
+      "base": 117,
+      "shaded": 126
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 80,
+      "base": 112,
+      "shaded": 125
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 78,
+      "base": 112,
+      "shaded": 89
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 82,
+      "base": 104,
+      "shaded": 119
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 84,
+      "base": 93,
+      "shaded": 99
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 86,
+      "base": 98,
+      "shaded": 113
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 87,
+      "base": 107,
+      "shaded": 95
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 94,
+      "base": 98,
+      "shaded": 79
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 96,
+      "base": 98,
+      "shaded": 95
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 98,
+      "base": 93,
+      "shaded": 76
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 100,
+      "base": 87,
+      "shaded": 87
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 102,
+      "base": 90,
+      "shaded": 90
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 103,
+      "base": 95,
+      "shaded": 81
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 108,
+      "base": 104,
+      "shaded": 80
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 110,
+      "base": 98,
+      "shaded": 104
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 111,
+      "base": 107,
+      "shaded": 91
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 109,
+      "base": 117,
+      "shaded": 112
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 101,
+      "base": 95,
+      "shaded": 83
+    },
+    {
+      "frame": 15003,
+      "phase": 2,
+      "vertex": 99,
+      "base": 108,
+      "shaded": 127
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 23,
+      "base": 112,
+      "shaded": 105
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 22,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 27,
+      "base": 112,
+      "shaded": 130
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 26,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 31,
+      "base": 104,
+      "shaded": 82
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 30,
+      "base": 93,
+      "shaded": 77
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 8,
+      "base": 98,
+      "shaded": 91
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 6,
+      "base": 104,
+      "shaded": 120
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 7,
+      "base": 117,
+      "shaded": 121
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 9,
+      "base": 107,
+      "shaded": 109
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 35,
+      "base": 93,
+      "shaded": 109
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 34,
+      "base": 87,
+      "shaded": 67
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 10,
+      "base": 90,
+      "shaded": 113
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 32,
+      "base": 108,
+      "shaded": 101
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 36,
+      "base": 95,
+      "shaded": 99
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 11,
+      "base": 95,
+      "shaded": 108
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 38,
+      "base": 98,
+      "shaded": 102
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 37,
+      "base": 108,
+      "shaded": 101
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 39,
+      "base": 107,
+      "shaded": 90
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 46,
+      "base": 126,
+      "shaded": 137
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 48,
+      "base": 126,
+      "shaded": 150
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 50,
+      "base": 112,
+      "shaded": 90
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 52,
+      "base": 98,
+      "shaded": 113
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 54,
+      "base": 104,
+      "shaded": 115
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 53,
+      "base": 118,
+      "shaded": 96
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 55,
+      "base": 117,
+      "shaded": 130
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 63,
+      "base": 255,
+      "shaded": 236
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 47,
+      "base": 255,
+      "shaded": 236
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 61,
+      "base": 168,
+      "shaded": 190
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 45,
+      "base": 168,
+      "shaded": 168
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 62,
+      "base": 126,
+      "shaded": 116
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 64,
+      "base": 126,
+      "shaded": 110
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 66,
+      "base": 112,
+      "shaded": 100
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 68,
+      "base": 98,
+      "shaded": 120
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 70,
+      "base": 104,
+      "shaded": 120
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 69,
+      "base": 118,
+      "shaded": 94
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 71,
+      "base": 117,
+      "shaded": 121
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 80,
+      "base": 112,
+      "shaded": 128
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 78,
+      "base": 112,
+      "shaded": 90
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 82,
+      "base": 104,
+      "shaded": 115
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 84,
+      "base": 93,
+      "shaded": 104
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 86,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 85,
+      "base": 108,
+      "shaded": 84
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 87,
+      "base": 107,
+      "shaded": 100
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 94,
+      "base": 98,
+      "shaded": 82
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 96,
+      "base": 98,
+      "shaded": 91
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 98,
+      "base": 93,
+      "shaded": 73
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 100,
+      "base": 87,
+      "shaded": 91
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 102,
+      "base": 90,
+      "shaded": 94
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 101,
+      "base": 95,
+      "shaded": 88
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 103,
+      "base": 95,
+      "shaded": 78
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 108,
+      "base": 104,
+      "shaded": 80
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 110,
+      "base": 98,
+      "shaded": 109
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 111,
+      "base": 107,
+      "shaded": 88
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 109,
+      "base": 117,
+      "shaded": 117
+    },
+    {
+      "frame": 15005,
+      "phase": 4,
+      "vertex": 99,
+      "base": 108,
+      "shaded": 124
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 23,
+      "base": 112,
+      "shaded": 109
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 22,
+      "base": 98,
+      "shaded": 119
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 27,
+      "base": 112,
+      "shaded": 133
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 26,
+      "base": 98,
+      "shaded": 113
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 31,
+      "base": 104,
+      "shaded": 81
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 30,
+      "base": 93,
+      "shaded": 81
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 8,
+      "base": 98,
+      "shaded": 86
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 6,
+      "base": 104,
+      "shaded": 117
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 7,
+      "base": 117,
+      "shaded": 117
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 9,
+      "base": 107,
+      "shaded": 113
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 35,
+      "base": 93,
+      "shaded": 106
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 34,
+      "base": 87,
+      "shaded": 64
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 10,
+      "base": 90,
+      "shaded": 113
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 32,
+      "base": 108,
+      "shaded": 96
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 36,
+      "base": 95,
+      "shaded": 104
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 11,
+      "base": 95,
+      "shaded": 104
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 38,
+      "base": 98,
+      "shaded": 107
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 37,
+      "base": 108,
+      "shaded": 105
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 39,
+      "base": 107,
+      "shaded": 87
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 46,
+      "base": 126,
+      "shaded": 141
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 48,
+      "base": 126,
+      "shaded": 149
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 50,
+      "base": 112,
+      "shaded": 93
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 52,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 54,
+      "base": 104,
+      "shaded": 110
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 53,
+      "base": 118,
+      "shaded": 99
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 55,
+      "base": 117,
+      "shaded": 126
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 62,
+      "base": 126,
+      "shaded": 112
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 64,
+      "base": 126,
+      "shaded": 114
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 66,
+      "base": 112,
+      "shaded": 105
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 68,
+      "base": 98,
+      "shaded": 119
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 70,
+      "base": 104,
+      "shaded": 117
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 69,
+      "base": 118,
+      "shaded": 94
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 71,
+      "base": 117,
+      "shaded": 117
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 80,
+      "base": 112,
+      "shaded": 131
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 78,
+      "base": 112,
+      "shaded": 93
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 82,
+      "base": 104,
+      "shaded": 110
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 84,
+      "base": 93,
+      "shaded": 108
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 86,
+      "base": 98,
+      "shaded": 119
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 85,
+      "base": 108,
+      "shaded": 84
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 87,
+      "base": 107,
+      "shaded": 104
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 94,
+      "base": 98,
+      "shaded": 86
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 96,
+      "base": 98,
+      "shaded": 86
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 98,
+      "base": 93,
+      "shaded": 70
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 100,
+      "base": 87,
+      "shaded": 96
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 102,
+      "base": 90,
+      "shaded": 99
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 101,
+      "base": 95,
+      "shaded": 92
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 103,
+      "base": 95,
+      "shaded": 75
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 108,
+      "base": 104,
+      "shaded": 81
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 110,
+      "base": 98,
+      "shaded": 113
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 111,
+      "base": 107,
+      "shaded": 85
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 109,
+      "base": 117,
+      "shaded": 121
+    },
+    {
+      "frame": 15007,
+      "phase": 6,
+      "vertex": 99,
+      "base": 108,
+      "shaded": 121
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 23,
+      "base": 112,
+      "shaded": 114
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 22,
+      "base": 98,
+      "shaded": 120
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 27,
+      "base": 112,
+      "shaded": 134
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 26,
+      "base": 98,
+      "shaded": 109
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 31,
+      "base": 104,
+      "shaded": 80
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 30,
+      "base": 93,
+      "shaded": 86
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 8,
+      "base": 98,
+      "shaded": 82
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 6,
+      "base": 104,
+      "shaded": 113
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 7,
+      "base": 117,
+      "shaded": 112
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 9,
+      "base": 107,
+      "shaded": 118
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 35,
+      "base": 93,
+      "shaded": 102
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 34,
+      "base": 87,
+      "shaded": 63
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 10,
+      "base": 90,
+      "shaded": 112
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 32,
+      "base": 108,
+      "shaded": 92
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 36,
+      "base": 95,
+      "shaded": 108
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 11,
+      "base": 95,
+      "shaded": 99
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 38,
+      "base": 98,
+      "shaded": 111
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 37,
+      "base": 108,
+      "shaded": 110
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 39,
+      "base": 107,
+      "shaded": 84
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 46,
+      "base": 126,
+      "shaded": 144
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 48,
+      "base": 126,
+      "shaded": 148
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 50,
+      "base": 112,
+      "shaded": 96
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 52,
+      "base": 98,
+      "shaded": 119
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 54,
+      "base": 104,
+      "shaded": 106
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 53,
+      "base": 118,
+      "shaded": 102
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 55,
+      "base": 117,
+      "shaded": 121
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 62,
+      "base": 126,
+      "shaded": 109
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 64,
+      "base": 126,
+      "shaded": 119
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 66,
+      "base": 112,
+      "shaded": 109
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 68,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 70,
+      "base": 104,
+      "shaded": 113
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 69,
+      "base": 118,
+      "shaded": 95
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 71,
+      "base": 117,
+      "shaded": 112
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 80,
+      "base": 112,
+      "shaded": 134
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 78,
+      "base": 112,
+      "shaded": 96
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 82,
+      "base": 104,
+      "shaded": 106
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 84,
+      "base": 93,
+      "shaded": 111
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 86,
+      "base": 98,
+      "shaded": 120
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 85,
+      "base": 108,
+      "shaded": 84
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 87,
+      "base": 107,
+      "shaded": 109
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 94,
+      "base": 98,
+      "shaded": 91
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 96,
+      "base": 98,
+      "shaded": 82
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 98,
+      "base": 93,
+      "shaded": 69
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 100,
+      "base": 87,
+      "shaded": 100
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 102,
+      "base": 90,
+      "shaded": 103
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 101,
+      "base": 95,
+      "shaded": 97
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 103,
+      "base": 95,
+      "shaded": 72
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 108,
+      "base": 104,
+      "shaded": 84
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 110,
+      "base": 98,
+      "shaded": 116
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 111,
+      "base": 107,
+      "shaded": 84
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 109,
+      "base": 117,
+      "shaded": 126
+    },
+    {
+      "frame": 15009,
+      "phase": 8,
+      "vertex": 99,
+      "base": 108,
+      "shaded": 117
+    }
+  ],
+  "phase_trajectory": {
+    "command": [
+      "psx",
+      "run",
+      "--from-state",
+      "validation/swim/level_start/state.bin",
+      "--frames",
+      "140",
+      "--sample",
+      "89cd0:i32:phase",
+      "--out",
+      "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/caustics/phase-calibration",
+      "--summary"
+    ],
+    "initial_phase": 0,
+    "samples_sha256": "d0722d19cfbf83b0f1cbb910492c44ccb48e950949848ae0b971b853678611e5"
+  }
+}
