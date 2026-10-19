@@ -3,6 +3,11 @@
 from backward_collision_smoke import main
 
 CAPTURES = {
+    'vertical_steer_forward': [28, 30, 32, 34, 40, 42, 52, 90, 100, 102, 144, 220],
+    'vertical_steer_back_open': [28, 30, 32, 34, 36, 40, 42, 52, 90, 100, 102, 144, 220],
+    'vertical_steer_wall': [30, 36, 38, 40, 42, 60, 82, 84, 86, 90, 130, 220],
+    'vertical_steer_reverse_heldout': [46, 48, 50, 52, 54, 56, 58, 60, 76, 116, 118, 120, 162, 240],
+    'vertical_steer_late_heldout': [44, 46, 54, 56, 60, 62, 64, 80, 108, 116, 118, 160, 240],
     'braking_wall_validation_heldout': [190, 216, 218, 224, 226, 228, 230, 246, 256],
     'vertical_clearance_heldout': [24, 28, 30, 36, 38, 40, 62, 82, 84, 86, 98, 100, 102, 142, 144, 210],
     'vertical_clearance_delay_heldout': [42, 46, 48, 54, 56, 58, 80, 100, 102, 104, 116, 118, 120, 160, 162, 250],

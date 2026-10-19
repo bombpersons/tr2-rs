@@ -210,6 +210,13 @@ it off. Record partial progress below without checking the parent item.
   and clip28 preview pass. Full-game MCP checks41 poses across three routes.
   No engine format or template change was needed.
   [Evidence](docs/vertical-clearance-evidence.md).
-- Next: vertical jump directional steering, corner airborne ceiling impacts, fast-fall/slide recovery,
+- 2026-10-19: Vertical jump steering: five complete passing routes,625 sampled
+  ticks across thirteen columns, including two fresh independent routes. Signed
+  backward acceleration, forward cap, early reversal and late-input cutoff match
+  the original. Workspace tests (226 passed), Clippy, builds, sandbox movement
+  and rendering, editor byte-exact saves and clip28 preview pass. Full-game MCP
+  checks64 poses. A separate diagnostic retains item260 pushing at Home.
+  [Evidence](docs/vertical-steering-evidence.md).
+- Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
