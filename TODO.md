@@ -203,7 +203,13 @@ it off. Record partial progress below without checking the parent item.
   All283 full-game poses across29 routes pass, including82 new poses.
   A fresh diagnostic retains a vertical jump's front-wall clearance mismatch
   beginning at field228. [Evidence](docs/walk-stop-evidence.md).
-- Next: vertical jump clearance over the front wall (the retained braking-wall
-  jump diagnostic), corner airborne ceiling impacts, fast-fall/slide recovery,
+- 2026-10-19: Vertical front-floor clearance: the prior diagnostic now passes
+  as calibration, with two fresh independent complete jump/landing routes. All373
+  sampled ticks across thirteen columns pass. Workspace tests (221 passed),
+  Clippy, all-target builds, sandbox movement/rendering, editor byte-exact saves
+  and clip28 preview pass. Full-game MCP checks41 poses across three routes.
+  No engine format or template change was needed.
+  [Evidence](docs/vertical-clearance-evidence.md).
+- Next: vertical jump directional steering, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

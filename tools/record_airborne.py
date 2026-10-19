@@ -12,6 +12,9 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'vertical_clearance_heldout': ('vertical_wall_start', 220, [event(['SQUARE'], 8)]),
+    'vertical_clearance_delay_heldout': ('vertical_wall_start', 260, [event(['SQUARE'], 28, 18),
+                                                                  event(['SQUARE'], 84, 72)]),
     'walk_stop_left_heldout': ('home_runway_start', 240, [event(['UP', 'R1'], 100)]),
     'walk_stop_right_heldout': ('home_runway_start', 220, [event(['UP', 'R1'], 80)]),
     'walk_stop_rehold_heldout': ('home_runway_start', 280, [event(['UP', 'R1'], 80),
@@ -79,8 +82,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case', choices=CASES)
     parser.add_argument('--prepare-checkpoints', action='store_true')
+    parser.add_argument('--prepare-vertical-wall', action='store_true')
     parser.add_argument('--summarize-only', action='store_true')
     args = parser.parse_args()
+    if args.prepare_vertical_wall:
+        subprocess.run(['psx', 'run', '--from-state', '.psx/forward_ledge_start/state.bin',
+                        '--frames', '260', '--input', json.dumps([
+                            event(['UP'], 56), event(['SQUARE'], 68, 62), event(['UP'], 176, 130)]),
+                        '--save-state', '--out', '.psx/vertical_wall_start', '--summary'],
+                       cwd=ROOT, check=True)
+        if args.case is None:
+            return
     if args.prepare_checkpoints:
         subprocess.run(['psx', 'run', '--from-state', '.psx/home_hang_start/state.bin',
                         '--frames', '90', '--input', json.dumps([event(['CIRCLE'], 2)]),
@@ -120,8 +132,9 @@ def main():
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
         'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout',
-                                            'forward_ledge_release_heldout', 'forward_ledge_walk_heldout'),
-        'diagnostic_only': args.case == 'braking_wall_validation_heldout',
+                                            'forward_ledge_release_heldout', 'forward_ledge_walk_heldout',
+                                            'braking_wall_validation_heldout'),
+        'diagnostic_only': False,
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,
@@ -132,6 +145,19 @@ def main():
     if args.case in ('forward_ledge_release_heldout', 'forward_ledge_walk_heldout'):
         metadata['provenance_note'] = ('Former diagnostic recorded after the ledge-fall implementation; '
                                        'used to refine walking/flight goals and the braking-wall state in the next milestone.')
+    if start == 'vertical_wall_start':
+        source = '.psx/forward_ledge_start/state.bin'
+        metadata['checkpoint_preparation'] = {
+            'source': source,
+            'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
+            'frames': 260,
+            'input': [event(['UP'], 56), event(['SQUARE'], 68, 62), event(['UP'], 176, 130)],
+            'output': checkpoint, 'pokes': [],
+        }
+    if args.case == 'braking_wall_validation_heldout':
+        metadata['provenance_note'] = ('Former walking-stop milestone diagnostic; unchanged CSV used to refine '
+                                       'the vertical front-floor clearance margin. Fresh vertical_clearance '
+                                       'routes provide independent validation.')
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))
 

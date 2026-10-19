@@ -449,7 +449,16 @@ fn jump_motion(
         // A descending sweep can cross its floor without turning that floor
         // into a horizontal wall. This is the same upper-endpoint rule used
         // by ordinary locomotion and the retained standing-jump recording.
-        let floor_test = if motion.grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) };
+        let floor_test = if vertical_jump {
+            // Jump-up allows the front floor up to384 above the feet
+            // (0x8003B7E4). Once the rising feet clear that margin, the
+            // retained2-unit wall speed can move over the ledge.
+            proposed.y + units(384.0)
+        } else if motion.grounded {
+            old.y + STEP_HEIGHT
+        } else {
+            old.y.max(proposed.y)
+        };
         let ceiling_margin = if forward_jump || reach || vertical_jump { units(192.0) } else { 0.0 };
         blocked = hits[0].height > floor_test || hits[0].ceiling + ceiling_margin < proposed.y + height;
         if blocked {

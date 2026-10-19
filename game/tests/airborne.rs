@@ -190,6 +190,12 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 }
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
+recorded_case!(heldout_vertical_jump_clears_the_wall_and_completes_landing, "vertical_clearance_heldout");
+recorded_case!(heldout_delayed_vertical_jump_ignores_jump_during_descent_and_lands, "vertical_clearance_delay_heldout");
+recorded_case!(
+    calibration_vertical_jump_clears_the_front_floor_before_the_feet_reach_it,
+    "braking_wall_validation_heldout"
+);
 recorded_case!(original_forward_ledge_fall_lands_into_the_authored_running_clip, "forward_ledge_run");
 recorded_case!(calibration_released_ledge_fall_exposes_braking_wall_state_override, "forward_ledge_release_heldout");
 recorded_case!(calibration_walk_after_ledge_fall_exposes_flight_goal_and_authored_stop, "forward_ledge_walk_heldout");
