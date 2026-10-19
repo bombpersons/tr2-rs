@@ -34,6 +34,7 @@ python3 tools/subdivision_smoke.py             # off/split/filled room meshes at
 python3 tools/room_visibility_smoke.py         # Wall/Home room pixels after repeated camera turns
 python3 tools/ceiling_smoke.py                 # forward/vertical/reach ceiling impacts and authored recovery
 python3 tools/swimming_smoke.py --suite drowning # oxygen exhaustion and submerged/surface death poses
+python3 tools/screen_size_smoke.py             # Wall view, pause menu and title at 368x240, 16:9 and 2x
 ```
 
 Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/evidence.md);

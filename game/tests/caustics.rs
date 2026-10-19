@@ -95,6 +95,7 @@ fn room_policy_shades_wet_corners_and_preserves_dry_corners() {
             clip_from_view: PerspectiveProjection::default().get_clip_from_view(),
             atlas_size: UVec2::splat(256),
             full_size: UVec2::new(384, 240),
+            margin: Vec2::ZERO,
         };
         let mut output = RoomMeshOutput::default();
         policy.0.tessellate(&face, &view, &mut output);

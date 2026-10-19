@@ -30,7 +30,7 @@ def serializable(value):
 
 
 class Client:
-    def __init__(self, binary: Path, out: Path, level: str | None, asset_root: Path | None = None):
+    def __init__(self, binary: Path, out: Path, level: str | None, asset_root: Path | None = None, extra_args: list[str] | None = None):
         self.out = out
         self.out.mkdir(parents=True, exist_ok=True)
         self.log = (out / 'game.log').open('w')
@@ -40,6 +40,7 @@ class Client:
         args = [str(binary), '--mcp', '--headless', '--software']
         if level is not None:
             args += ['--level', level]
+        args += extra_args or []
         env = os.environ.copy()
         env.pop('DISPLAY', None)
         env.pop('WAYLAND_DISPLAY', None)

@@ -4,8 +4,11 @@
 use bevy::prelude::*;
 use engine::{
     controller::{Button, ControllerState},
-    psx::{PsxScreen, PsxView},
-    render::{ActiveLevel, LevelLoaded, LevelSystems},
+    psx::PsxView,
+    render::{
+        ActiveLevel, LevelLoaded, LevelSystems, ViewSettings,
+        overlay::{OverlayAnchor, overlay_projection},
+    },
     schedule::WorldSystems,
     shell::GameSystems,
 };
@@ -57,15 +60,21 @@ impl Plugin for PresentationPlugin {
     }
 }
 
-fn setup(mut commands: Commands, server: Res<AssetServer>, screen: Res<PsxScreen>, session: Res<Session>, mut music: MessageWriter<crate::audio::TrackRequest>) {
+/// The HUD and menus are laid out in the original's 368x240 display pixels
+/// (`ViewSettings::size`) and scale with the screen's height; a wider screen
+/// adds room at the sides, where edge elements follow through
+/// `OverlayAnchor`. At the original's size this is one unit per pixel.
+fn setup(mut commands: Commands, server: Res<AssetServer>, view: Res<ViewSettings>, session: Res<Session>, mut music: MessageWriter<crate::audio::TrackRequest>) {
     if session.title {
         music.write(crate::audio::TrackRequest(2));
     }
-    commands.spawn((Camera2d, Camera { order: 1, clear_color: ClearColorConfig::None, ..default() }, PsxView));
+    commands.spawn((Camera2d, Camera { order: 1, clear_color: ClearColorConfig::None, ..default() }, overlay_projection(&view), PsxView));
+    // The title fills the original's display; wider screens pillarbox it in black.
     commands.spawn((
-        Sprite { custom_size: Some(Vec2::new(screen.width as f32, screen.height as f32)), ..Sprite::from_image(server.load("screens/pixus_titleus.png")) },
+        Sprite { custom_size: Some(view.size.as_vec2()), ..Sprite::from_image(server.load("screens/pixus_titleus.png")) },
         Transform::from_xyz(0.0, 0.0, 0.5),
         TitleBackdrop,
+        children![(Sprite::from_color(Color::BLACK, Vec2::splat(8192.0)), Transform::from_xyz(0.0, 0.0, -0.25))],
     ));
     commands.spawn((
         Text2d::new("Loading..."),
@@ -75,8 +84,13 @@ fn setup(mut commands: Commands, server: Res<AssetServer>, screen: Res<PsxScreen
         Transform::from_xyz(0.0, 90.0, 1.0),
         Hud,
     ));
-    commands.spawn((Sprite::from_color(Color::srgb(0.05, 0.05, 0.05), Vec2::new(106.0, 8.0)), Transform::from_xyz(-95.0, 106.0, 0.0)));
-    commands.spawn((Sprite::from_color(Color::srgb(0.8, 0.18, 0.12), Vec2::new(100.0, 4.0)), Transform::from_xyz(-95.0, 106.0, 1.0), HealthBar));
+    // Health bar frame 89 units from the left edge and 14 from the top; the
+    // bar is its child, so the HUD system only sets the bar's local x.
+    commands.spawn((
+        Sprite::from_color(Color::srgb(0.05, 0.05, 0.05), Vec2::new(106.0, 8.0)),
+        OverlayAnchor::new(Vec2::new(-1.0, 1.0), Vec2::new(89.0, -14.0)),
+        children![(Sprite::from_color(Color::srgb(0.8, 0.18, 0.12), Vec2::new(100.0, 4.0)), Transform::from_xyz(0.0, 0.0, 1.0), HealthBar)],
+    ));
 }
 
 /// A new level starts with closed menus and fresh counters.
@@ -148,5 +162,5 @@ fn update_hud(session:Res<Session>,active:Option<Res<ActiveLevel>>,players:Query
         let title=LEVELS.iter().find(|(n,_)|*n==active.name).map(|(_,t)|*t).unwrap_or(&active.name);
         label.0=if players.single().is_ok_and(|(p,_)|p.health<=0) {format!("{title}\n\nLara has died\nSTART for menu")}else{String::new()};
     }
-    if let Ok((p,_))=players.single(){if let Ok((mut sprite,mut t,mut vis))=health.single_mut(){let width=(p.health as f32/10.0).clamp(0.0,100.0);sprite.custom_size=Some(Vec2::new(width,4.0));t.translation.x=-145.0+width/2.0;*vis=if session.title {Visibility::Hidden}else{Visibility::Inherited};}}
+    if let Ok((p,_))=players.single(){if let Ok((mut sprite,mut t,mut vis))=health.single_mut(){let width=(p.health as f32/10.0).clamp(0.0,100.0);sprite.custom_size=Some(Vec2::new(width,4.0));t.translation.x=-50.0+width/2.0;*vis=if session.title {Visibility::Hidden}else{Visibility::Inherited};}}
 }

@@ -101,11 +101,13 @@ fn front_facing(p: &[Projected]) -> bool {
 
 fn outside(p: &[Projected], view: &RoomView) -> bool {
     // 0x80061fc4 rejects only when all corners lie outside the same edge.
-    let size = view.full_size.as_vec2();
-    p.iter().all(|p| p.screen.x < 0.0)
-        || p.iter().all(|p| p.screen.y < 0.0)
-        || p.iter().all(|p| p.screen.x >= size.x)
-        || p.iter().all(|p| p.screen.y >= size.y)
+    // The edges are the original's projection window, widened by the margin
+    // a wider screen draws beyond it (zero at the original's size).
+    let (min, max) = (-view.margin, view.full_size.as_vec2() + view.margin);
+    p.iter().all(|p| p.screen.x < min.x)
+        || p.iter().all(|p| p.screen.y < min.y)
+        || p.iter().all(|p| p.screen.x >= max.x)
+        || p.iter().all(|p| p.screen.y >= max.y)
 }
 
 /// Integer UV-byte interpolation survives atlas translation: the importer
@@ -224,6 +226,7 @@ mod tests {
             clip_from_view: projection.get_clip_from_view(),
             atlas_size: UVec2::splat(256),
             full_size: UVec2::new(384, 240),
+            margin: Vec2::ZERO,
         }
     }
 
@@ -239,6 +242,16 @@ mod tests {
                 .to_vec(),
             texture_attribute: 0,
         }
+    }
+
+    #[test]
+    fn a_wider_screen_widens_the_off_screen_rejection_by_its_margin() {
+        // Corners right of the original's 384-pixel projection window.
+        let corners = [400.0, 410.0, 405.0].map(|x| Projected { screen: Vec2::new(x, 100.0), depth: 1000.0, error: false });
+        assert!(outside(&corners, &view()), "rejected on the original's screen");
+        assert!(!outside(&corners, &RoomView { margin: Vec2::new(29.0, 0.0), ..view() }), "drawn on a 426-wide screen");
+        let left = corners.map(|p| Projected { screen: Vec2::new(-p.screen.x + 384.0 - 30.0, 100.0), ..p });
+        assert!(outside(&left, &RoomView { margin: Vec2::new(29.0, 0.0), ..view() }), "beyond the widened left edge");
     }
 
     fn render(face: &RoomFace, view: &RoomView) -> RoomMeshOutput {

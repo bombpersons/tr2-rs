@@ -99,10 +99,17 @@ From psx `0.1.0+src-41f296d388d06491-release` to
   `.gitignore` already covered the template's entries; `game/src/demo/` was
   replaced by this game long ago, so its change does not apply.
 
-Not yet adapted: the display menu can now resize the screen or switch to
-`--aspect window`, but the game's `ViewSettings` projection (384x240, cropped
-to 368x240) and its HUD were laid out for a fixed screen. The default
-(`Fixed`, 368x240) behaves as before; other sizes are unverified.
+Adapted afterwards: the level camera follows screen resizes
+(`ViewSettings::sub_view`/`margin`, `engine::render::fit_view_to_screen`):
+the original's 384x240 projection cropped to 368x240, scaled by the screen's
+height, with extra width split equally between the sides. The room
+tessellator's off-screen rejection widens by the same margin (`RoomView::margin`).
+The HUD and title use an overlay camera in the original's 240-line units
+(`engine::render::overlay`), with `OverlayAnchor` for edge elements. At
+368x240 the captures from `tools/screen_size_smoke.py` are byte-identical to
+before the change. `--aspect window` needs a real window and was not run
+headless; it resizes through the same `PsxScreen::set_size` path, and the view
+test covers arbitrary widths, narrower ones included.
 
 Validation: `cargo test --workspace --all-features` passed, as did all five
 ignored GPU/MCP tests in `psx-bevy/tests/dev_mcp.rs` (ALSA null output). The

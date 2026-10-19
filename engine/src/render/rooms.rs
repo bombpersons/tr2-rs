@@ -33,7 +33,13 @@ pub struct RoomView {
     pub view_from_room: Mat4,
     pub clip_from_view: Mat4,
     pub atlas_size: UVec2,
+    /// The original's projection window in its own pixels
+    /// ([`ViewSettings::full_size`]); screen coordinates are measured in it.
     pub full_size: UVec2,
+    /// How far the drawn view reaches beyond each side of that window on the
+    /// current screen ([`ViewSettings::margin`]): zero at the original's size,
+    /// wider for a wider screen.
+    pub margin: Vec2,
 }
 
 impl RoomView {
@@ -211,6 +217,7 @@ pub(super) fn rebuild(
             clip_from_view,
             atlas_size: atlas.size(),
             full_size: settings.full_size,
+            margin: camera_view.sub_camera_view.as_ref().map_or(Vec2::ZERO, |sub| settings.margin(sub)),
         };
         if source.last_view == Some(context) && source.last_policy == Some(revision) {
             continue;

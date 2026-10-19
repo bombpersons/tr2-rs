@@ -43,6 +43,7 @@ fn subdivided_room_face_matches_recorded_psx_leaf_texels_shades_and_depths() {
             * Mat4::from_translation(position(reference.origin)),
         clip_from_view: projection.get_clip_from_view(),
         full_size: UVec2::new(384, 240),
+        margin: Vec2::ZERO,
         // Use the original texture page as a simple test atlas. Translation
         // into the baked atlas is integer texels and does not affect rounding.
         atlas_size: UVec2::splat(256),

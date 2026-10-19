@@ -3,6 +3,7 @@
 //!
 //! All geometry comes from the level asset; no captured frame is used.
 pub mod backdrop;
+pub mod overlay;
 pub mod rooms;
 pub mod textures;
 pub mod view;
@@ -110,9 +111,33 @@ pub struct ViewSettings {
     pub fog_start: f32,
     pub fog_end: f32,
     /// Full projected width and the drawn width (a narrower display window
-    /// crops the right edge of the projection).
+    /// crops the right edge of the projection), in the original's pixels.
+    /// A screen of another size scales these by its height and widens (or
+    /// narrows) both sides of the view equally: [`ViewSettings::sub_view`].
     pub full_size: UVec2,
     pub size: UVec2,
+}
+
+impl ViewSettings {
+    /// The level camera's sub-view on a `screen` of real pixels: the
+    /// original's projection scaled by the screen's height, keeping the
+    /// vertical field of view and the crop, with any extra width (Hor+)
+    /// split equally between the two sides. At [`ViewSettings::size`] it is
+    /// exactly `full_size` cropped to `size`.
+    pub fn sub_view(&self, screen: UVec2) -> bevy::camera::SubCameraView {
+        let scale = screen.y as f32 / self.size.y as f32;
+        let crop = (self.full_size.as_vec2() - self.size.as_vec2()) * scale;
+        let full_size = UVec2::new(screen.x + crop.x.round() as u32, screen.y + crop.y.round() as u32);
+        bevy::camera::SubCameraView { full_size, offset: Vec2::ZERO, size: screen }
+    }
+
+    /// How far, in the original's pixels, a camera drawing `sub_view` sees
+    /// beyond each side of the original's projection window (negative when
+    /// narrower). Zero at the original's size.
+    pub fn margin(&self, sub_view: &bevy::camera::SubCameraView) -> Vec2 {
+        let scale = sub_view.size.y as f32 / self.size.y as f32;
+        Vec2::new((sub_view.size.x as f32 / scale - self.size.x as f32) * 0.5, 0.0)
+    }
 }
 
 impl Default for ViewSettings {
@@ -201,6 +226,7 @@ impl Plugin for RenderPlugin {
                     .chain(),
             )
             .add_systems(Startup, spawn_camera)
+            .add_systems(Update, (fit_view_to_screen, overlay::place).before(LevelSystems::Meshes))
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
             .add_systems(Update, (pose_models, follow_camera).in_set(LevelSystems::Pose))
             .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility))
@@ -209,16 +235,13 @@ impl Plugin for RenderPlugin {
     }
 }
 
-fn spawn_camera(mut commands: Commands, settings: Res<ViewSettings>) {
+fn spawn_camera(mut commands: Commands, settings: Res<ViewSettings>, screen: Option<Res<PsxScreen>>) {
+    let screen = screen.map_or(settings.size, |screen| screen.size());
     commands.spawn((
         Camera3d::default(),
         Camera {
             clear_color: ClearColorConfig::Custom(Color::BLACK),
-            sub_camera_view: Some(bevy::camera::SubCameraView {
-                full_size: settings.full_size,
-                offset: Vec2::ZERO,
-                size: settings.size,
-            }),
+            sub_camera_view: Some(settings.sub_view(screen)),
             ..default()
         },
         Projection::Perspective(PerspectiveProjection {
@@ -238,6 +261,27 @@ fn spawn_camera(mut commands: Commands, settings: Res<ViewSettings>) {
         CameraRig::default(),
         Name::new("ChaseCamera"),
     ));
+}
+
+/// Keep the level camera's crop and Hor+ widening matched to the screen as
+/// it is resized ([`PsxScreen::set_size`], the display menu). Only cameras
+/// drawing to the PS1 screen (`PsxView`) are fitted; an editor's ordinary
+/// camera is left alone.
+fn fit_view_to_screen(
+    settings: Res<ViewSettings>,
+    screen: Option<Res<PsxScreen>>,
+    mut cameras: Query<&mut Camera, (With<GameCamera>, With<PsxView>)>,
+) {
+    let Some(screen) = screen else { return };
+    if !screen.is_changed() && !settings.is_changed() {
+        return;
+    }
+    let sub_view = settings.sub_view(screen.size());
+    for mut camera in &mut cameras {
+        if camera.sub_camera_view.as_ref() != Some(&sub_view) {
+            camera.sub_camera_view = Some(sub_view);
+        }
+    }
 }
 
 fn request_level(
