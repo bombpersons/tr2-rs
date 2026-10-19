@@ -1,0 +1,114 @@
+{
+  "source": "PSX Home runtime RAM obtained from supplied disc; byte ranges only",
+  "ram_sha256": "d3c15ce08786be4c31a123a8b54c1cc2f8e24179937e3039f66e50378b8e4367",
+  "functions": [
+    {
+      "start": "0x44fc4",
+      "end_exclusive": "0x45384",
+      "sha256": "18af5be2de1c5d4e42dd7257756d9f191d4d92d276fc584753a3ca8614b86f93",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x44fc4",
+        "--count",
+        "240",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x45384",
+      "end_exclusive": "0x45474",
+      "sha256": "a88ac213d71bd79831febf7baac9973e275c426a165fc93c19d279ab8c048d47",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x45384",
+        "--count",
+        "60",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x45474",
+      "end_exclusive": "0x4552c",
+      "sha256": "819c3bc2e352227fd07e5f644abe0e50f9745c3476442c802536b28b360cdb41",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x45474",
+        "--count",
+        "46",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x4552c",
+      "end_exclusive": "0x455f4",
+      "sha256": "0a0634ba157d1ee746b23a51c1b676c27bc5659181f2e3cbd732d63bee5d450c",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x4552c",
+        "--count",
+        "50",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x455f4",
+      "end_exclusive": "0x456dc",
+      "sha256": "84636538f68ea02f8b5e25130299af888c309a9ebcd90c45ffa0d60be99a32a4",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x455f4",
+        "--count",
+        "58",
+        "--text"
+      ]
+    },
+    {
+      "start": "0x45cb8",
+      "end_exclusive": "0x45ed4",
+      "sha256": "557a532dfaf809bbbdd43eeabe646d68a1608e2afdb825591c551abc83e2c6b8",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x45cb8",
+        "--count",
+        "135",
+        "--text"
+      ]
+    }
+  ],
+  "controls": {
+    "13": "0x455f4",
+    "17": "0x45474",
+    "18": "0x4552c",
+    "35": "0x456dc"
+  },
+  "collisions": {
+    "13": "0x457d0",
+    "17": "0x45790",
+    "18": "0x457b0",
+    "35": "0x457f0"
+  }
+}

@@ -125,6 +125,11 @@ it off. Record partial progress below without checking the parent item.
 ## Water
 
 - [ ] Swimming: acceleration, braking, turning, pitch, collision and animation.
+  Ordinary submerged stroke/glide/tread, exact turning/pitch/bank, authored
+  dispatch and oxygen consumption now match700 ticks across six complete
+  replays, including three independent validations. Collision/current/roll/
+  death branches remain. [Evidence](docs/swimming-evidence.md),
+  [tests](game/tests/swimming.rs).
 - [ ] Water transitions: entry, surface, submerge and climb out; oxygen behavior.
 
 ## Combat and interactions
@@ -149,6 +154,9 @@ it off. Record partial progress below without checking the parent item.
 
 ## Appearance
 
+- [ ] Underwater green shading, caustics and water-surface rendering. New
+  submerged pose comparisons retain the missing appearance separately from
+  verified motion. [Evidence](docs/swimming-evidence.md).
 - [ ] Distance darkening: original room/object depth shading and boundaries.
 - [ ] Distant texture LOD: original >=8192 room policy and texture selection.
 - [x] Home sky: render the baked model with original rotation-only placement,

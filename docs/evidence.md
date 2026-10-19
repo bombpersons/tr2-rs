@@ -77,3 +77,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Adjacent attendant navigation](winston-evidence.md#adjacent-navigation-box-corridor-targets):1950 additional exact item ticks across four complete routes with three independent validations; source steering targets and overlapping-box containment verified. General multi-box/zone/obstacle navigation remains pending.
 
 - [Frontal oblique running wall contacts](oblique-wall-evidence.md): complete native collision/shift trace and2745 exact full-controller ticks across six ordinary routes, with two fresh combined-rule validations. Tangent restoration and quantized ground/braking motion close the navigation replay diagnostic; side/corner/static contacts remain unverified.
+
+- [Submerged stroke/glide/tread and steering](swimming-evidence.md):700 exact ticks,16 compared columns, three fresh independent replays and126 full-game pose checks. Authored dispatch, pitch/bank/turn inertia, quantized movement and ordinary air consumption verified; transitions/collisions/drowning/appearance remain pending.

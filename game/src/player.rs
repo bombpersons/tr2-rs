@@ -23,6 +23,8 @@ pub use traversal::Traversal;
 mod backward;
 mod forward;
 mod rolling;
+mod swimming;
+pub use swimming::{SubmergedMotion, SwimmingTuning};
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -49,8 +51,6 @@ pub const PLAYER_RADIUS: f32 = units(100.0);
 /// Inherited Character::stepHeight value; unchanged by contact verification.
 pub const STEP_HEIGHT: f32 = units(256.0);
 pub const MAX_HEALTH: i32 = 1000;
-/// OpenLara LARA_SWIM_SPEED = 50 units/frame.
-pub const SWIM_SPEED: f32 = units(50.0 * ORIGINAL_FPS);
 /// Original Lara control 0x80038194: state handlers push one turn rate by
 /// 409 yaw units/tick, then it decays 364 toward zero and is added to yaw.
 const TURN_PUSH: i32 = 409;
@@ -58,7 +58,7 @@ const TURN_DECAY: i32 = 364;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal)]
+#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal, SubmergedMotion)]
 pub struct Player {
     /// Feet position; rendering synchronizes this into Transform.
     pub position: Vec3,
@@ -286,6 +286,7 @@ impl Plugin for PlayerRulesPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, AvatarPlugin);
         app.register_type::<Traversal>();
+        app.insert_resource(crate::interactions::swimming_tuning());
         app.configure_sets(FixedUpdate, PlayerSystems::Control.in_set(WorldSystems::Control))
             .configure_sets(FixedUpdate, PlayerSystems::Motion.in_set(WorldSystems::Motion))
             .configure_sets(FixedUpdate, PlayerSystems::Animation.in_set(WorldSystems::Animation))
@@ -501,9 +502,7 @@ fn turn(
     animation_state: Option<usize>,
 ) {
     if player.mode == PlayerMode::Swimming {
-        // The underwater controller is separate and not yet traced.
-        motion.turn_rate = 0;
-        motion.turning = 0;
+        // Submerged control owns turn acceleration, decay and bank.
         return;
     }
     let controls = GroundControls::read(pad);
@@ -571,7 +570,7 @@ fn turn(
 fn apply_turn_rate(time: Res<Time>, mut players: Query<(&mut Player, &Motion)>) {
     let ticks = original_frames(time.delta_secs());
     for (mut player, motion) in &mut players {
-        if motion.turn_rate != 0 {
+        if motion.turn_rate != 0 && player.mode != PlayerMode::Swimming {
             let yaw = player.yaw + motion.turn_rate as f32 * ticks * std::f32::consts::TAU / 65536.0;
             player.yaw = yaw.rem_euclid(std::f32::consts::TAU);
         }
@@ -582,11 +581,19 @@ fn control(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
-    mut players: Query<(&mut Player, &mut Motion, &mut WeaponState, &AnimationState, &mut Traversal)>,
+    tuning: Res<SwimmingTuning>,
+    mut players: Query<(
+        &mut Player,
+        &mut Motion,
+        &mut WeaponState,
+        &AnimationState,
+        &mut Traversal,
+        &mut SubmergedMotion,
+    )>,
 ) {
     let dt = time.delta_secs();
     let controls = GroundControls::read(&pad);
-    for (mut player, mut motion, mut weapon, animation, mut traversal) in &mut players {
+    for (mut player, mut motion, mut weapon, animation, mut traversal, mut submerged) in &mut players {
         let was_running = player.mode == PlayerMode::Run;
         let was_walking = player.mode == PlayerMode::Walk;
         let was_standing =
@@ -600,7 +607,7 @@ fn control(
                 traversal.run_jump_ready = true;
             }
         }
-        // Swimming retains the provisional controller until separately traced.
+        // Submerged input is read directly; its steering runs before movement.
         let direction = if player.mode == PlayerMode::Swimming { pad.direction() } else { controls.direction };
         // State20 sets the fast rate; slow states6/7 keep adding 409 even
         // after a long R1 hold is released (0x80038DA4..0x80038E04).
@@ -743,20 +750,22 @@ fn control(
         }
         let walk = controls.walk;
         let side = controls.side;
-        if player.mode == PlayerMode::Swimming {
-            let turn = if motion.grounded { 150.0_f32.to_radians() } else { std::f32::consts::FRAC_PI_3 };
-            player.yaw = (player.yaw + direction.x * turn * dt).rem_euclid(std::f32::consts::TAU);
-        }
         let forward = player.forward();
         let right = Vec3::new(forward.z, 0.0, -forward.x);
         if player.mode == PlayerMode::Swimming {
-            motion.pitch = (motion.pitch + direction.y * 60.0_f32.to_radians() * dt).clamp(-1.4, 1.4);
-            let speed = if pad.held(Button::Square) { SWIM_SPEED } else { 0.0 };
-            let target = (forward * motion.pitch.cos() + Vec3::Y * motion.pitch.sin()) * speed;
-            // Acceleration/friction smoothing is provisional; maximum speed is sourced above.
-            motion.velocity = motion.velocity.move_towards(target, units(2.0 * 900.0) * dt);
+            swimming::control(
+                &mut player,
+                &mut motion,
+                &mut submerged,
+                animation,
+                &mut traversal,
+                &pad,
+                clips.as_deref(),
+                &tuning,
+            );
             continue;
         }
+        *submerged = SubmergedMotion { air_ticks: tuning.max_air_ticks, ..default() };
         if !motion.grounded {
             continue;
         }
@@ -903,11 +912,31 @@ fn integrate(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
-    mut players: Query<(&mut Player, &mut Motion, &WeaponState, &mut AnimationState, &mut Traversal)>,
+    mut players: Query<(
+        &mut Player,
+        &mut Motion,
+        &WeaponState,
+        &mut AnimationState,
+        &mut Traversal,
+        &mut SubmergedMotion,
+    )>,
 ) {
     let dt = time.delta_secs();
     let geometry = world.as_deref();
-    for (mut player, mut motion, weapon, mut animation, mut traversal) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged) in &mut players {
+        if player.mode == PlayerMode::Swimming {
+            swimming::step(
+                &mut player,
+                &mut motion,
+                &mut submerged,
+                &mut animation,
+                &mut traversal,
+                geometry,
+                clips.as_deref(),
+                dt,
+            );
+            continue;
+        }
         if rolling::step(&mut player, &mut motion, &mut animation, &mut traversal, geometry, clips.as_deref(), dt) {
             continue;
         }
@@ -1492,9 +1521,12 @@ fn animate(
 
 /// Commit visual placement after object pushes, without stepping the animation
 /// a second time. The camera and the render hierarchy see the same final actor.
-fn sync_transform(mut players: Query<(&Player, &mut Transform)>) {
-    for (player, mut transform) in &mut players {
+fn sync_transform(mut players: Query<(&Player, &Motion, &SubmergedMotion, &mut Transform)>) {
+    for (player, motion, submerged, mut transform) in &mut players {
         transform.translation = player.position;
         transform.rotation = Quat::from_rotation_y(player.yaw);
+        if player.mode == PlayerMode::Swimming {
+            transform.rotation *= Quat::from_rotation_x(-motion.pitch) * Quat::from_rotation_z(-submerged.bank);
+        }
     }
 }
