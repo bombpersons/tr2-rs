@@ -418,21 +418,24 @@ fn jump_motion(
     // Forward collision0x8003AB00 refreshes its probe heading after
     // animation motion. Fast-fall0x8003AEEC keeps the rebound heading.
     let collision_yaw = player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0;
+    let vertical_jump = matches!(mode, PlayerMode::JumpingUp { .. });
     let collision_heading = if matches!(mode, PlayerMode::FastFalling) {
         heading
-    } else if matches!(mode, PlayerMode::JumpingForward) && speed < 0 {
+    } else if (matches!(mode, PlayerMode::JumpingForward) || vertical_jump) && speed < 0 {
         collision_yaw + std::f32::consts::PI
     } else {
         collision_yaw
     };
-    motion.movement_heading = Some(collision_heading);
-    let direction = Vec3::new(collision_heading.sin(), 0.0, collision_heading.cos());
+    // Jump-up keeps its signed animation movement along yaw, while probing
+    // behind Lara for negative speed (0x8003B7D8..0x8003B820).
+    let movement_heading = if vertical_jump { collision_yaw } else { collision_heading };
+    motion.movement_heading = Some(movement_heading);
+    let direction = Vec3::new(movement_heading.sin(), 0.0, movement_heading.cos());
     motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     let (quadrant, forward, delta) = cardinal(player.yaw);
     let hits = front(world, proposed, collision_heading, player.room);
     let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == 3;
     let reach = matches!(mode, PlayerMode::JumpingForward) && state == 11;
-    let vertical_jump = matches!(mode, PlayerMode::JumpingUp { .. });
     // Jump-up collision uses870 rather than the ordinary762-unit body
     // probe (0x8003B828). Jump/reach handlers allow192 at the front ceiling
     // (reach0x8003B1C4..0x8003B1D0).
@@ -549,10 +552,27 @@ fn jump_motion(
         motion.velocity = (Vec3::new(heading.sin(), 0.0, heading.cos()) * units((speed / 4) as f32 * ORIGINAL_FPS))
             .with_y(motion.velocity.y.min(-units(ORIGINAL_FPS)));
     }
-    if blocked && matches!(mode, PlayerMode::JumpingUp { .. }) {
-        // Jump-up collision retains a2-unit speed against the wall.
-        motion.velocity.x = player.forward().x * units(2.0 * ORIGINAL_FPS);
-        motion.velocity.z = player.forward().z * units(2.0 * ORIGINAL_FPS);
+    if vertical_jump {
+        let speed = if blocked || ceiling_contact {
+            // Any contact retains signed speed+/-2; zero selects-2
+            // (0x8003B89C..0x8003B8B4).
+            if speed > 0 { 2 } else { -2 }
+        } else if -motion.velocity.y * 1024.0 / ORIGINAL_FPS < -70.0 {
+            // Only early, unobstructed ascent accepts directional input.
+            // Collision changes speed after this tick's displacement:
+            // Up adds1 below5, otherwise Down subtracts2 at or above-4
+            // (0x8003B8B8..0x8003B92C).
+            if pad.held(Button::Up) && speed < 5 {
+                speed + 1
+            } else if pad.held(Button::Down) && speed >= -4 {
+                speed - 2
+            } else {
+                speed
+            }
+        } else {
+            speed
+        };
+        motion.velocity = (player.forward() * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     }
     if let Some(hit) = world.floor_at(player.position, player.room) {
         player.room = hit.room;

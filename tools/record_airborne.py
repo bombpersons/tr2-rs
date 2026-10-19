@@ -12,6 +12,14 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'vertical_steer_forward': ('home_runway_start', 240, [event(['SQUARE'], 8), event(['UP'], 50, 28)]),
+    'vertical_steer_backward': ('home_runway_start', 240, [event(['SQUARE'], 8), event(['DOWN'], 50, 28)]),
+    'vertical_steer_wall': ('vertical_wall_start', 240, [event(['SQUARE'], 8), event(['UP'], 50, 28)]),
+    'vertical_steer_back_open': ('vertical_open_start', 240, [event(['SQUARE'], 8), event(['DOWN'], 50, 28)]),
+    'vertical_steer_reverse_heldout': ('vertical_open_start', 260, [event(['SQUARE'], 28, 18),
+                                                               event(['DOWN'], 52, 46), event(['UP'], 86, 52)]),
+    'vertical_steer_late_heldout': ('vertical_wall_start', 260, [event(['SQUARE'], 24, 16),
+                                                            event(['DOWN'], 80, 62)]),
     'vertical_clearance_heldout': ('vertical_wall_start', 220, [event(['SQUARE'], 8)]),
     'vertical_clearance_delay_heldout': ('vertical_wall_start', 260, [event(['SQUARE'], 28, 18),
                                                                   event(['SQUARE'], 84, 72)]),
@@ -83,8 +91,16 @@ def main():
     parser.add_argument('--case', choices=CASES)
     parser.add_argument('--prepare-checkpoints', action='store_true')
     parser.add_argument('--prepare-vertical-wall', action='store_true')
+    parser.add_argument('--prepare-vertical-open', action='store_true')
     parser.add_argument('--summarize-only', action='store_true')
     args = parser.parse_args()
+    if args.prepare_vertical_open:
+        subprocess.run(['psx', 'run', '--from-state', '.psx/vertical_wall_start/state.bin',
+                        '--frames', '140', '--input', json.dumps([event(['DOWN', 'R1'], 60)]),
+                        '--save-state', '--out', '.psx/vertical_open_start', '--summary'],
+                       cwd=ROOT, check=True)
+        if args.case is None:
+            return
     if args.prepare_vertical_wall:
         subprocess.run(['psx', 'run', '--from-state', '.psx/forward_ledge_start/state.bin',
                         '--frames', '260', '--input', json.dumps([
@@ -134,7 +150,7 @@ def main():
         'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout',
                                             'forward_ledge_release_heldout', 'forward_ledge_walk_heldout',
                                             'braking_wall_validation_heldout'),
-        'diagnostic_only': False,
+        'diagnostic_only': args.case == 'vertical_steer_backward',
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,
@@ -158,6 +174,18 @@ def main():
         metadata['provenance_note'] = ('Former walking-stop milestone diagnostic; unchanged CSV used to refine '
                                        'the vertical front-floor clearance margin. Fresh vertical_clearance '
                                        'routes provide independent validation.')
+    if args.case == 'vertical_steer_backward':
+        metadata['provenance_note'] = ('Signed speeds match, but item-bound pushes at fields40 and88 shift x/z. '
+                                       'Position writes at0x8001CA78/0x8001CA90 are retained in '
+                                       'validation/vertical-steering/ and .psx/vertical_backward_writes. '
+                                       'This recording is diagnostic, not a passing parity claim.')
+    if start == 'vertical_open_start':
+        source = '.psx/vertical_wall_start/state.bin'
+        metadata['checkpoint_preparation'] = {
+            'source': source,
+            'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
+            'frames': 140, 'input': [event(['DOWN', 'R1'], 60)], 'output': checkpoint, 'pokes': [],
+        }
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))
 

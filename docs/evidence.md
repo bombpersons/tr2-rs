@@ -57,3 +57,5 @@ and Reach contact stop ascent while retaining their respective jump/reach clips.
 Corner/side and forward-top contacts remain unverified.
 
 - [Vertical jump front-floor clearance](vertical-clearance-evidence.md):384-unit margin verified from PSX binary and373 sampled ticks, including two fresh independent full landing routes.
+
+- [Vertical jump steering](vertical-steering-evidence.md): signed directional acceleration and ascent cutoff,625 sampled ticks and two independent complete routes; separate item-push diagnostic retained.

@@ -77,7 +77,9 @@ fn compare_case(csv: &str, metadata: &str) {
             f64::from({
                 // Ground collision can refresh the backward probe heading
                 // after the entry move. Only state9 has signed rebound speed.
-                let speed = if p.mode == PlayerMode::FastFalling {
+                let speed = if matches!(p.mode, PlayerMode::JumpingUp { .. }) {
+                    m.velocity.dot(p.forward())
+                } else if p.mode == PlayerMode::FastFalling {
                     let heading = m.movement_heading.unwrap_or(p.yaw);
                     m.velocity.dot(Vec3::new(heading.sin(), 0.0, heading.cos()))
                 } else {
@@ -190,6 +192,11 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 }
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
+recorded_case!(original_vertical_jump_accelerates_forward_only_during_early_ascent, "vertical_steer_forward");
+recorded_case!(original_vertical_jump_accelerates_backward_with_signed_speed, "vertical_steer_back_open");
+recorded_case!(heldout_vertical_jump_reverses_early_then_ignores_late_steering, "vertical_steer_reverse_heldout");
+recorded_case!(heldout_vertical_jump_ignores_steering_after_early_ascent, "vertical_steer_late_heldout");
+recorded_case!(original_vertical_jump_waits_for_wall_clearance_before_accelerating, "vertical_steer_wall");
 recorded_case!(heldout_vertical_jump_clears_the_wall_and_completes_landing, "vertical_clearance_heldout");
 recorded_case!(heldout_delayed_vertical_jump_ignores_jump_during_descent_and_lands, "vertical_clearance_delay_heldout");
 recorded_case!(
