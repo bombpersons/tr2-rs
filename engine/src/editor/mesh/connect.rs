@@ -542,24 +542,10 @@ pub fn disconnect(level: &mut Level, a: usize, b: usize) -> Result<(), String> {
             }
             for surface in [Surface::Floor, Surface::Ceiling] {
                 let link = if surface == Surface::Floor { s.below } else { s.above };
-                if link != Some(to) {
-                    continue;
+                if link == Some(to) && close_link(level, from, at, surface) {
+                    derived.insert(at);
+                    changed = true;
                 }
-                let Some(c) = sector_corners(level, from, at.0, at.1, surface) else { continue };
-                let r = &mut level.rooms[from];
-                let (x0, z0) = (at.0 as i32 * SECTOR, at.1 as i32 * SECTOR);
-                let p = |i: usize| [x0 + (i & 1) as i32 * SECTOR, c[i], z0 + (i >> 1) as i32 * SECTOR];
-                let toward = if surface == Surface::Floor { [0, -1, 0] } else { [0, 1, 0] };
-                let texture = some_texture(r, Some(surface));
-                add_face(r, [p(0), p(1), p(3), p(2)], toward, texture);
-                let s = sector_mut(level, from, at);
-                if surface == Surface::Floor {
-                    s.below = None;
-                } else {
-                    s.above = None;
-                }
-                derived.insert(at);
-                changed = true;
             }
         }
         derive(level, from, &derived, &had)?;
@@ -570,6 +556,101 @@ pub fn disconnect(level: &mut Level, a: usize, b: usize) -> Result<(), String> {
         return Err(format!("rooms {a} and {b} have no doorway or hole between them"));
     }
     Ok(())
+}
+
+/// Give a sector back the floor (or ceiling) face a hole took, at its stored
+/// height and slope, and drop the link through it. Returns false for a
+/// solid sector. The caller re-derives the sector.
+fn close_link(level: &mut Level, room: usize, at: (usize, usize), surface: Surface) -> bool {
+    let Some(c) = sector_corners(level, room, at.0, at.1, surface) else { return false };
+    let r = &mut level.rooms[room];
+    let (x0, z0) = (at.0 as i32 * SECTOR, at.1 as i32 * SECTOR);
+    let p = |i: usize| [x0 + (i & 1) as i32 * SECTOR, c[i], z0 + (i >> 1) as i32 * SECTOR];
+    let toward = if surface == Surface::Floor { [0, -1, 0] } else { [0, 1, 0] };
+    let texture = some_texture(r, Some(surface));
+    add_face(r, [p(0), p(1), p(3), p(2)], toward, texture);
+    let s = sector_mut(level, room, at);
+    if surface == Surface::Floor {
+        s.below = None;
+    } else {
+        s.above = None;
+    }
+    fit_height(&mut level.rooms[room]);
+    true
+}
+
+/// Fit the horizontal portal pair between `upper` and `lower` to the holes
+/// left between them, or remove it when none are.
+fn refit_holes(level: &mut Level, upper: usize, lower: usize) {
+    let r = &level.rooms[upper];
+    let mut window: Option<Window> = None;
+    for x in 0..r.x_sectors {
+        for z in 0..r.z_sectors {
+            let s = r.sectors[x * r.z_sectors + z];
+            if s.below != Some(lower) {
+                continue;
+            }
+            let (x0, z0) = (r.origin[0] + x as i32 * SECTOR, r.origin[2] + z as i32 * SECTOR);
+            let w = Window { axis: 1, at: s.floor, low: [x0, s.floor, z0], high: [x0 + SECTOR, s.floor, z0 + SECTOR] };
+            window = Some(window.map_or(w, |old| old.union(w)));
+        }
+    }
+    level.rooms[upper].portals.retain(|p| !(p.room == lower && p.normal[1] != 0));
+    level.rooms[lower].portals.retain(|p| !(p.room == upper && p.normal[1] != 0));
+    if let Some(window) = window {
+        open_window(level, upper, lower, [0, -1, 0], window);
+    }
+}
+
+/// Close the hole beside each of several faces of `room`: a floor face seen
+/// through a hole above it (the upper room's floor comes back), or a ceiling
+/// face seen through a hole below it (the lower room's ceiling comes back).
+/// Both rooms get their face again, the links go, and the portal pair
+/// shrinks to the holes left. The upper sector's navigation box was the
+/// floor beneath's, so it is cleared for a rebuild. Returns the rooms the
+/// holes joined `room` to.
+pub fn close_holes(level: &mut Level, room: usize, quads: &[usize]) -> Result<BTreeSet<usize>, String> {
+    let r = &level.rooms[room];
+    let mut holes = BTreeSet::new();
+    for &q in quads {
+        let f =
+            r.quads.get(q).and_then(|f| sector_face(r, f)).ok_or("select floor or ceiling faces seen through holes")?;
+        let s = sector_of(level, room, (f.x, f.z));
+        let (upper, lower) = match f.surface {
+            Surface::Floor => (s.above.ok_or("a selected floor has no hole above it")?, room),
+            Surface::Ceiling => (room, s.below.ok_or("a selected ceiling has no hole below it")?),
+        };
+        let (x, z) = (r.origin[0] + f.x as i32 * SECTOR + SECTOR / 2, r.origin[2] + f.z as i32 * SECTOR + SECTOR / 2);
+        let (Some(u), Some(l)) = (cell(&level.rooms[upper], x, z), cell(&level.rooms[lower], x, z)) else {
+            return Err("the hole's rooms do not both cover it".into());
+        };
+        if sector_of(level, upper, u).below != Some(lower) || sector_of(level, lower, l).above != Some(upper) {
+            return Err("this hole does not link both rooms both ways; Diagnostics shows why".into());
+        }
+        holes.insert((upper, u, lower, l));
+    }
+    if holes.is_empty() {
+        return Err("select floor or ceiling faces seen through holes".into());
+    }
+    let rooms: BTreeSet<usize> = holes.iter().flat_map(|&(u, _, l, _)| [u, l]).collect();
+    let had: BTreeMap<usize, BTreeSet<_>> =
+        rooms.iter().map(|&r| (r, sector_faces(&level.rooms[r]).keys().copied().collect())).collect();
+    let mut derived: BTreeMap<usize, BTreeSet<(usize, usize)>> = BTreeMap::new();
+    for &(upper, u, lower, l) in &holes {
+        close_link(level, upper, u, Surface::Floor);
+        close_link(level, lower, l, Surface::Ceiling);
+        sector_mut(level, upper, u).nav_box = None;
+        derived.entry(upper).or_default().insert(u);
+        derived.entry(lower).or_default().insert(l);
+    }
+    for (r, cells) in &derived {
+        derive(level, *r, cells, &had[r])?;
+    }
+    let pairs: BTreeSet<(usize, usize)> = holes.iter().map(|&(u, _, l, _)| (u, l)).collect();
+    for &(upper, lower) in &pairs {
+        refit_holes(level, upper, lower);
+    }
+    Ok(pairs.into_iter().map(|(u, l)| if u == room { l } else { u }).collect())
 }
 
 /// [`connect`] through each of several wall faces of `room`, as one edit.

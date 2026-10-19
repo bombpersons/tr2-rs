@@ -170,9 +170,9 @@ window, the map and clicking faces in mesh mode all choose the same room.
   agree, add the vertical portal.
   (Built for a room already below at the floor's height; creating the
   room below belongs with New room.)
-- **Split room (built)** along a sector line, or at a height. A height split
-  is the first step to an overhang or bridge; closing part of the resulting
-  hole (to make the bridge's floor) still needs a "close hole" tool.
+- **Split room (built)** along a sector line, or at a height. With **Close
+  hole (built)** on part of the resulting hole, that makes an overhang or a
+  bridge.
 - **Merge (built)** two joined or side-by-side compatible rooms.
 - **Push wall** into a neighbouring room offers to connect instead of
   refusing.
@@ -222,6 +222,6 @@ nothing in the game.
 2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics. (Done.)
 4. Connect / open hole (done, with Disconnect), new room, split and merge
-   (done). Next: closing part of a hole, flip rooms.
+   (done), close hole (done). Next: flip rooms.
 5. Navigation box rebuild. (Done: incremental, for missing and stale boxes.)
 6. Lights and baking.

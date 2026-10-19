@@ -277,6 +277,16 @@ problems afterwards.
   ceiling there must be at exactly the floor's height: the floor face and the
   ceiling face below go, the sectors link `below` and `above`, and a mirrored
   pair of horizontal portals covers the hole.
+- **Close hole** closes part of a hole, for a bridge or an overhang: select
+  the floor faces seen through it from above (they belong to the room below)
+  or the ceiling faces seen through it from below (they belong to the room
+  above). Each of those sectors gets the upper room's floor and the lower
+  room's ceiling back at their stored heights, the links between them go, and
+  the portal pair shrinks to the holes left (or goes, with none left). The
+  new floor's sector loses the navigation box it shared with the floor
+  beneath, so Diagnostics asks for a navigation rebuild. With Split at a
+  height, this makes a bridge: split the room where the bridge's surface
+  goes, then close the hole wherever the bridge stands.
 - **Disconnect** (the **x** in the Rooms window) reverses both: doorway
   sectors become solid border again with full walls, holes get their floor
   and ceiling faces back, and the portals between the two rooms go. On WALL,
@@ -351,7 +361,7 @@ span the room) into one face per sector first, so only the doorway's sector
 opens.
 
 The operations are `engine::editor::{connect_faces, open_holes,
-disconnect, new_room, split_along, split_height, merge_rooms}`.
+close_holes, disconnect, new_room, split_along, split_height, merge_rooms}`.
 
 Each edit re-derives every sector whose floor or ceiling face it touched,
 and refuses (with the reason in the status bar, leaving the document as it
@@ -462,7 +472,8 @@ new restoring it, disconnecting a doorway and a hole and opening them again
 with Connect and Open hole (on levels that have them), drawing a room beside
 the sandbox room on the map, connecting it and rebuilding navigation,
 splitting room 0 across x and at a height and merging it back each time,
-mesh mode (raise a floor, a refused unsnapped
+closing four sectors of a hole from below and rebuilding navigation (on
+levels with holes), mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

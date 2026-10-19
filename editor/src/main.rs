@@ -142,6 +142,8 @@ struct EditorCommand {
     mesh_connect: bool,
     /// Open holes through the selected floor faces.
     mesh_hole: bool,
+    /// Close the holes beside the selected floor or ceiling faces.
+    mesh_close_hole: bool,
     /// Close every doorway and hole between rooms "a,b".
     disconnect: String,
     /// Draw a new room on the map: "x0,z0,x1,z1,floor,ceiling" (world
@@ -411,6 +413,10 @@ fn automation(
     if c.mesh_hole {
         c.mesh_hole = false;
         editor.mesh_open_hole();
+    }
+    if c.mesh_close_hole {
+        c.mesh_close_hole = false;
+        editor.mesh_close_hole();
     }
     if !c.draft_room.is_empty() {
         let text = std::mem::take(&mut c.draft_room);

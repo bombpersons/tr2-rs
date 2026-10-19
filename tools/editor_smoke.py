@@ -426,6 +426,54 @@ def split_smoke(client, level, captures):
     return {'room': 0, 'line': line, 'height': middle, 'steps': steps}
 
 
+def floor_faces_under_holes(level, room, above):
+    """Quads of `room` that are the floor of one sector whose ceiling opens into `above`."""
+    r = level['rooms'][room]
+    found = []
+    for i, q in enumerate(r['quads']):
+        p = [r['vertices'][v][:3] for v in q[:4]]
+        xs, zs = {v[0] for v in p}, {v[2] for v in p}
+        if len(xs) != 2 or len(zs) != 2 or max(xs) - min(xs) != 1024 or max(zs) - min(zs) != 1024:
+            continue
+        if min(xs) % 1024 or min(zs) % 1024:
+            continue
+        # Newell's method about y: positive faces up (a floor).
+        n = sum((p[k][2] - p[(k + 1) % 4][2]) * (p[k][0] + p[(k + 1) % 4][0]) for k in range(4))
+        x, z = min(xs) // 1024, min(zs) // 1024
+        if n > 0 and r['sectors'][x * r['z_sectors'] + z].get('above') == above:
+            found.append(i)
+    return found
+
+
+def close_hole_smoke(client, level, captures):
+    """Close part of a hole from below, by selecting the floor seen through
+    it: only the new floor's navigation is missing, which a rebuild fixes."""
+    pairs = sorted({(a, s['below']) for a, r in enumerate(level['rooms']) for s in r['sectors'] if s.get('below') is not None})
+    found = next(((u, l, f[:4]) for u, l in pairs if (f := floor_faces_under_holes(level, l, u))), None)
+    if found is None:
+        return None
+    upper, lower, faces = found
+    state = command(client, mode='object')
+    before = state['problems_new']
+    state = command(client, mode='mesh', mesh_room=lower)
+    state = command(client, mesh_select=','.join(f'q{i}' for i in faces), frame=True)
+    state = settled(client, state, mesh_close_hole=True)
+    assert state['message'].startswith(f'Closed {len(faces)} sectors of the hole to room {upper}'), state
+    time.sleep(1.5)
+    captures.append(client.capture('hole-closed'))
+    state = settled(client, state, rebuild_nav=True)
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before, state
+    state = settled(client, state, undo=True)
+    state = settled(client, state, undo=True)
+    assert not state['dirty'], state
+    command(client, mode='object')
+    return {'rooms': [upper, lower], 'closed': len(faces)}
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -560,6 +608,7 @@ def main():
         holes = hole_smoke(client, saved, captures)
         built = new_room_smoke(client, saved, captures) if source.parent.name == 'sandbox' else None
         split = split_smoke(client, saved, captures)
+        closed = close_hole_smoke(client, saved, captures)
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -579,7 +628,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'close_hole': closed, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

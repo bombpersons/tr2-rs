@@ -240,6 +240,15 @@ fn mesh_actions(ui: &mut egui::Ui, editor: &mut Editor) {
     ) {
         editor.mesh_open_hole();
     }
+    if action(
+        ui,
+        "Close hole",
+        "",
+        "Close the hole over each selected floor face (seen through it from above), or under each selected ceiling face (seen from below): both rooms get their floor and ceiling back there",
+        faces,
+    ) {
+        editor.mesh_close_hole();
+    }
 }
 
 fn mesh_settings(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, atlas: Option<egui::TextureId>) {

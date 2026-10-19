@@ -256,6 +256,27 @@ impl Editor {
         }
     }
 
+    /// Close the hole beside each selected floor or ceiling face.
+    pub fn mesh_close_hole(&mut self) {
+        let quads = self.selected_quads();
+        let closed = self.mesh_edit("Closed", |level, room| {
+            if quads.is_empty() {
+                return Err(
+                    "Select floor faces seen through a hole above them, or ceilings seen through one below".into()
+                );
+            }
+            authoring::close_holes(level, room, &quads)
+        });
+        if let Some(rooms) = closed {
+            self.mesh_clear();
+            self.status = format!(
+                "Closed {} sectors of the hole to room {} - rebuild navigation for the new floor (Ctrl+Z to undo)",
+                quads.len(),
+                join(&rooms)
+            );
+        }
+    }
+
     fn selected_quads(&self) -> Vec<usize> {
         self.mesh.faces.iter().filter_map(|f| if let Face::Quad(i) = f { Some(*i) } else { None }).collect()
     }

@@ -598,3 +598,46 @@ fn splitting_at_a_height_stacks_two_rooms_and_merging_restores_one() {
     assert_eq!(level.placements[0].room, 0);
     joins_cleanly(&level);
 }
+
+#[test]
+fn closing_part_of_a_hole_brings_back_both_faces_and_shrinks_the_portals() {
+    // A 2 x 1 room over another, its floor open into it over both sectors.
+    let mut level = box_level(4, 3);
+    let mut below = level.rooms[0].clone();
+    for v in &mut below.vertices {
+        v[1] += 2048;
+    }
+    for s in below.sectors.iter_mut().filter(|s| s.floor != SOLID) {
+        (s.floor, s.ceiling) = (s.floor + 2048, s.ceiling + 2048);
+    }
+    (below.top, below.bottom) = (0, 2048);
+    level.rooms.push(below);
+    let floors = [face_at(&level, 1, 1, Surface::Floor), face_at(&level, 2, 1, Surface::Floor)];
+    assert_eq!(open_holes(&mut level, 0, &floors), Ok(BTreeSet::from([1])));
+    let face = |level: &Level, room: usize, x: usize, surface: Surface| {
+        let r = &level.rooms[room];
+        (0..r.quads.len())
+            .find(|&i| sector_face(r, &r.quads[i]).is_some_and(|f| (f.x, f.z, f.surface) == (x, 1, surface)))
+    };
+    // Seen from above through the hole: the lower room's floor at (1, 1).
+    let lower_floor = face(&level, 1, 1, Surface::Floor).unwrap();
+    let wall =
+        (0..level.rooms[1].quads.len()).find(|&i| sector_face(&level.rooms[1], &level.rooms[1].quads[i]).is_none());
+    assert!(close_holes(&mut level, 1, &[wall.unwrap()]).is_err(), "a wall is beside no hole");
+    assert_eq!(close_holes(&mut level, 1, &[lower_floor]), Ok(BTreeSet::from([0])));
+    let (upper, lower) = (&level.rooms[0], &level.rooms[1]);
+    assert_eq!((upper.sectors[3 + 1].below, lower.sectors[3 + 1].above), (None, None));
+    assert!(face(&level, 0, 1, Surface::Floor).is_some() && face(&level, 1, 1, Surface::Ceiling).is_some());
+    assert_eq!(upper.sectors[2 * 3 + 1].below, Some(1), "the other sector is still open");
+    let xs: BTreeSet<i32> = upper.portals[0].vertices.iter().map(|v| v[0]).collect();
+    assert_eq!(xs, BTreeSet::from([2 * SECTOR, 3 * SECTOR]), "the portal covers only the hole left");
+    assert_eq!(room_at(&level, 0, [1536, -512, 1536]).and(room_at(&level, 0, [1536, 512, 1536])), Some(0));
+    assert_eq!(room_at(&level, 0, [2560, 512, 1536]), Some(1));
+    joins_cleanly(&level);
+    // Seen from below: the upper room's ceiling over the last hole.
+    let upper_ceiling = face(&level, 0, 2, Surface::Ceiling).unwrap();
+    assert_eq!(close_holes(&mut level, 0, &[upper_ceiling]), Ok(BTreeSet::from([1])));
+    assert!(level.rooms.iter().all(|r| r.portals.is_empty()));
+    joins_cleanly(&level);
+    assert!(disconnect(&mut level, 0, 1).is_err(), "nothing joins them any more");
+}
