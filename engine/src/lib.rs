@@ -19,10 +19,11 @@
 //! - [`lighting`], [`render`], [`audio`]: drawing and sound.
 //! - [`config`]: RON tuning files for per-type design numbers.
 //! - [`editor`]: authoring transactions, exact no-op saves and level validation.
-//! - [`psx`], [`shell`], [`controller`], [`controls`], [`launcher`],
-//!   [`viewer`], [`model_viewer`], [`testing`] and, with the `dev-mcp`
-//!   feature, `dev_mcp`: the PS1 look, logic ticks and input, rebinding, the
-//!   executable's command line, capture viewers, headless tests and the
+//! - [`psx`], [`shell`], [`controller`], [`controls`], [`display`],
+//!   [`pointer`], [`settings`], [`launcher`], [`viewer`], [`model_viewer`],
+//!   [`testing`] and, with the `dev-mcp` feature, `dev_mcp`: the PS1 look,
+//!   logic ticks, pad and mouse input, rebinding, the display menu, player
+//!   settings files, the executable's command line, capture viewers, headless tests and the
 //!   developer MCP. They live in the template's crate, [`psx_bevy`], which
 //!   `psx template update` replaces; they are re-exported here so games
 //!   depend on `engine` only (see `docs/template.md`).
@@ -41,7 +42,9 @@ pub mod world;
 pub use psx_bevy;
 #[cfg(feature = "dev-mcp")]
 pub use psx_bevy::dev_mcp;
-pub use psx_bevy::{controller, controls, launcher, model_viewer, psx, shell, testing, viewer};
+pub use psx_bevy::{
+    controller, controls, display, launcher, model_viewer, pointer, psx, settings, shell, testing, viewer,
+};
 
 use bevy::prelude::*;
 

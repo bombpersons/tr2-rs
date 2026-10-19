@@ -6,7 +6,7 @@ template commit `53b1eac` (merged from `99dae8d`).
 
 It now uses the template's workspace layout and is tracked by
 `.psx-template.toml`, written by `psx template adopt`. The current template build is
-psx `0.1.0+src-41f296d388d06491-release`. Package `tomb-raider-ii`, region
+psx `0.3.0+src-a3beb4f814bc417d-release`. Package `tomb-raider-ii`, region
 NTSC, 2 fields per tick.
 
 ## Updating
@@ -76,6 +76,37 @@ also moved its walker through MCP input. Captures and transcripts are under
 `validation/template-update/`. Clippy completed with existing warnings;
 `cargo fmt --all -- --check` reports existing formatting differences outside
 the changed code.
+
+## Update 2026-10-19
+
+From psx `0.1.0+src-41f296d388d06491-release` to
+`0.3.0+src-a3beb4f814bc417d-release`.
+
+- New template modules `display` (F2 display menu: resolution, aspect,
+  fullscreen, `PsxLook`; saved to `display.json`), `pointer` (mouse on the PS1
+  screen) and `settings` (player settings files), re-exported from `engine`.
+  New `examples/screen_size.rs` GPU check. The launcher adds `DisplayPlugin`,
+  `--display`, `--display-settings`, `--fullscreen`, `--aspect` and F11.
+- `PsxScreen::set_size`, `PsxAspect` and `PsxAnchor`: the framebuffer may now
+  change size at runtime. Mouse input on `ControllerState::mouse`, in replays
+  and in `game_step`/`game_set_input`; a MOUSE column in the controls menu.
+- Conflicts: upstream did not adopt `use_scene_lighting`. `material.rs` kept
+  as is (no upstream change); `psx/mod.rs` and `README.md` took the new
+  version with the conditional sync, its regression test and the README
+  paragraph reapplied.
+- Seeded files: merged the display/mouse notes into the root `README.md` and
+  `game/AGENTS.md`, and the new re-exports into `engine/src/lib.rs`.
+  `.gitignore` already covered the template's entries; `game/src/demo/` was
+  replaced by this game long ago, so its change does not apply.
+
+Not yet adapted: the display menu can now resize the screen or switch to
+`--aspect window`, but the game's `ViewSettings` projection (384x240, cropped
+to 368x240) and its HUD were laid out for a fixed screen. The default
+(`Fixed`, 368x240) behaves as before; other sizes are unverified.
+
+Validation: `cargo test --workspace --all-features` passed, as did all five
+ignored GPU/MCP tests in `psx-bevy/tests/dev_mcp.rs` (ALSA null output). The
+game (`--level wall`) and the engine sandbox start headless without errors.
 
 ## Where the template's files live
 

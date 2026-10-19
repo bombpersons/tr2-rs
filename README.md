@@ -68,6 +68,9 @@ cargo run                                # the game (default member: game/)
 cargo run -- --software                  # force a software adapter
 cargo run -- --region pal                # override REGION (display + tick rate)
 cargo run -- --controls                  # open the controls menu (F1 also opens it)
+cargo run -- --display                   # open the display menu (F2 also opens it)
+cargo run -- --fullscreen                # borderless fullscreen (F11 toggles)
+cargo run -- --aspect window             # screen width follows the window's shape
 cargo run -p engine --example sandbox    # the engine's own tiny game
 cargo test --workspace                   # headless tests: engine, game, importers
 cargo run --features dev-mcp -- --mcp --headless --software  # developer MCP, offscreen
@@ -79,7 +82,7 @@ cargo build --release                    # shipping build; developer MCP is excl
 
 | Path | Owner | Contents |
 |---|---|---|
-| `psx-bevy/` | psx template | PS1 look, ticks and input, controls menu, testing, viewers, developer MCP, launcher. Updated by `psx template update`; edit sparingly and keep edits mergeable ([README](psx-bevy/README.md), [template notes](docs/template.md)) |
+| `psx-bevy/` | psx template | PS1 look, ticks and input, controls and display menus, testing, viewers, developer MCP, launcher. Updated by `psx template update`; edit sparingly and keep edits mergeable ([README](psx-bevy/README.md), [template notes](docs/template.md)) |
 | `engine/` | this project | This game's engine family: object type and action registries, update-order sets, level and tuning formats, `examples/sandbox.rs`. No names, numbers or assets from this game ([AGENTS.md](engine/AGENTS.md)) |
 | `editor/` | this project | Engine-format authoring, full-resolution UI and standard 3D preview ([guide](docs/editor.md)) |
 | `game/` | this project | This title: per-type controllers, action handlers, HUD, menus, baked assets in `game/assets/`, trajectory tests ([AGENTS.md](game/AGENTS.md)) |
@@ -102,6 +105,7 @@ psx template update             # replace unmodified template files
 ```
 
 Files under `psx-bevy/` that you edited are left alone and the new version is
-written beside them as `<file>.psx-new`. Files the template only seeded
+written beside them as `<file>.psx-new`; reapply your change from
+`docs/template.md` to it. Files the template only seeded
 (everything outside `psx-bevy/`) are never touched; when their template
 version changed, the update reports a diff to apply by hand.
