@@ -138,7 +138,6 @@ case!(original_surface_climb_out_onto_ledge, "climb_out");
 case!(heldout_angled_east_climb_snaps_to_the_axis, "climb_east_heldout");
 case!(heldout_right_stroke_into_wall_stops_and_deflects, "strafe_wall_heldout");
 case!(heldout_dive_with_up_and_turn_pitches_down_and_settles, "dive_steer_heldout");
-// Both hops end at the pool's east wall (fields64/84), where the
-// submerged wall collision begins; that collision is not ported yet.
-case!(heldout_back_hop_off_the_edge_enters_the_entry_dive, "entry_hop_heldout", 62);
-case!(heldout_turned_back_hop_enters_at_an_angle, "entry_angled_hop_heldout", 82);
+// Both hops continue into the pool's east wall underwater (fields64/84).
+case!(heldout_back_hop_off_the_edge_enters_the_entry_dive_into_the_wall, "entry_hop_heldout");
+case!(heldout_turned_back_hop_enters_at_an_angle_into_the_wall, "entry_angled_hop_heldout");

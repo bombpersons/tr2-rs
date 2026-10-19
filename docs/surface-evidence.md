@@ -79,8 +79,9 @@ rest of the workspace tests still pass.
 
 ## Limits
 
-- Submerged wall/floor collision (`0x80045CB8`) is still provisional: both hop
-  entries are compared only until they reach the pool wall (fields 62 and 82).
+- Submerged collision (`0x80045CB8`) was later ported in
+  [a separate change](swimming-evidence.md#submerged-collision-0x80045cb8);
+  both hop entries now run to their end.
 - Wading (water mode 4) and the shallow-water stand-up branch are not ported;
   shallow water is now walked on as ground. Swan-dive entries (states 52/53),
   water currents, splash/sound effects, Look at the surface and drowning

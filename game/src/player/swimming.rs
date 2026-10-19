@@ -1,6 +1,6 @@
-//! Submerged stroke, glide and tread, from PSX0x80045384..0x800456DC.
-//! Free-space motion/steering is verified separately from water transitions
-//! and the still-provisional wall/floor/surface response.
+//! Submerged stroke, glide and tread, from PSX0x80045384..0x800456DC, and
+//! their shared collision response 0x80045CB8.
+use super::collision::{self, Contact};
 use super::{AnimationState, Motion, ORIGINAL_FPS, Player, PlayerAnimations, Traversal, original_frames, units};
 use bevy::prelude::*;
 use engine::{
@@ -123,6 +123,8 @@ pub(super) fn control(
         if pad.held(Button::Up) {
             motion.pitch = radians(angle(motion.pitch) - tuning.pitch_step / 2);
         }
+        // The wrapper's pitch limit (0x80045134) applies to the dive too.
+        motion.pitch = radians(angle(motion.pitch).clamp(-tuning.pitch_limit, tuning.pitch_limit));
         motion.turn_rate = decay(motion.turn_rate, tuning.turn_drag);
         water.bank = radians(decay(angle(water.bank), tuning.bank_drag));
         player.yaw = radians((angle(player.yaw) + motion.turn_rate) as i16 as i32);
@@ -209,23 +211,66 @@ pub(super) fn step(
         units(((sin(pitch) * thrust) >> 16) as f32),
         units(((((cos(yaw) * thrust) >> 16) * cos(pitch)) >> 14) as f32),
     ) * original_frames(dt);
-    let proposed = player.position + delta;
+    let old = player.position;
+    player.position += delta;
     motion.grounded = false;
-    motion.velocity = delta / dt;
-    // Bounded world response until collision/entry/surface branches are ported.
-    // Body extent comes from the native pitch-dependent query at0x80045CB8.
     if let Some(world) = world {
-        if let Some(hit) = world.floor_at(proposed, player.room) {
-            let half = units(((sin(pitch) * 762) >> 14).abs().max(200) as f32 / 2.0);
-            player.position =
-                proposed.with_y(proposed.y.clamp(hit.height + half, (hit.ceiling - half).max(hit.height + half)));
-            // A dry room hands over to LaraControl's surfacing test next tick.
-            player.room = hit.room;
-        } else {
+        collide(player, motion, water, world, old);
+        // UpdateLaraRoom at the feet; a dry room hands over to LaraControl's
+        // surfacing test next tick.
+        player.room = super::body_room(world, player.position, player.room, 0.0);
+    }
+    motion.velocity = (player.position - old) / dt;
+}
+
+/// Submerged state collision 0x80045CB8 (states 13/17/18/35): a body whose
+/// height follows pitch, GetCollisionInfo with radius 300, then pitch/yaw
+/// deflection, the floor push and the water-depth test 0x80045BA4.
+fn collide(player: &mut Player, motion: &mut Motion, water: &mut SubmergedMotion, world: &WorldGeometry, old: Vec3) {
+    let mut pitch = angle(motion.pitch);
+    let mut yaw = angle(player.yaw);
+    // Beyond vertical the body faces backwards; this is also the heading a
+    // surfacing tick moves along.
+    let facing = if (pitch + 16384) & 0xffff > 0x8000 { yaw - 0x8000 } else { yaw } as i16 as i32;
+    motion.movement_heading = Some(radians(facing));
+    let height = ((sin(pitch) * 762) >> 14).abs().max(200);
+    let mut at = collision::original(player.position);
+    let limits = collision::Limits { radius: 300, bad_pos: 32512, bad_neg: -height, bad_ceiling: 400 };
+    let info = collision::info(
+        world,
+        at + IVec3::Y * (height / 2),
+        collision::original(old),
+        player.room,
+        height,
+        facing,
+        &limits,
+    );
+    at += info.shift;
+    match info.contact {
+        Contact::Front if pitch > 6370 => pitch += 364,
+        Contact::Front if pitch < -6370 => pitch -= 364,
+        Contact::Front | Contact::TopFront => water.speed = 0.0,
+        Contact::Top if pitch >= -8190 => pitch -= 364,
+        Contact::Left => yaw += 910,
+        Contact::Right => yaw -= 910,
+        Contact::Clamp => {
+            player.position = old;
             water.speed = 0.0;
-            motion.velocity = Vec3::ZERO;
+            return;
         }
-    } else {
-        player.position = proposed;
+        _ => {}
+    }
+    if info.mid.floor < 0 {
+        at.y += info.mid.floor;
+        pitch += 364;
+    }
+    player.position = collision::level(at);
+    motion.pitch = radians(pitch as i16 as i32);
+    player.yaw = radians(yaw as i16 as i32);
+    // GetWaterDepth finds no water here: undo the move. Shallow water (depth
+    // 512 or less) starts wading in the original, which is not ported.
+    if world.water_surface(player.position, player.room).is_none() {
+        player.position = old;
+        water.speed = 0.0;
     }
 }

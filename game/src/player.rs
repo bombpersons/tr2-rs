@@ -23,6 +23,7 @@ pub use traversal::Traversal;
 mod backward;
 mod forward;
 mod rolling;
+mod collision;
 mod surface;
 mod swimming;
 pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
