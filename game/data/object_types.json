@@ -385,7 +385,8 @@
    "name": "winston",
    "attendant": {
     "follow_distance": 1536,
-    "max_turn": 182
+    "max_turn": 182,
+    "path_margin": 512
    }
   }
  ]

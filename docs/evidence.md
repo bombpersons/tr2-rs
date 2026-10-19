@@ -73,3 +73,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Home attendant local follow](winston-evidence.md): four ordinary PSX routes,1260 exact item ticks and three post-implementation validation routes; authored start/stop and local turning verified, navigation/contact remain pending.
 
 - [Home attendant animated contact](winston-evidence.md#animated-contact-and-avatar-pushing):285 exact full-controller ticks across four ordinary routes, three independent;82 native sphere centers within1.022 source units, exact recorded contact masks, nearest-key bounds and expanded-edge pushing. Blocked-world/special-mode/ordering branches remain pending.
+
+- [Adjacent attendant navigation](winston-evidence.md#adjacent-navigation-box-corridor-targets):1950 additional exact item ticks across four complete routes with three independent validations; source steering targets and overlapping-box containment verified. General multi-box/zone/obstacle navigation remains pending.

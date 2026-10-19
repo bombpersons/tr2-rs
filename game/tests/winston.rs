@@ -45,7 +45,9 @@ fn compare_case(csv: &str) {
     app.insert_resource(WorldGeometry::new(data));
     let mut previous = first;
     for row in rows.iter().skip(2).step_by(2) {
-        app.world_mut().get_mut::<Player>(player).unwrap().position = pos(previous, "lara");
+        let mut avatar = app.world_mut().get_mut::<Player>(player).unwrap();
+        avatar.position = pos(previous, "lara");
+        avatar.room = at(previous, "lara_room") as usize;
         app.run_tick(&[]);
         let transform = app.world().get::<Transform>(actor).unwrap();
         let a = app.world().get::<ObjectAnimation>(actor).unwrap();
@@ -69,6 +71,12 @@ fn compare_case(csv: &str) {
         let expected = ["x", "y", "z", "yaw", "animation", "animation_frame", "state", "goal", "speed", "room"]
             .map(|k| at(row, &format!("actor_{k}")));
         assert_eq!(actual, expected, "native field {}", at(row, "run_frame"));
+        assert_eq!(
+            ((w.target.x * 1024.0).round() as i32, (w.target.z * 1024.0).round() as i32),
+            (at(row, "target_x"), at(row, "target_z")),
+            "navigation target at field{}",
+            at(row, "run_frame")
+        );
         previous = row;
     }
 }
@@ -91,4 +99,24 @@ fn heldout_diagonal_follow_uses_previous_avatar_pose() {
 #[test]
 fn heldout_walking_departure_starts_and_stops_the_attendant() {
     compare_case(include_str!("data/original/winston_heldout_walk.csv"));
+}
+
+#[test]
+fn original_neighbor_box_target_keeps_the_corridor_coordinate_then_rejoins_lara() {
+    compare_case(include_str!("data/original/winston_nav_run.csv"));
+}
+
+#[test]
+fn heldout_neighbor_box_short_run_rejoins_lara_before_completing_its_stop() {
+    compare_case(include_str!("data/original/winston_nav_short_heldout.csv"));
+}
+
+#[test]
+fn heldout_neighbor_box_walking_departure_uses_the_same_corridor() {
+    compare_case(include_str!("data/original/winston_nav_walk_heldout.csv"));
+}
+
+#[test]
+fn heldout_neighbor_box_turn_retains_a_corridor_target_before_rejoining() {
+    compare_case(include_str!("data/original/winston_nav_turn_heldout.csv"));
 }

@@ -242,3 +242,8 @@ Animated contact reuses the existing clip bounds, joint trees and mesh sphere
 fields; no level format changes are needed. Model posing remains shared by
 the full-resolution preview and game. The preview does not simulate sphere
 contacts or game-specific push decisions.
+
+Navigation corridor queries read the existing `boxes` and `overlaps` fields.
+Box maxima are exclusive sector boundaries, matching the existing camera
+math. The authoring view and byte-exact save contract retain all navigation
+data; game-specific path decisions are not simulated in the editor.

@@ -139,3 +139,63 @@ bootstrap tick; no gameplay correction is applied during replay. Native/rebuilt
 contact views and attendant poses were visually inspected. The rebuilt engine
 sandbox ran and the editor Home idle-pose preview and untouched save passed.
 No template or persistent level-format changes were needed.
+
+## Adjacent navigation-box corridor targets
+
+The local controller now distinguishes Lara's position (awareness) from the
+point Winston steers toward (navigation). `WorldGeometry::adjacent_path_target`
+interprets existing authored box rectangles and overlap links. It implements
+the flat, directly overlapping corridor subset of `0x80015DD4..0x800161DC`:
+when outside the destination on one axis, keep the actor's perpendicular
+coordinate within its512-unit clearance margins; geometrically inside the
+destination, resume direct aiming at Lara. Geometric containment matters:
+boxes overlap, so the actor can enter the destination rectangle before its
+sector's selected box id changes.
+
+The binary evidence is the retained Home `path-target.disasm.txt`, plus `psx
+ ghidra decompile --analysis .psx/ghidra/81851f7f0f07d25e404efd4e5af7c7665abdb2a13a7af60fbb2b6db01a7e54e5/analysis.json
+ --addr 0x15DD4`. The cached analysis used Wall RAM; the whole function's bytes
+`0x15DD4..0x16354` match Home RAM exactly, SHA256
+`a6b1391fb0a5ead9cfd602a8e777f0089b65fdd83c40a02ea4d8a43edc3c4c12`.
+The pseudocode was interpreted against the original MIPS and runtime targets.
+Its warnings about load-delay/GTE semantics do not establish runtime behavior;
+the retained per-tick target comparisons provide that check here.
+
+In the long running route, Lara moves from sector-box135 into18. Winston
+retains target Z95723 for hundreds of fields instead of steering immediately
+to Lara's Z95805. Once his geometric position enters box18 during deceleration,
+he turns toward Lara again. The new `nav_run` capture extends through the
+complete stop. Three post-implementation validations cover shorter running,
+walking across the boundary and a turn after the initial departure. Across
+1950 new ticks, actor x/y/z, yaw, animation, absolute frame, state, goal, speed,
+room and both steering-target coordinates match exactly. The original1260
+local ticks now also compare their two steering-target coordinates.
+
+`game/tests/winston.rs` deliberately isolates the item by supplying each
+preceding observed avatar pose. The developer-MCP smoke replays the complete
+pad route through the real avatar rules instead. The engine's independent
+hand-authored boxes check margin clamping, geometric overlap before sector-id
+changes and explicit refusal of missing links, blocked destinations or height
+transitions. Bounds are half-open sector intervals; the documentation now
+matches the existing camera/navigation arithmetic.
+
+This is local adjacency, not a general pathfinder. Multi-box search queues,
+zone selection, dynamic blockage, diagonal/corner corridors, stair/drop limits,
+creature wall deflection and scheduling remain unported. Unsupported local
+queries retain the previous direct-target fallback; floor movement still has
+the separately documented flat-height guard. No authored links, placements,
+models or level file fields were modified.
+
+
+Adjacent-corridor checks: the all-features workspace suite and Clippy completed,
+with existing unrelated warnings. The engine sandbox ran offscreen and the
+editor Home walk-loop preview/save checks passed. Full-game run, short-run and
+walking routes pass17 checkpoints each (51), including target coordinates;
+route and attendant-centered views were visually inspected. The turned route
+matches the isolated item through all650 ticks but exposes an existing avatar
+collision diagnostic in the complete game: after an oblique wall contact,
+Lara settles at Z95536 rather than95550. Its steering target first exposes
+that difference at checkpoint616, after all preceding checked item positions
+match. `tools/winston_smoke.py --case nav_turn_heldout` retains this failure;
+no fitted item correction hides it. Correcting the avatar branch is separate
+from claiming the local corridor query matches its observed inputs.
