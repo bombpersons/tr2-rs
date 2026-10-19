@@ -1047,7 +1047,15 @@ fn integrate(
             }
         }
         let mut displacement = motion.velocity * dt;
-        if !swimming {
+        if motion.grounded && matches!(player.mode, PlayerMode::Run | PlayerMode::Idle) {
+            // AnimateLara0x80043248 uses the quantized sine table even on
+            // ordinary ground/braking frames. Continuous trig can move an
+            // extra unit before an oblique contact (fresh right/start routes).
+            let angle = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+            let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round() as i32;
+            displacement.x = units(((engine::camera::chase::sin(angle) * speed) >> 14) as f32 * original_frames(dt));
+            displacement.z = units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * original_frames(dt));
+        } else if !swimming {
             // Native positions are integral units. Per-axis floor is visible:
             // at the recorded oblique heading, a2-unit jump speed moves(-2,0).
             // Suppress trigonometric roundoff at exact cardinal headings.
@@ -1136,6 +1144,11 @@ fn integrate(
         let facing = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
         if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing]
         {
+            // A front impact restores the perpendicular coordinate from the
+            // tick's start before applying the normal shift (GetCollisionInfo
+            // and LaraDeflectEdge0x8003C544; oblique-wall trace field225).
+            // Sliding along a side contact remains in the separate axis path.
+            player.position[2 - facing] = old[2 - facing];
             // Run collision 0x8003a844: no hit-wall clip during run-start clip6
             // (holding UP against the wall keeps standing); otherwise a wall 256
             // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.

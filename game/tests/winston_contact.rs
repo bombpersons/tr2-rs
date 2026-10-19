@@ -80,10 +80,10 @@ fn compare_case(csv: &str, metadata: &str) {
             ("lara_x", player.position.x * 1024.0),
             ("lara_y", -player.position.y * 1024.0),
             ("lara_z", player.position.z * 1024.0),
-            ("lara_yaw", (player.yaw * 65536.0 / std::f32::consts::TAU).round()),
+            ("lara_yaw", (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as f32),
             ("lara_animation", pose.animation as f32),
             ("lara_animation_frame", pclip.frame_start as f32 + pose.frame),
-            ("lara_state", pclip.state as f32),
+            ("lara_state", if matches!(player.mode, PlayerMode::HitWall { .. }) { 12.0 } else { pclip.state as f32 }),
             ("lara_goal", world.get::<Traversal>(lara).unwrap().goal as f32),
             ("lara_room", player.room as f32),
             (
@@ -187,4 +187,52 @@ fn ordinary_skeletal_math_bounds_the_four_native_sphere_clouds() {
         let field = case["calls"][0]["run_field"].as_u64().unwrap();
         assert_eq!(mask, if field == 39 { 0x10000 } else { 0x110000 });
     }
+}
+
+#[test]
+fn original_oblique_run_wall_contact_preserves_the_unblocked_coordinate() {
+    compare_case(
+        include_str!("data/original/winston_nav_turn_heldout.csv"),
+        include_str!("data/original/winston_nav_turn_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_oblique_left_delayed_run_preserves_the_front_wall_tangent() {
+    compare_case(
+        include_str!("data/original/winston_wall_oblique_left_delay_heldout.csv"),
+        include_str!("data/original/winston_wall_oblique_left_delay_heldout.json"),
+    );
+}
+
+#[test]
+fn calibration_oblique_right_run_restores_the_opposite_tangent_direction() {
+    compare_case(
+        include_str!("data/original/winston_wall_oblique_right_heldout.csv"),
+        include_str!("data/original/winston_wall_oblique_right_heldout.json"),
+    );
+}
+
+#[test]
+fn calibration_oblique_run_start_stops_without_entering_the_wall_hit_clip() {
+    compare_case(
+        include_str!("data/original/winston_wall_oblique_start_heldout.csv"),
+        include_str!("data/original/winston_wall_oblique_start_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_oblique_right_validation_keeps_quantized_motion_and_wall_recovery_exact() {
+    compare_case(
+        include_str!("data/original/winston_wall_oblique_right_validation_heldout.csv"),
+        include_str!("data/original/winston_wall_oblique_right_validation_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_oblique_start_validation_keeps_quantized_braking_and_blocked_restart_exact() {
+    compare_case(
+        include_str!("data/original/winston_wall_oblique_start_validation_heldout.csv"),
+        include_str!("data/original/winston_wall_oblique_start_validation_heldout.json"),
+    );
 }

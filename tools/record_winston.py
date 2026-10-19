@@ -13,6 +13,26 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'wall_oblique_right_validation_heldout': (900, [
+        {'frame':0,'buttons':['UP'],'until':148},
+        {'frame':148,'buttons':['RIGHT'],'until':176},
+        {'frame':180,'buttons':['UP'],'until':250}], True),
+    'wall_oblique_start_validation_heldout': (850, [
+        {'frame':0,'buttons':['UP'],'until':160},
+        {'frame':160,'buttons':['LEFT'],'until':184},
+        {'frame':190,'buttons':['UP'],'until':250}], True),
+    'wall_oblique_left_delay_heldout': (820, [
+        {'frame':0,'buttons':['UP'],'until':142},
+        {'frame':142,'buttons':['LEFT'],'until':166},
+        {'frame':174,'buttons':['UP'],'until':254}], True),
+    'wall_oblique_right_heldout': (820, [
+        {'frame':0,'buttons':['UP'],'until':150},
+        {'frame':150,'buttons':['RIGHT'],'until':174},
+        {'frame':174,'buttons':['UP'],'until':238}], True),
+    'wall_oblique_start_heldout': (800, [
+        {'frame':0,'buttons':['UP'],'until':158},
+        {'frame':158,'buttons':['LEFT'],'until':182},
+        {'frame':182,'buttons':['UP'],'until':248}], True),
     'nav_short_heldout': (780, [{'frame':0,'buttons':['UP'],'until':146}], True),
     'nav_walk_heldout': (1080, [{'frame':0,'buttons':['UP','R1'],'until':540}], True),
     'nav_turn_heldout': (1300, [
@@ -69,7 +89,10 @@ def record(name):
                     fields=fields, input=inputs, independent=independent, pokes=[], command=command,
                     build=json.loads((out / "report.json").read_text())["build"],
                     samples_sha256=hashlib.sha256((out / "samples.csv").read_bytes()).hexdigest(),
-                    scope=('Local navigation-box corridor and authored follow' if name.startswith('nav') else 'Animated attendant contact and avatar pushing' if name.startswith('contact') else 'Local same-floor follow, authored start/stop and turning; no contact or cross-box navigation'))
+                    scope=('Frontal oblique avatar room-wall correction and recovery' if name.startswith('wall_') else 'Local navigation-box corridor and authored follow' if name.startswith('nav') else 'Animated attendant contact and avatar pushing' if name.startswith('contact') else 'Local same-floor follow, authored start/stop and turning; no contact or cross-box navigation'))
+    if name in ['wall_oblique_right_heldout','wall_oblique_start_heldout']:
+        metadata['independent']=False
+        metadata['validation_note']='Recorded after tangent restoration; reused to diagnose ground trigonometry, so calibration for the combined rule.'
     destination = ROOT / 'game/tests/data/original'
     (destination / f'winston_{name}.csv').write_bytes((out / 'samples.csv').read_bytes())
     (destination / f'winston_{name}.json').write_text(json.dumps(metadata, indent=2)+'\n')

@@ -47,7 +47,7 @@ def main():
             client.edit('Object260_9', 'ObjectAnimation', {'animation': clip, 'frame': int(start['actor_animation_frame']) - level['animations'][clip]['frame_start']})
             client.edit('Object260_9', 'AnimationGoal', {'state': int(start['actor_goal'])})
             client.edit('Object260_9', 'Winston', {'speed': int(start['actor_speed'])})
-            samples = [2,8,16,36,38,40,42,78,88,90,94,96,98] if name.startswith('contact') else ([2,102,158,160,162,164,360,548,550,592,594,616,618,644,646,650] if name.startswith('nav') else [2,58,64,102,160,240,360])
+            samples = [2,102,148,174,180,198,212,224,226,228,230,240,256,260,280] if name.startswith('wall_') else [2,8,16,36,38,40,42,78,88,90,94,96,98] if name.startswith('contact') else ([2,102,158,160,162,164,360,548,550,592,594,616,618,644,646,650] if name.startswith('nav') else [2,58,64,102,160,240,360])
             fields = sorted(set([f for f in samples if f < len(rows)] + [len(rows)-1]))
             tick = 0
             for field in fields:
@@ -75,7 +75,7 @@ def main():
                     assert [round(c['Winston']['target'][i]*1024) for i in [0,2]]==[int(row['target_x']),int(row['target_z'])],(name,field,c,row)
                 if 'actor_contact_mask' in row:
                     assert c['Winston']['contact_mask']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
-                if name.startswith('contact'):
+                if name.startswith(('contact','wall_','nav')):
                     player=client.query(components=['Player','AnimationState'])['entities'][0]['components']
                     pos=player['Player']['position']
                     got_lara=[round(pos[0]*1024),round(-pos[1]*1024),round(pos[2]*1024)]

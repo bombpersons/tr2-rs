@@ -196,6 +196,6 @@ matches the isolated item through all650 ticks but exposes an existing avatar
 collision diagnostic in the complete game: after an oblique wall contact,
 Lara settles at Z95536 rather than95550. Its steering target first exposes
 that difference at checkpoint616, after all preceding checked item positions
-match. `tools/winston_smoke.py --case nav_turn_heldout` retains this failure;
-no fitted item correction hides it. Correcting the avatar branch is separate
-from claiming the local corridor query matches its observed inputs.
+match. `tools/winston_smoke.py --case nav_turn_heldout` now passes after the
+independently verified avatar correction in [oblique-wall-evidence.md](oblique-wall-evidence.md);
+no item target or movement correction was added to hide the difference.
