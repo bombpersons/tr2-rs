@@ -68,16 +68,18 @@ rule was fitted to either independent validation route. The observation harness
 now reports the existing `HitWall` mode as state12, because wall-hit clips53/54
 declare state2 while their controller overrides it until the natural end link.
 
-Two additional post-implementation recordings are retained with
-`diagnostic_only: true`, without passing tests or parity claims:
+Two additional post-implementation recordings were retained as diagnostics at
+this milestone. The subsequent [walking-stop milestone](walk-stop-evidence.md)
+resolves both using these unchanged recordings as explicitly labelled calibration:
 
 - `forward_ledge_release_heldout` matches the fall, standing landing and
   restart, but later braking into the wall at field196 uses clip11 with a
-  one-tick state12 override that the port does not preserve.
+  one-tick state12 override that the port did not preserve.
 - `forward_ledge_walk_heldout` exposes Walk requesting goal52 while airborne,
-  and an existing walk-release dispatch mismatch after landing. Its full
-  trajectory remains unverified. Neither diagnostic was used to change the
-  flight controller; the fresh release validation avoids the later wall.
+  and a walk-release dispatch mismatch after landing. Neither diagnostic was
+  used to change the flight controller in the ledge-fall milestone; the fresh
+  release validation avoided the later wall. Both full trajectories now pass
+  with the walking-stop changes and their separate independent validation.
 
 ## Verification
 

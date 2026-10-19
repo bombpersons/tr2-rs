@@ -1,8 +1,8 @@
 {
   "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
   "heldout_after_implementation": true,
-  "used_to_refine_rules": false,
-  "diagnostic_only": true,
+  "used_to_refine_rules": true,
+  "diagnostic_only": false,
   "level": "assault",
   "command": [
     "psx",
@@ -132,5 +132,6 @@
   "checkpoint": ".psx/forward_ledge_start/state.bin",
   "checkpoint_sha256": "5ae430a8ee2d168c4bba8078db8da9b10cf39a6b0d8d8cac9b6b5d60c8b25c0a",
   "samples_sha256": "a6dbb031eae7fe655af33b246ab30a52b9bfa9841ee2234f55123545e304eb39",
-  "writes_sha256": "cca5c7f32762e4075c4e4c33b4728b6e4920578b77502548279c1c621ce6800e"
+  "writes_sha256": "cca5c7f32762e4075c4e4c33b4728b6e4920578b77502548279c1c621ce6800e",
+  "provenance_note": "Former diagnostic recorded after the ledge-fall implementation; used to refine walking/flight goals and the braking-wall state in the next milestone."
 }

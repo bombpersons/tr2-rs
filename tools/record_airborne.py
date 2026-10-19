@@ -12,6 +12,18 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'walk_stop_left_heldout': ('home_runway_start', 240, [event(['UP', 'R1'], 100)]),
+    'walk_stop_right_heldout': ('home_runway_start', 220, [event(['UP', 'R1'], 80)]),
+    'walk_stop_rehold_heldout': ('home_runway_start', 280, [event(['UP', 'R1'], 80),
+                                                        event(['UP', 'R1'], 162, 110)]),
+    'forward_ledge_walk_validation_heldout': ('forward_ledge_start', 280, [event(['UP'], 72, 16),
+                                                                       event(['UP', 'R1'], 148, 72)]),
+    'braking_wall_validation_heldout': ('forward_ledge_start', 260, [event(['UP'], 56),
+                                                                 event(['SQUARE'], 68, 62),
+                                                                 event(['UP'], 176, 130),
+                                                                 event(['SQUARE'], 196, 188)]),
+    'braking_wall_release_validation_heldout': ('forward_ledge_start', 280, [event(['UP'], 74, 18),
+                                                                         event(['UP'], 198, 152)]),
     'forward_ledge_run': ('forward_ledge_start', 210, [event(['UP'], 90)]),
     'forward_ledge_delay_heldout': ('forward_ledge_start', 240, [event(['UP'], 146, 14)]),
     'forward_ledge_release_heldout': ('forward_ledge_start', 240, [event(['UP'], 58),
@@ -107,8 +119,9 @@ def main():
     metadata = {
         'source': 'Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes',
         'heldout_after_implementation': args.case.endswith('_heldout'),
-        'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout'),
-        'diagnostic_only': args.case in ('forward_ledge_release_heldout', 'forward_ledge_walk_heldout'),
+        'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout',
+                                            'forward_ledge_release_heldout', 'forward_ledge_walk_heldout'),
+        'diagnostic_only': args.case == 'braking_wall_validation_heldout',
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
         'checkpoint': checkpoint,
@@ -116,6 +129,9 @@ def main():
         'samples_sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
         'writes_sha256': hashlib.sha256((ROOT / output / 'writes.jsonl').read_bytes()).hexdigest(),
     }
+    if args.case in ('forward_ledge_release_heldout', 'forward_ledge_walk_heldout'):
+        metadata['provenance_note'] = ('Former diagnostic recorded after the ledge-fall implementation; '
+                                       'used to refine walking/flight goals and the braking-wall state in the next milestone.')
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))
 

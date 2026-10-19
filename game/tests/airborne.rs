@@ -191,6 +191,19 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
 recorded_case!(original_forward_ledge_fall_lands_into_the_authored_running_clip, "forward_ledge_run");
+recorded_case!(calibration_released_ledge_fall_exposes_braking_wall_state_override, "forward_ledge_release_heldout");
+recorded_case!(calibration_walk_after_ledge_fall_exposes_flight_goal_and_authored_stop, "forward_ledge_walk_heldout");
+recorded_case!(heldout_walk_release_waits_for_the_left_authored_stop, "walk_stop_left_heldout");
+recorded_case!(heldout_walk_release_waits_for_the_right_authored_stop, "walk_stop_right_heldout");
+recorded_case!(heldout_walk_rehold_waits_for_the_committed_stop_before_restarting, "walk_stop_rehold_heldout");
+recorded_case!(
+    heldout_delayed_walk_request_in_flight_lands_before_walking_and_stopping,
+    "forward_ledge_walk_validation_heldout"
+);
+recorded_case!(
+    heldout_braking_wall_contact_retains_its_state_until_the_standing_end_link,
+    "braking_wall_release_validation_heldout"
+);
 recorded_case!(heldout_delayed_ledge_fall_lands_running_then_hits_a_wall, "forward_ledge_delay_heldout");
 recorded_case!(
     heldout_released_ledge_fall_ignores_airborne_jump_and_recovers_before_running,

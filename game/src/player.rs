@@ -153,7 +153,7 @@ pub enum PlayerMode {
         frames_left: f32,
         offset: Vec3,
     },
-    /// Original state12: running into a wall plays clip53/54 in place.
+    /// State12: wall-hit53/54, or a standing stop outside their foot ranges.
     HitWall {
         animation: usize,
         frames_left: f32,
@@ -575,6 +575,7 @@ fn control(
     let controls = GroundControls::read(&pad);
     for (mut player, mut motion, mut weapon, animation, mut traversal) in &mut players {
         let was_running = player.mode == PlayerMode::Run;
+        let was_walking = player.mode == PlayerMode::Walk;
         let was_standing =
             player.mode == PlayerMode::Idle && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(2);
         if was_running {
@@ -764,6 +765,10 @@ fn control(
             // Run control requests goal2 on release (0x8003898C), but the
             // running state and authored speed persist until its stop range.
             (PlayerMode::Run, forward * RUN_SPEED)
+        } else if was_walking && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(0) {
+            // Walk control requests goal2 on release (0x800387A0).
+            // Finish the stride and its authored stop before standing.
+            (PlayerMode::Walk, forward * WALK_SPEED)
         } else {
             (PlayerMode::Idle, Vec3::ZERO)
         };
@@ -805,13 +810,17 @@ fn control(
                 };
                 speed.map_or(velocity, |speed| heading * speed)
             } else {
-                let direction = if mode == PlayerMode::Run && direction.y == 0.0 { 1.0 } else { direction.y };
+                let direction = if matches!(mode, PlayerMode::Run | PlayerMode::Walk) && direction.y == 0.0 {
+                    1.0
+                } else {
+                    direction.y
+                };
                 forward * direction * speed.unwrap_or_else(|| ground_speed(mode, motion.locomotion_frame))
             }
         } else {
             velocity
         };
-        if mode == PlayerMode::Run
+        if matches!(mode, PlayerMode::Run | PlayerMode::Walk)
             && direction.y == 0.0
             && clips.as_deref().zip(next.as_ref()).and_then(|(clips, next)| clips.state(next.animation)) == Some(2)
         {
@@ -1098,12 +1107,14 @@ fn integrate(
             // (holding UP against the wall keeps standing); otherwise a wall 256
             // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.
             let next = clips.as_deref().map(|c| (c, step_animation(&animation, 6, None, Some(c), original_frames(dt))));
+            let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != 6)
+                && wall_ahead(geometry, old, player.yaw, player.room);
             let hit_clip = next.filter(|(_, next)| next.animation == 0).map(|(c, next)| {
                 let frame = c.clips[0].frame_start + next.frame.floor() as usize;
                 if frame < 10 { 53 } else { 54 }
             });
             motion.velocity = Vec3::ZERO;
-            match hit_clip.filter(|_| wall_ahead(geometry, old, player.yaw, player.room)) {
+            match hit_clip.filter(|_| hit_wall) {
                 Some(clip) => {
                     let frames = clips
                         .as_deref()
@@ -1137,6 +1148,17 @@ fn integrate(
                             *animation = step_animation(&animation, request, None, Some(clips), original_frames(dt));
                         } else {
                             animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
+                        }
+                        if hit_wall {
+                            // Run collision sets state12 before testing the
+                            // foot ranges (0x8003A8F0..0x8003A944). If neither
+                            // range accepts, ColStop enters11 but retains12
+                            // until that clip's natural end on the next tick.
+                            let clip = &clips.clips[animation.animation];
+                            player.mode = PlayerMode::HitWall {
+                                animation: animation.animation,
+                                frames_left: (clip.frame_end + 1 - clip.frame_start) as f32 - animation.frame,
+                            };
                         }
                         traversal.animation_stepped = true;
                     }
@@ -1226,7 +1248,13 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
                 103
             }
         }
-        PlayerMode::Walk => 20,
+        PlayerMode::Walk => {
+            if controls.direction.y == 0.0 {
+                STANDING_CLIP
+            } else {
+                20
+            }
+        }
         PlayerMode::Run => {
             if controls.direction.y == 0.0 {
                 STANDING_CLIP
@@ -1339,12 +1367,13 @@ pub fn step_animation(
     if let Some(clips) = clips
         && let (Some(state), Some(target)) = (clips.state(current.animation), clips.state(index))
         && (matches!(state, 5 | 16 | 21 | 22)
+            || (state == 0 && matches!(index, 11 | 20 | 103))
             || (state == 1 && matches!(index, 6 | 11 | 103))
-            || (state == 2 && index == 6)
+            || (state == 2 && matches!(index, 6 | 20))
             || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))
     {
         // AnimateLara 0x80042E30..0x80042FD8 advances, tries the goal
-        // every tick, then follows end links. A run, backward walk or sidestep
+        // every tick, then follows end links. A walk, run or sidestep
         // stop request must wait for a foot's authored dispatch window.
         // Run applies only to ordinary run/stand requests: collision-forced
         // clips (e.g. vault50, whose declared state is also2) enter directly.
