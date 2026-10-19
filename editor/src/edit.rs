@@ -3,7 +3,9 @@
 //! Drags write to an overlay that the viewport and windows show at once; the
 //! overlay becomes a single undo step when the drag ends.
 use crate::Editor;
+use engine::editor::{self as authoring, RoomChange};
 use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A turn in the format's binary angle units.
 pub const TURN: i64 = 65536;
@@ -87,16 +89,65 @@ impl Editor {
         if self.overlay.is_empty() {
             return;
         }
-        let edits = std::mem::take(&mut self.overlay);
+        let mut edits = std::mem::take(&mut self.overlay);
+        let (rooms, note) = self.moved_rooms(&edits);
+        edits.extend(rooms);
         let reload = edits.keys().any(|pointer| !is_transform(pointer));
         match self.doc.apply(edits) {
             Ok(()) => {
-                self.status = "Edited - Ctrl+Z to undo".into();
+                self.status = note.unwrap_or_else(|| "Edited - Ctrl+Z to undo".into());
                 self.revision += 1;
                 self.preview |= reload;
             }
             Err(error) => self.status = error,
         }
+    }
+
+    /// Room changes for placements that `edits` move, and what to tell the
+    /// user about them. A placement keeps its authored room unless the move
+    /// crosses into another (`engine::editor::moved_room`); an edit that sets
+    /// the room itself is left alone.
+    fn moved_rooms(&self, edits: &BTreeMap<String, Value>) -> (Vec<(String, Value)>, Option<String>) {
+        let moved: BTreeSet<usize> = edits
+            .keys()
+            .filter_map(|p| {
+                let rest = p.strip_prefix("/placements/")?;
+                let (index, field) = rest.split_once('/')?;
+                field.starts_with("position").then(|| index.parse().ok())?
+            })
+            .filter(|index| !edits.contains_key(&format!("/placements/{index}/room")))
+            .collect();
+        if moved.is_empty() {
+            return (vec![], None);
+        }
+        let Ok(level) = self.doc.level() else { return (vec![], None) };
+        let (mut out, mut into, mut outside) = (vec![], vec![], vec![]);
+        for index in moved {
+            let Some(placement) = level.placements.get(index) else { continue };
+            let mut to = placement.position;
+            for (axis, value) in to.iter_mut().enumerate() {
+                if let Some(v) = edits.get(&format!("/placements/{index}/position/{axis}")).and_then(Value::as_i64) {
+                    *value = v as i32;
+                }
+            }
+            match authoring::moved_room(&level, placement.room, placement.position, to) {
+                RoomChange::Keep => (),
+                RoomChange::Into(room) => {
+                    out.push((format!("/placements/{index}/room"), Value::from(room)));
+                    into.push(format!("{index} into room {room}"));
+                }
+                RoomChange::Outside => outside.push(index.to_string()),
+            }
+        }
+        let note = match (into.is_empty(), outside.is_empty()) {
+            (true, true) => None,
+            (false, true) => Some(format!("Moved object {} - Ctrl+Z to undo", into.join(", "))),
+            (_, false) => Some(format!(
+                "Object {} is in no room (solid or outside every grid); its room is unchanged",
+                outside.join(", ")
+            )),
+        };
+        (out, note)
     }
 }
 
@@ -152,6 +203,27 @@ mod tests {
         editor.undo();
         assert_eq!(editor.doc.value(), &before);
         assert!(!editor.doc.is_dirty());
+    }
+
+    #[test]
+    fn moves_keep_the_room_in_open_floor_and_warn_when_dropped_into_solid() {
+        let mut editor = crate::sandbox();
+        editor.selection = vec![0];
+        editor.edit_selected("position/0", Change::Add(1024), false);
+        assert_eq!(editor.doc.value()["placements"][0]["position"][0], 2560 + 1024);
+        assert_eq!(editor.doc.value()["placements"][0]["room"], 0);
+        assert!(editor.status.starts_with("Edited"), "{}", editor.status);
+        // The sandbox's border ring is solid: the move is kept, with a warning.
+        editor.edit_selected("position/0", Change::Set(&Value::from(512)), false);
+        assert_eq!(editor.doc.value()["placements"][0]["position"][0], 512);
+        assert_eq!(editor.doc.value()["placements"][0]["room"], 0);
+        assert!(editor.status.contains("in no room"), "{}", editor.status);
+        // Setting the room by hand is never second-guessed.
+        editor.edit(
+            vec![("/placements/0/position/0".into(), Value::from(2560)), ("/placements/0/room".into(), Value::from(0))],
+            false,
+        );
+        assert!(editor.status.starts_with("Edited"), "{}", editor.status);
     }
 
     #[test]

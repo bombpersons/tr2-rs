@@ -220,9 +220,11 @@ pub fn camera(
     }
     if editor.frame {
         editor.frame = false;
-        let selected = if editor.overview { None } else { selection_bounds(&editor, level.as_deref()) };
+        let room = editor.overview || editor.frame_room;
+        let selected = if room { None } else { selection_bounds(&editor, level.as_deref()) };
         let (center, distance) = selected.unwrap_or_else(|| room_bounds(&editor));
         editor.overview = false;
+        editor.frame_room = false;
         // camera_transform takes level space; this is its own inverse.
         let center = view::render_position(center);
         *transform =
@@ -276,7 +278,7 @@ fn ctrl(keys: &ButtonInput<KeyCode>) -> bool {
 fn room_bounds(editor: &Editor) -> (Vec3, f32) {
     let mut parts = editor.pointer.split('/').skip(1);
     let index = match (parts.next(), parts.next().and_then(|s| s.parse::<usize>().ok())) {
-        _ if editor.mesh.on => editor.mesh.room,
+        _ if editor.mesh.on || editor.frame_room => editor.mesh.room,
         (Some("rooms"), Some(index)) => index,
         _ => 0,
     };

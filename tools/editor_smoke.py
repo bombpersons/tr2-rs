@@ -189,6 +189,44 @@ def mesh_smoke(client, copy, level, captures):
     return {'room': index, 'raised_face': quad, 'sector': [x, z], 'pushed_wall': pushed}
 
 
+def doorway(level):
+    """A placement and the offset that carries it through one of its room's
+    doorways: the centre of a border sector whose floor data leads on."""
+    infos = level['floor_infos']
+    for index, p in enumerate(level['placements']):
+        room = level['rooms'][p['room']]
+        for x in range(room['x_sectors']):
+            for z in range(room['z_sectors']):
+                s = room['sectors'][x * room['z_sectors'] + z]
+                info = s.get('floor_info')
+                target = infos[info].get('portal') if info is not None else None
+                if target is None or target == p['room'] or s['floor'] == SOLID:
+                    continue
+                to = [room['origin'][0] + x * 1024 + 512, s['floor'], room['origin'][2] + z * 1024 + 512]
+                return index, target, [to[i] - p['position'][i] for i in range(3)]
+    return None
+
+
+def rooms_smoke(client, level, captures):
+    """The Rooms window and map, and an object carried through a doorway."""
+    state = command(client, show_rooms=True, room=len(level['rooms']) - 1, select='none', frame_room=True)
+    assert state['mesh_room'] == len(level['rooms']) - 1, state
+    time.sleep(1)
+    captures.append(client.capture('rooms-map'))
+    found = doorway(level) if len(level['rooms']) > 1 else None
+    result = {'rooms_window': True, 'doorway': None}
+    if found:
+        index, target, offset = found
+        state = command(client, select=str(index))
+        state = settled(client, state, move_selection=','.join(map(str, offset)))
+        assert f'into room {target}' in state['message'], state
+        state = settled(client, state, undo=True)
+        assert not state['dirty'], state
+        result['doorway'] = {'placement': index, 'into': target}
+    command(client, select='none')
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', type=Path, default=ROOT / 'engine/assets/levels/sandbox/level.json')
@@ -278,6 +316,7 @@ def main():
         assert saved == before, 'save lost unrelated data'
         state = command(client, select='1', frame=True)
         captures.append(client.capture('edited'))
+        rooms = rooms_smoke(client, saved, captures)
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -297,7 +336,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'rooms': rooms, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

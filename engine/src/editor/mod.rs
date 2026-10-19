@@ -5,11 +5,13 @@
 //! save rewrites only what changed, in the file's own formatting. Changes use
 //! the same typed format and reference validation as the preview.
 mod mesh;
+mod rooms;
 mod splice;
 mod validate;
 
 use crate::world::Level;
 pub use mesh::*;
+pub use rooms::*;
 use serde_json::Value;
 use std::{
     fs,

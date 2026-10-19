@@ -117,23 +117,33 @@ wraps instead of scrolling on narrow windows.
   Textures filter and "used in this room"; a vertex-shade brush (see
   lighting).
 
-## Rooms mode (planned)
+## Rooms mode (understanding and bookkeeping built; editing planned)
 
-### Understanding
+### Understanding (built)
 
 - **Rooms window:** every room with its size, flags (water, wind), ambient,
   neighbours and flip partner. Click to select and frame.
 - **Map view:** a top-down view of room rectangles on the sector grid, with
   portals as edges (sideways) and dots (vertical), and a height-range slider
   to slice through stacks.
-- **Room tint** in 3D: the active room and its portal neighbours highlighted,
-  everything else faded.
+- **Room outline** in 3D: the current room's box and its portals, drawn
+  while the Rooms or Map window is open. (Built as an outline rather than
+  the tint first planned: it reads more clearly through walls and leaves
+  the preview's materials alone.)
+
+The current room is the one mesh mode edits, so the toolbar, the Rooms
+window, the map and clicking faces in mesh mode all choose the same room.
 
 ### Bookkeeping
 
-- **Automatic object room:** moving a placement sets `placement.room` from
-  `floor_at` starting at its old room (following portals as the game does);
-  a warning when it lands in solid ground. Lights do the same.
+- **Automatic object room (built):** a move changes `placement.room` only
+  when looking the room up from the old and the new position (by
+  `floor_at`'s rules) gives different answers, so crossing a doorway or a
+  vertical link carries the object across and every other move keeps the
+  authored room. 57 imported placements sit where a strict lookup would put
+  them in another room, so recomputing it outright would rewrite authored
+  data. A move into solid ground keeps the room and warns. Lights will do
+  the same.
 - **Diagnostics:** one-sided portals, sector portals without a render
   portal, mismatched heights across a link, objects in the wrong room, stale
   navigation boxes. A fix button where the fix is unambiguous.
@@ -195,8 +205,8 @@ nothing in the game.
 
 ## Order of work
 
-1. Toolbar and Paint tool.
-2. Rooms window, map view, automatic object room.
+1. Toolbar and Paint tool. (Done.)
+2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics.
 4. Connect / open hole, then split and merge, then new room.
 5. Navigation box rebuild.

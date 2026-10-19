@@ -56,6 +56,23 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
 - **Animation** previews authored clips (see below).
 - **Textures** shows the texture table cut from the atlas, for painting faces
   in mesh mode (see "Mesh editing").
+- **Rooms** (View > Rooms) lists every room with its grid size, height range,
+  object count and flags. Click one to make it the current room (the one
+  mesh mode edits); double-click frames it. Below the list, the current
+  room's water and wind flags and ambient shade are editable, and its
+  portals ("-> 4" a doorway, "v 77" a hole in the floor, "^ 13" an opening
+  in the ceiling), flip partner and objects are buttons that jump to them.
+- **Map** (View > Map) draws the rooms from above: open sectors filled (blue
+  for water rooms), the current room outlined in yellow and the rooms its
+  portals open into in cyan, its doorways as green lines and its floor and
+  ceiling openings as orange and purple boxes, objects as dots (selected in
+  yellow), and the camera as a white arrow. Drag to pan and scroll to zoom;
+  **Fit** shows everything. Click a room to make it current. Rooms stack
+  and overlap, so clicking the same spot again steps to the next room under
+  it, highest first; double-click frames it. **Slice** limits the map (and
+  its clicks) to rooms overlapping a height range, starting from the current
+  room's. While Rooms or Map is open, the 3D view outlines the current
+  room's box and its portals in the same colours.
 
 The **toolbar** has four groups. Each button runs the same function as its
 key and menu item, and a button that does not apply is greyed out with the
@@ -91,6 +108,17 @@ the toolbar's Snap is on; holding Ctrl while dragging inverts it. A drag shows l
 let go. Moves and turns update the objects in place; other edits rebuild the
 preview.
 
+A placement's room is authored data, so moving an object keeps it unless
+the move crosses into another room. The editor looks the room up from the
+object's old and new positions, the way collision does (doorway sectors,
+then the rooms below and above), and changes `room` only when that lookup
+changed; the status bar names the new room, and undo restores both. A move
+that ends inside solid ground or outside every room keeps the room and
+says so. Typing the room yourself is never overridden. The imported levels
+keep 57 placements in rooms that a strict lookup would not give them (such
+as items floating over water rooms), which is why the room is never simply
+recomputed (`engine::editor::moved_room`).
+
 All edits are validated against the whole document before they are kept,
 and an edit that is invalid for any selected object changes none of them.
 Undo and redo restore optional fields that an edit added. Coordinates are
@@ -109,6 +137,7 @@ the level format's units, with Y increasing downward.
 | 1 / 2 / 3 / 4 | Select / Move / Rotate / Paint tool (after clicking the view) |
 | Click / Shift-click / Ctrl-click | Select / add or remove (viewport and Objects window) |
 | F / View > Frame selection | Frame the selection (or the Data window's room) |
+| View > Rooms / Map | Room list and details / top-down map of the rooms |
 | View > Overview | Frame the first room |
 | Hold right mouse + drag | Look around |
 | Middle mouse + drag / mouse wheel | Pan / zoom |
@@ -292,7 +321,9 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
 checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
-references, the unsaved-changes question, mesh mode (raise a floor, a refused unsnapped
+references, the unsaved-changes question, the Rooms and Map windows with the
+current room's outline, carrying an object through a doorway into the next
+room (on levels with several rooms) and undoing it, mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

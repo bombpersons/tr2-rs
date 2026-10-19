@@ -4,6 +4,7 @@ mod edit;
 mod files;
 mod gizmo;
 mod mesh;
+mod rooms;
 mod toolbar;
 mod ui;
 mod viewport;
@@ -53,6 +54,8 @@ struct Editor {
     tool: toolbar::Tool,
     /// Object moves and turns snap (Ctrl inverts while dragging).
     snap: bool,
+    /// The next framing shows the current room rather than the selection.
+    frame_room: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -83,6 +86,7 @@ impl Editor {
             mesh: default(),
             tool: default(),
             snap: false,
+            frame_room: false,
         }
     }
 }
@@ -106,6 +110,9 @@ struct EditorCommand {
     save_as: String,
     /// Placement indices, such as "1,2"; "none" clears the selection.
     select: String,
+    /// Move the selected objects by "x,y,z" level units as one step, as a
+    /// gizmo drag does (rooms follow the move).
+    move_selection: String,
     /// Dismiss the unsaved-changes question, keeping the document.
     cancel: bool,
     /// "object" or "mesh".
@@ -127,6 +134,12 @@ struct EditorCommand {
     mesh_rotate: bool,
     /// Open the Textures window.
     show_textures: bool,
+    /// Open the Rooms and Map windows.
+    show_rooms: bool,
+    /// Make this room current (as the Rooms window and map do); negative leaves it.
+    room: i64,
+    /// Frame the current room.
+    frame_room: bool,
     /// "select", "move", "rotate" or "paint".
     tool: String,
 }
@@ -221,6 +234,7 @@ fn main() -> AppExit {
             gizmo::GizmoPlugin,
             mesh::MeshPlugin,
             toolbar::ToolbarPlugin,
+            rooms::RoomsPlugin,
             animation::AnimationPreviewPlugin,
         ))
         .init_resource::<files::FileDialogs>();
@@ -292,7 +306,7 @@ fn capture(mut commands: Commands, mut capture: ResMut<Capture>, target: Res<Edi
 fn setup(mut commands: Commands) {
     commands.spawn((
         Name::new("Editor"),
-        EditorCommand { mesh_room: -1, mesh_paint: -1, ..default() },
+        EditorCommand { mesh_room: -1, mesh_paint: -1, room: -1, ..default() },
         EditorStatus::default(),
         animation::AnimationPreview::default(),
     ));
@@ -342,6 +356,19 @@ fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>
         c.mesh_rotate = false;
         editor.mesh_rotate_texture();
     }
+    if c.show_rooms {
+        c.show_rooms = false;
+        editor.windows.rooms = true;
+        editor.windows.map = true;
+    }
+    if c.room >= 0 {
+        let room = std::mem::replace(&mut c.room, -1);
+        editor.select_room(room as usize);
+    }
+    if c.frame_room {
+        c.frame_room = false;
+        editor.frame_room();
+    }
     if c.show_textures {
         c.show_textures = false;
         editor.windows.textures = true;
@@ -367,6 +394,18 @@ fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>
         let text = std::mem::take(&mut c.select);
         editor.selection = text.split(',').filter_map(|s| s.trim().parse().ok()).collect();
         editor.status = format!("Selected {} objects", editor.selection.len());
+    }
+    if !c.move_selection.is_empty() {
+        let text = std::mem::take(&mut c.move_selection);
+        match text.split(',').map(|n| n.trim().parse::<i64>()).collect::<Result<Vec<_>, _>>().as_deref() {
+            Ok(&[x, y, z]) => {
+                for (axis, delta) in [x, y, z].into_iter().enumerate() {
+                    editor.edit_selected(&format!("position/{axis}"), edit::Change::Add(delta), true);
+                }
+                editor.commit();
+            }
+            _ => editor.status = "move_selection takes x,y,z".into(),
+        }
     }
     if c.navigate {
         c.navigate = false;
@@ -494,6 +533,7 @@ impl Editor {
                 self.navigate(String::new());
                 self.frame = true;
                 self.overview = true;
+                self.windows.map_view.fit = true;
                 self.changed("Opened level");
             }
             Err(error) => self.status = format!("Could not open {}: {error}", path.display()),

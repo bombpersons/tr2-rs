@@ -240,8 +240,7 @@ fn mesh_settings(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, 
         editor.mesh_room(room);
     }
     if ui.button("Frame room").on_hover_text("Frame the room being edited").clicked() {
-        editor.frame = true;
-        editor.overview = true;
+        editor.frame_room();
     }
     ui.separator();
     ui.label("Brush");

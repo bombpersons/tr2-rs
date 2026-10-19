@@ -21,6 +21,9 @@ pub struct Windows {
     pub data: bool,
     pub animation: bool,
     pub textures: bool,
+    pub rooms: bool,
+    pub map: bool,
+    pub map_view: crate::rooms::MapView,
     pub group: Group,
     pub filter: String,
 }
@@ -32,6 +35,9 @@ impl Default for Windows {
             data: false,
             animation: false,
             textures: false,
+            rooms: false,
+            map: false,
+            map_view: default(),
             group: Group::Room,
             filter: String::new(),
         }
@@ -91,6 +97,7 @@ fn ui(
     mut previews: Query<&mut AnimationPreview>,
     world: Option<Res<WorldGeometry>>,
     server: Res<AssetServer>,
+    cameras: Query<&GlobalTransform, With<engine::render::GameCamera>>,
 ) -> Result {
     // The Textures window and the toolbar's brush swatch draw from the atlas.
     let atlas = (editor.windows.textures || editor.mesh.on)
@@ -121,6 +128,19 @@ fn ui(
             } else {
                 show_data = properties(ui, editor, types);
             }
+        });
+    egui::Window::new("Rooms")
+        .open(&mut windows.rooms)
+        .default_pos([8.0, top + 300.0])
+        .default_size([330.0, 460.0])
+        .show(ctx, |ui| crate::rooms::window(ui, editor, world.as_deref().map(|w| &*w.data), &mut show_data));
+    egui::Window::new("Map")
+        .open(&mut windows.map)
+        .default_pos([area.right() - 448.0, area.bottom() - 470.0])
+        .default_size([440.0, 420.0])
+        .show(ctx, |ui| {
+            let level = world.as_deref().map(|w| &*w.data);
+            crate::rooms::map(ui, editor, &mut windows.map_view, level, cameras.single().ok())
         });
     windows.data |= show_data;
     egui::Window::new("Data")
@@ -237,6 +257,8 @@ fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
                             ui.checkbox(&mut windows.data, "Data");
                             ui.checkbox(&mut windows.animation, "Animation");
                             ui.checkbox(&mut windows.textures, "Textures");
+                            ui.checkbox(&mut windows.rooms, "Rooms");
+                            ui.checkbox(&mut windows.map, "Map");
                             ui.separator();
                             if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
                                 editor.frame = true;
