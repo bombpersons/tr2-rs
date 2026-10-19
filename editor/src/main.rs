@@ -110,6 +110,9 @@ struct EditorCommand {
     save_as: String,
     /// Placement indices, such as "1,2"; "none" clears the selection.
     select: String,
+    /// Click the 3D view at "x,y" window pixels (",shift" holds Shift), as
+    /// the mouse would.
+    click: String,
     /// Move the selected objects by "x,y,z" level units as one step, as a
     /// gizmo drag does (rooms follow the move).
     move_selection: String,
@@ -312,8 +315,33 @@ fn setup(mut commands: Commands) {
     ));
 }
 
-fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>) {
+fn automation(
+    mut editor: ResMut<Editor>,
+    mut command: Query<&mut EditorCommand>,
+    mut pointer: ResMut<viewport::VirtualPointer>,
+    mut mouse: ResMut<ButtonInput<MouseButton>>,
+    mut keys: ResMut<ButtonInput<KeyCode>>,
+) {
     let Ok(mut c) = command.single_mut() else { return };
+    if pointer.release {
+        *pointer = default();
+        mouse.release(MouseButton::Left);
+        keys.release(KeyCode::ShiftLeft);
+    }
+    if !c.click.is_empty() {
+        let text = std::mem::take(&mut c.click);
+        let parts: Vec<_> = text.split(',').map(str::trim).collect();
+        match (parts.first().and_then(|x| x.parse().ok()), parts.get(1).and_then(|y| y.parse().ok())) {
+            (Some(x), Some(y)) => {
+                *pointer = viewport::VirtualPointer { position: Some(Vec2::new(x, y)), release: true };
+                if parts.get(2) == Some(&"shift") {
+                    keys.press(KeyCode::ShiftLeft);
+                }
+                mouse.press(MouseButton::Left);
+            }
+            _ => editor.status = "click takes x,y or x,y,shift".into(),
+        }
+    }
     if !c.mode.is_empty() {
         let mode = std::mem::take(&mut c.mode);
         editor.set_mesh_mode(mode == "mesh");

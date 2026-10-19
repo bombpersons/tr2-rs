@@ -10,7 +10,7 @@ use crate::{
     Editor,
     gizmo::{self, OnTop},
     toolbar::Tool,
-    viewport::{ViewportFocus, file_offset, world},
+    viewport::{ViewportFocus, VirtualPointer, file_offset, world},
 };
 use bevy::prelude::*;
 use bevy_egui::{egui, input::EguiWantsInput};
@@ -482,6 +482,7 @@ fn pick(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
+    pointer: Res<VirtualPointer>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
 ) {
     if !editor.mesh.on {
@@ -497,7 +498,7 @@ fn pick(
     if editor.mesh.stroke.is_some() && !mouse.pressed(MouseButton::Left) {
         editor.end_stroke();
     }
-    let cursor = windows.single().ok().and_then(Window::cursor_position);
+    let cursor = crate::viewport::cursor(&windows, &pointer);
     let (Ok((camera, eye)), Some(cursor)) = (cameras.single(), cursor) else { return };
     let blocked = egui.wants_any_pointer_input() || handles.busy() || editor.leaving.is_some();
     let painting = editor.tool == Tool::Paint;

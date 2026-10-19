@@ -15,6 +15,21 @@ use engine::{
 };
 use serde_json::Value;
 
+/// A pointer that automation places, for clicks in the 3D view without a
+/// real mouse (the headless smoke test has no window). It goes through the
+/// same systems as the window's cursor.
+#[derive(Resource, Default)]
+pub struct VirtualPointer {
+    pub position: Option<Vec2>,
+    /// Release the button and modifiers on the next frame.
+    pub release: bool,
+}
+
+/// Where the pointer is in the 3D view: the automation pointer, else the window's cursor.
+pub fn cursor(windows: &Query<&Window>, pointer: &VirtualPointer) -> Option<Vec2> {
+    pointer.position.or_else(|| windows.single().ok().and_then(Window::cursor_position))
+}
+
 /// The viewport owns keyboard flight after a click in it, until a click on a window.
 #[derive(Resource)]
 pub(super) struct ViewportFocus {
@@ -30,6 +45,7 @@ pub struct ViewportPlugin;
 impl Plugin for ViewportPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ViewportFocus>()
+            .init_resource::<VirtualPointer>()
             .init_resource::<EguiWantsInput>()
             .add_systems(
                 Update,
@@ -39,10 +55,12 @@ impl Plugin for ViewportPlugin {
                 PostUpdate,
                 (
                     place.before(bevy::transform::TransformSystems::Propagate),
+                    // Ray casts skip meshes not visible in a view, and Bevy
+                    // clears that flag until CheckVisibility sets it again.
                     (select, highlight)
                         .chain()
                         .after(gizmo::interact)
-                        .after(bevy::transform::TransformSystems::Propagate),
+                        .after(bevy::camera::visibility::VisibilitySystems::CheckVisibility),
                 ),
             );
     }
@@ -106,6 +124,7 @@ pub(super) fn select(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
+    pointer: Res<VirtualPointer>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     mut ray_cast: MeshRayCast,
     hierarchy: Hierarchy,
@@ -117,7 +136,7 @@ pub(super) fn select(
     if !focus.active || handles.busy() || editor.leaving.is_some() || !mouse.just_pressed(MouseButton::Left) {
         return;
     }
-    let Some(cursor) = windows.single().ok().and_then(Window::cursor_position) else { return };
+    let Some(cursor) = cursor(&windows, &pointer) else { return };
     let Ok((camera, transform)) = cameras.single() else { return };
     let Ok(ray) = camera.viewport_to_world(transform, cursor) else { return };
     let objects = |entity| owner(entity, &hierarchy).0.is_some();
@@ -318,6 +337,7 @@ mod tests {
             .init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<ViewportFocus>()
             .init_resource::<gizmo::Handles>()
+            .init_resource::<VirtualPointer>()
             .insert_resource(crate::sandbox());
         let mut window = Window { resolution: (1280, 800).into(), ..default() };
         window.set_cursor_position(Some(Vec2::new(640.0, 400.0)));

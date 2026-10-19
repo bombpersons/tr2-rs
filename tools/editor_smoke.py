@@ -189,6 +189,38 @@ def mesh_smoke(client, copy, level, captures):
     return {'room': index, 'raised_face': quad, 'sector': [x, z], 'pushed_wall': pushed}
 
 
+def click(client, at, before):
+    """Click and wait for the selection to change (or a few seconds, when the
+    click should change nothing): large levels draw slowly in software."""
+    client.edit('Editor', 'EditorCommand', {'click': at})
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        state = status(client)
+        if state['selection'] != before:
+            return state
+        time.sleep(0.1)
+    return state
+
+
+def click_smoke(client, level, preferred):
+    """Click a framed object at the centre of the 3D view through the same
+    systems as the mouse; with the Select tool, Shift-click toggles it off."""
+    candidates = [i for i in [preferred, 1, 0] + list(range(len(level['placements']))) if i is not None]
+    for index in dict.fromkeys(candidates[:12]):
+        command(client, select=str(index), frame=True)
+        time.sleep(0.5)
+        command(client, select='none')
+        state = click(client, '640,400', [])
+        if state['selection'] == [index]:
+            # The Move tool's arrows now cover the centre; Select has no handles.
+            command(client, tool='select')
+            state = click(client, '640,400,shift', [index])
+            assert state['selection'] == [], state
+            command(client, tool='move')
+            return index
+    raise AssertionError('clicking a framed object never selected it')
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -261,6 +293,7 @@ def main():
         assert state['selection'] == [0, 1], state
         captures.append(client.capture('multi-select'))
         command(client, select='none')
+        clicked = click_smoke(client, json.loads(original), args.pose_placement)
         if source.parent.name == 'sandbox':
             command(client, select='1', frame=True)
             client.edit('Editor', 'AnimationPreview', {'active':True, 'isolate':True, 'placement':1, 'clip':0, 'frame':0.0, 'goal':1, 'playing':False})
@@ -336,7 +369,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'rooms': rooms, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

@@ -7,7 +7,7 @@ use crate::{
     Editor,
     edit::TURN,
     toolbar::Tool,
-    viewport::{ViewportFocus, file_offset, placement_position, world},
+    viewport::{ViewportFocus, VirtualPointer, cursor, file_offset, placement_position, world},
 };
 use bevy::prelude::*;
 use bevy_egui::input::EguiWantsInput;
@@ -139,10 +139,11 @@ pub fn interact(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
+    pointer: Res<VirtualPointer>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     level: Option<Res<WorldGeometry>>,
 ) {
-    let cursor = windows.single().ok().and_then(Window::cursor_position);
+    let cursor = cursor(&windows, &pointer);
     let (Ok((camera, eye)), Some(cursor)) = (cameras.single(), cursor) else {
         handles.hovered = None;
         return;
