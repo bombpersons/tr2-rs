@@ -379,6 +379,14 @@
    "pickup": {
     "message": "Item collected"
    }
+  },
+  {
+   "id": 260,
+   "name": "winston",
+   "attendant": {
+    "follow_distance": 1536,
+    "max_turn": 182
+   }
   }
  ]
 }
