@@ -12,6 +12,20 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'roll_runway': ('home_runway_start', 220, [event(['CIRCLE'], 2)]),
+    'roll_step_up': ('backward_step_down_start', 220, [event(['CIRCLE'], 2)]),
+    'roll_step_down': ('backward_rolled_start', 220, [event(['CIRCLE'], 2)]),
+    'roll_wall': ('vertical_open_start', 220, [event(['CIRCLE'], 2)]),
+    'roll_runway_delay_heldout': ('home_runway_start', 240, [event(['CIRCLE'], 16, 14),
+                                                         event(['RIGHT'], 38, 22)]),
+    'roll_wall_hold_heldout': ('vertical_open_start', 280, [event(['CIRCLE'], 100)]),
+    'roll_recovery_walk_heldout': ('backward_rolled_start', 260, [event(['CIRCLE'], 14, 12),
+                                                             event(['UP', 'R1'], 126, 62)]),
+    'roll_ledge_heldout': ('forward_ledge_start', 240, [event(['CIRCLE'], 2)]),
+    'roll_ledge_fall_heldout': ('roll_ledge_start', 280, [event(['CIRCLE'], 2)]),
+    'roll_during_walk_heldout': ('home_start', 240, [event(['UP', 'R1'], 40),
+                                                 event(['UP', 'R1', 'CIRCLE'], 64, 40),
+                                                 event(['UP', 'R1'], 120, 64)]),
     'walk_wall': ('vertical_wall_start', 180, [event(['UP', 'R1'], 100)]),
     'walk_ledge': ('forward_ledge_start', 280, [event(['UP', 'R1'], 220)]),
     'walk_step_up': ('home_start', 420, [event(['UP', 'R1'], 360)]),
@@ -104,8 +118,16 @@ def main():
     parser.add_argument('--prepare-vertical-wall', action='store_true')
     parser.add_argument('--prepare-vertical-open', action='store_true')
     parser.add_argument('--prepare-walk-step', action='store_true')
+    parser.add_argument('--prepare-roll-ledge', action='store_true')
     parser.add_argument('--summarize-only', action='store_true')
     args = parser.parse_args()
+    if args.prepare_roll_ledge:
+        subprocess.run(['psx', 'run', '--from-state', '.psx/forward_ledge_start/state.bin',
+                        '--frames', '160', '--input', json.dumps([event(['UP', 'R1'], 60)]),
+                        '--save-state', '--out', '.psx/roll_ledge_start', '--summary'],
+                       cwd=ROOT, check=True)
+        if args.case is None:
+            return
     if args.prepare_walk_step:
         subprocess.run(['psx', 'run', '--from-state', '.psx/backward_step_down_start/state.bin',
                         '--frames', '90', '--input', json.dumps([event(['CIRCLE'], 2)]),
@@ -169,7 +191,8 @@ def main():
         'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout',
                                             'forward_ledge_release_heldout', 'forward_ledge_walk_heldout',
                                             'braking_wall_validation_heldout', 'walk_wall', 'walk_ledge',
-                                            'walk_step_up', 'walk_step_down'),
+                                            'walk_step_up', 'walk_step_down', 'roll_runway', 'roll_step_up',
+                                            'roll_step_down', 'roll_wall'),
         'diagnostic_only': args.case == 'vertical_steer_backward',
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
@@ -212,6 +235,13 @@ def main():
             'source': source,
             'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
             'frames': 90, 'input': [event(['CIRCLE'], 2)], 'output': checkpoint, 'pokes': [],
+        }
+    if start == 'roll_ledge_start':
+        source = '.psx/forward_ledge_start/state.bin'
+        metadata['checkpoint_preparation'] = {
+            'source': source,
+            'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
+            'frames': 160, 'input': [event(['UP', 'R1'], 60)], 'output': checkpoint, 'pokes': [],
         }
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))

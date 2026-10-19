@@ -72,6 +72,12 @@ it off. Record partial progress below without checking the parent item.
 
 ## Completed traversal milestones
 
+- [x] Ordinary authored rolling: entry offset, turn effect, deceleration,
+  wall/step correction, held repetition, recovery walk and a second-half
+  backward departure/landing. Ten complete PSX routes include six independent
+  recordings. [Evidence](docs/rolling-evidence.md), [tests](game/tests/airborne.rs).
+  Corner/static/ceiling/slope and other launch/departure cases remain.
+
 - [x] Ordinary vertical/forward ledge jump, reach, grab, hang, pull-up and
   drop; independent early-climb, early-drop and missing-Action validation.
   [Evidence](docs/traversal-evidence.md), [tests](game/tests/traversal.rs).
@@ -240,6 +246,12 @@ it off. Record partial progress below without checking the parent item.
   original. Workspace tests (238 passed), Clippy, builds,100 full-game MCP
   poses, sandbox movement/rendering and editor saves/clip60 preview pass.
   No engine format or template change. [Evidence](docs/forward-walk-evidence.md).
-- Next: authored rolling, dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
+- 2026-10-19: Authored rolling: removed the provisional timer/manual turn.
+  Ten complete PSX routes compare1220 sampled ticks across thirteen columns,
+  including six fresh independent recordings. Workspace tests (248 passed),
+  Clippy, builds,119 full-game MCP poses, sandbox movement/rendering and editor
+  saves/146-to147 preview pass. No engine format or template change.
+  [Evidence](docs/rolling-evidence.md).
+- Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

@@ -63,3 +63,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Home sky](sky-evidence.md): model/pose independently verified against runtime RAM, rotation-only draw and shade134 from PSX code,72 projected corners including a fresh independent camera view; standalone rendering and translation invariance.
 
 - [Forward walking room collision](forward-walk-evidence.md): blocked starts, ledge refusal, both ascending/descending feet and collision standing override;1309 sampled ticks including five independent complete routes.
+
+- [Authored rolling](rolling-evidence.md): entry offset, turn effect, authored speed and recovery, wall/step correction, held repetition and second-half backward departure;1220 sampled ticks including six independent routes.
