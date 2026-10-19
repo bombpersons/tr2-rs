@@ -62,6 +62,8 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   room's water and wind flags and ambient shade are editable, and its
   portals ("-> 4" a doorway, "v 77" a hole in the floor, "^ 13" an opening
   in the ceiling), flip partner and objects are buttons that jump to them.
+  The **x** beside a portal disconnects that room: every doorway and hole
+  between the two closes (see "Joining rooms").
 - **Map** (View > Map) draws the rooms from above: open sectors filled (blue
   for water rooms), the current room outlined in yellow and the rooms its
   portals open into in cyan, its doorways as green lines and its floor and
@@ -241,6 +243,37 @@ its lowest floor and its vertices as small crosses.
   reverse the winding and so the side a face is drawn from, so it is not
   offered.
 
+### Joining rooms
+
+Rooms join the way imported levels join them (WALL rooms 0 and 4 for a
+doorway, 0 and 77 for a hole), and the Diagnostics window should show no new
+problems afterwards.
+
+- **Connect** (toolbar, mesh mode) opens a doorway through each selected wall
+  face into the room beyond. The rooms' grids must overlap by two sectors, so
+  each room's solid border lies over the other's open floor: that border
+  sector becomes the doorway, naming the other room in its floor data and
+  taking the heights of the floor under it, so collision walks across. Each
+  room keeps wall in the shared plane only where its own space reaches past
+  the opening (above it, or a riser up to a higher floor beyond), and a
+  mirrored pair of render portals covers the opening, widened as more of the
+  same wall opens. Connect refuses a wall with no overlapping room beyond, or
+  where the two rooms' spaces do not meet.
+- **Open hole** opens each selected floor face into the room below, whose
+  ceiling there must be at exactly the floor's height: the floor face and the
+  ceiling face below go, the sectors link `below` and `above`, and a mirrored
+  pair of horizontal portals covers the hole.
+- **Disconnect** (the **x** in the Rooms window) reverses both: doorway
+  sectors become solid border again with full walls, holes get their floor
+  and ceiling faces back, and the portals between the two rooms go. On WALL,
+  disconnecting rooms and opening them again through the closing faces leaves
+  no new diagnostics problems (the smoke test does this for rooms 0 and 3,
+  and for the 90-sector hole between rooms 6 and 13).
+
+The operations are `engine::editor::{connect_faces, open_holes,
+disconnect}`. Creating rooms, and splitting or merging them, are next
+(docs/editor-design.md).
+
 Each edit re-derives every sector whose floor or ceiling face it touched,
 and refuses (with the reason in the status bar, leaving the document as it
 was) anything the grid cannot express: a floor that is not flat or evenly
@@ -346,7 +379,8 @@ goes through the same systems as the mouse, so this runs headless), the
 Rooms and Map windows with the current room's outline, carrying an object
 through a doorway into the next room (on levels with several rooms) and
 undoing it, Diagnostics reporting a deleted return portal as new and Fix all
-new restoring it, mesh mode (raise a floor, a refused unsnapped
+new restoring it, disconnecting a doorway and a hole and opening them again
+with Connect and Open hole (on levels that have them), mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

@@ -824,5 +824,8 @@ pub fn sector_mismatches(level: &Level, room: usize) -> Vec<String> {
     out
 }
 
+mod connect;
+pub use connect::*;
+
 #[cfg(test)]
 mod tests;

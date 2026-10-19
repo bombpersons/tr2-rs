@@ -274,3 +274,163 @@ fn rotating_a_texture_cycles_corners_and_keeps_the_sector() {
     assert_eq!(level.rooms[0].quads[quad], before, "four quarter turns are a whole turn");
     consistent(&level);
 }
+
+/// Two `box_level(4, 3)` rooms along x overlapping by two sectors, as
+/// imported neighbours do: each one's border lies over the other's floor.
+fn neighbours() -> Level {
+    let mut level = box_level(4, 3);
+    let mut b = level.rooms[0].clone();
+    b.origin[0] = 2 * SECTOR;
+    level.rooms.push(b);
+    level
+}
+
+/// A's wall between its open sector (2, 1) and its border (3, 1).
+fn shared_wall(level: &Level) -> usize {
+    let r = &level.rooms[0];
+    (0..r.quads.len())
+        .find(|&i| wall_face(r, &r.quads[i][..4]).is_some_and(|w| (w.axis, w.at, w.along) == (0, 3 * SECTOR, 1)))
+        .unwrap()
+}
+
+fn faces_in_plane(room: &Room, x: i32) -> Vec<Vec<[i32; 3]>> {
+    let quads = room.quads.iter().map(|q| q[..4].to_vec());
+    let triangles = room.triangles.iter().map(|t| t[..3].to_vec());
+    quads
+        .chain(triangles)
+        .map(|c| c.iter().map(|&v| point(room, v)).collect::<Vec<_>>())
+        .filter(|p| p.iter().all(|p| p[0] == x) && p.iter().all(|p| (SECTOR..=2 * SECTOR).contains(&p[2])))
+        .collect()
+}
+
+/// Problems with how rooms join (the test rooms have no navigation boxes).
+fn link_problems(level: &Level) -> Vec<String> {
+    crate::editor::diagnose(level, None)
+        .into_iter()
+        .filter(|p| !matches!(p.check, crate::editor::Check::NavBoxMissing))
+        .map(|p| p.detail)
+        .collect()
+}
+
+/// The room collision finds at a level-file position, walking from `room`.
+fn room_at(level: &Level, room: usize, p: [i32; 3]) -> Option<usize> {
+    WorldGeometry::new(level.clone()).floor_at(position(p), room).map(|h| h.room)
+}
+
+#[test]
+fn connecting_overlapping_rooms_opens_a_doorway_both_ways_and_disconnecting_closes_it() {
+    let mut level = neighbours();
+    let before = level.clone();
+    // Collision cannot cross yet: A's border is solid.
+    let doorway = [3584, -512, 1536];
+    assert_eq!(room_at(&level, 0, doorway), None);
+    let wall = shared_wall(&level);
+    assert_eq!(connect(&mut level, 0, wall), Ok(1));
+    let a = &level.rooms[0];
+    assert_eq!(level.floor_info(&a.sectors[3 * 3 + 1]).portal, Some(1));
+    assert_eq!((a.sectors[3 * 3 + 1].floor, a.sectors[3 * 3 + 1].ceiling), (0, -2048));
+    assert_eq!(level.floor_info(&level.rooms[1].sectors[1]).portal, Some(0));
+    assert!(faces_in_plane(a, 3 * SECTOR).is_empty(), "equal rooms need no wall in the opening");
+    assert!(faces_in_plane(&level.rooms[1], SECTOR).is_empty());
+    assert_eq!(level.rooms[0].portals.len(), 1);
+    assert_eq!(level.rooms[0].portals[0].normal, [-1, 0, 0]);
+    assert_eq!(level.rooms[1].portals[0].normal, [1, 0, 0]);
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+    // Collision walks through the doorway, and back.
+    assert_eq!(room_at(&level, 0, doorway), Some(1));
+    assert_eq!(room_at(&level, 1, [2560, -512, 1536]), Some(0));
+    for room in 0..2 {
+        assert!(sector_mismatches(&level, room).is_empty());
+        assert!(wall_mismatches(&level, room).is_empty());
+    }
+    crate::editor::validate_level(&level).unwrap();
+    assert!(connect(&mut level, 0, 0).is_err(), "a floor is not a wall");
+    // Disconnecting puts the wall and the solid border back.
+    disconnect(&mut level, 0, 1).unwrap();
+    assert!(level.rooms.iter().all(|r| r.portals.is_empty()));
+    assert_eq!(level.rooms[0].sectors[3 * 3 + 1].floor, SOLID);
+    assert_eq!(level.floor_info(&level.rooms[0].sectors[3 * 3 + 1]).portal, None);
+    assert_eq!(faces_in_plane(&level.rooms[0], 3 * SECTOR).len(), 1);
+    assert_eq!(faces_in_plane(&level.rooms[0], 3 * SECTOR), faces_in_plane(&before.rooms[0], 3 * SECTOR));
+    assert_eq!(room_at(&level, 0, doorway), None);
+    assert!(disconnect(&mut level, 0, 1).is_err(), "nothing left to disconnect");
+}
+
+#[test]
+fn a_doorway_onto_a_higher_floor_keeps_a_riser_on_the_lower_side() {
+    let mut level = neighbours();
+    // Raise B's floor under A's border by one step.
+    let r = &level.rooms[1];
+    let floor = (0..r.quads.len())
+        .find(|&i| sector_face(r, &r.quads[i]).is_some_and(|f| (f.x, f.z, f.surface) == (1, 1, Surface::Floor)))
+        .unwrap();
+    extrude(&mut level, 1, &[floor], -STEP).unwrap();
+    let wall = shared_wall(&level);
+    assert_eq!(connect(&mut level, 0, wall), Ok(1));
+    let riser = faces_in_plane(&level.rooms[0], 3 * SECTOR);
+    assert_eq!(riser.len(), 1);
+    let ys: BTreeSet<_> = riser[0].iter().map(|p| p[1]).collect();
+    assert_eq!(ys, BTreeSet::from([-STEP, 0]), "A sees a riser up to B's floor");
+    assert!(faces_in_plane(&level.rooms[1], SECTOR).is_empty(), "B looks down into A without one");
+    assert_eq!(level.rooms[0].sectors[3 * 3 + 1].floor, -STEP, "the doorway sector takes B's floor");
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+    disconnect(&mut level, 1, 0).unwrap();
+    assert!(link_problems(&level).is_empty());
+}
+
+#[test]
+fn a_hole_opens_a_floor_into_the_room_below_and_closing_it_restores_both_faces() {
+    let mut level = box_level(3, 3);
+    let mut below = level.rooms[0].clone();
+    for v in &mut below.vertices {
+        v[1] += 2048;
+    }
+    for s in below.sectors.iter_mut().filter(|s| s.floor != SOLID) {
+        (s.floor, s.ceiling) = (s.floor + 2048, s.ceiling + 2048);
+    }
+    (below.top, below.bottom) = (0, 2048);
+    level.rooms.push(below);
+    let before = level.clone();
+    let floor = face_at(&level, 1, 1, Surface::Floor);
+    assert_eq!(open_hole(&mut level, 0, floor), Ok(1));
+    assert_eq!((sector(&level, 1, 1).below, level.rooms[1].sectors[4].above), (Some(1), Some(0)));
+    assert!(!sector_faces(&level.rooms[0]).contains_key(&(1, 1, Surface::Floor)));
+    assert!(!sector_faces(&level.rooms[1]).contains_key(&(1, 1, Surface::Ceiling)));
+    assert_eq!((level.rooms[0].portals[0].normal, level.rooms[1].portals[0].normal), ([0, -1, 0], [0, 1, 0]));
+    assert_eq!(level.rooms[1].portals[0].vertices[0][1], -1, "the lower side sits one unit short");
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+    assert_eq!(room_at(&level, 0, [1536, 512, 1536]), Some(1));
+    assert!(open_hole(&mut level, 0, floor).is_err(), "the face is gone");
+    disconnect(&mut level, 0, 1).unwrap();
+    for room in 0..2 {
+        assert!(sector_mismatches(&level, room).is_empty());
+        assert_eq!(sector_faces(&level.rooms[room]).len(), sector_faces(&before.rooms[room]).len());
+    }
+    assert_eq!(sector(&level, 1, 1).below, None);
+    assert!(level.rooms.iter().all(|r| r.portals.is_empty()));
+    // A floor over nothing at its height has no room to open into.
+    let mut alone = box_level(3, 3);
+    let floor = face_at(&alone, 1, 1, Surface::Floor);
+    assert!(open_hole(&mut alone, 0, floor).unwrap_err().contains("no room below"));
+}
+
+#[test]
+fn several_faces_join_in_one_edit_even_as_faces_come_and_go() {
+    let mut level = box_level(4, 4);
+    let mut b = level.rooms[0].clone();
+    b.origin[0] = 2 * SECTOR;
+    level.rooms.push(b);
+    let r = &level.rooms[0];
+    let walls: Vec<usize> = (0..r.quads.len())
+        .filter(|&i| wall_face(r, &r.quads[i][..4]).is_some_and(|w| (w.axis, w.at) == (0, 3 * SECTOR)))
+        .collect();
+    assert_eq!(walls.len(), 2);
+    assert_eq!(connect_faces(&mut level, 0, &walls), Ok(BTreeSet::from([1])));
+    let doorways = level.rooms[0].sectors.iter().filter(|s| level.floor_info(s).portal == Some(1)).count();
+    assert_eq!(doorways, 2);
+    assert_eq!(level.rooms[0].portals.len(), 1, "one portal spans the whole opening");
+    let v = &level.rooms[0].portals[0].vertices;
+    let zs: BTreeSet<_> = v.iter().map(|p| p[2]).collect();
+    assert_eq!(zs, BTreeSet::from([SECTOR, 3 * SECTOR]));
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+}

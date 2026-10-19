@@ -260,6 +260,95 @@ def diagnostics_smoke(client, level, captures):
     return {'new': before, 'total': state['problems'], 'fixed': {'room': room, 'portal': portal, 'into': target}}
 
 
+def single_doorway(level):
+    """Two rooms joined by exactly one doorway sector each way and nothing else."""
+    infos = level['floor_infos']
+    def links(a, b):
+        r = level['rooms'][a]
+        side = [s for s in r['sectors'] if s.get('floor_info') is not None and infos[s['floor_info']].get('portal') == b]
+        vertical = [s for s in r['sectors'] if b in (s.get('below'), s.get('above'))]
+        return len(side), len(vertical)
+    for a, room in enumerate(level['rooms']):
+        for b in sorted({p['room'] for p in room['portals']}):
+            if links(a, b) == (1, 0) and links(b, a) == (1, 0):
+                return a, b
+    return None
+
+
+def connect_smoke(client, level, captures):
+    """Disconnect two rooms, then reopen the doorway by selecting the wall
+    that closed it and pressing Connect; the result has no new problems."""
+    pair = single_doorway(level)
+    if pair is None:
+        return None
+    a, b = pair
+    state = command(client, mode='object')
+    before = state['problems_new']
+    state = settled(client, state, disconnect=f'{a},{b}')
+    assert state['message'].startswith('Disconnected'), state
+    # The closing wall is the newest face of room a (one face out, one in).
+    wall = len(level['rooms'][a]['quads']) - 1
+    state = command(client, mode='mesh', mesh_room=a)
+    state = command(client, mesh_select=f'q{wall}', frame=True)
+    state = settled(client, state, mesh_connect=True)
+    assert state['message'].startswith(f'Opened a doorway into room {b}'), state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before, state
+    time.sleep(1)
+    captures.append(client.capture('connected'))
+    state = settled(client, state, undo=True)
+    state = settled(client, state, undo=True)
+    assert not state['dirty'], state
+    command(client, mode='object')
+    return {'rooms': [a, b]}
+
+
+def hole_pair(level):
+    """A room whose floor opens into a room below, with no doorway between them."""
+    infos = level['floor_infos']
+    for a, room in enumerate(level['rooms']):
+        for b in sorted({s['below'] for s in room['sectors'] if s.get('below') is not None}):
+            other = level['rooms'][b]
+            side = any(s.get('floor_info') is not None and infos[s['floor_info']].get('portal') in (a, b)
+                       for r, s in [(a, s) for s in other['sectors']] + [(b, s) for s in room['sectors']])
+            upward = any(s.get('above') == b for s in room['sectors']) or any(s.get('below') == a for s in other['sectors'])
+            if not side and not upward:
+                return a, b, sum(1 for s in room['sectors'] if s.get('below') == b)
+    return None
+
+
+def hole_smoke(client, level, captures):
+    """Close a hole by disconnecting, then reopen it by selecting the floors
+    that closed it and pressing Open hole."""
+    found = hole_pair(level)
+    if found is None:
+        return None
+    a, b, count = found
+    state = command(client, mode='object')
+    before = state['problems_new']
+    state = settled(client, state, disconnect=f'{a},{b}')
+    assert state['message'].startswith('Disconnected'), state
+    n = len(level['rooms'][a]['quads'])
+    floors = ','.join(f'q{i}' for i in range(n, n + count))
+    state = command(client, mode='mesh', mesh_room=a)
+    state = command(client, mesh_select=floors)
+    state = settled(client, state, mesh_hole=True)
+    assert state['message'].startswith(f'Opened the floor into room {b}'), state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before, state
+    state = settled(client, state, undo=True)
+    state = settled(client, state, undo=True)
+    assert not state['dirty'], state
+    command(client, mode='object')
+    return {'rooms': [a, b], 'cells': count}
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -390,6 +479,8 @@ def main():
         captures.append(client.capture('edited'))
         rooms = rooms_smoke(client, saved, captures)
         diagnostics = diagnostics_smoke(client, saved, captures)
+        connected = connect_smoke(client, saved, captures)
+        holes = hole_smoke(client, saved, captures)
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -409,7 +500,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

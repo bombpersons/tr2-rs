@@ -226,6 +226,40 @@ impl Editor {
         }
     }
 
+    /// Open a doorway through each selected wall face into the room beyond.
+    pub fn mesh_connect(&mut self) {
+        let quads = self.selected_quads();
+        let joined = self.mesh_edit("Connected", |level, room| {
+            if quads.is_empty() {
+                return Err("Select wall faces to open into the room beyond".into());
+            }
+            authoring::connect_faces(level, room, &quads)
+        });
+        if let Some(rooms) = joined {
+            self.mesh_clear();
+            self.status = format!("Opened a doorway into room {} - Ctrl+Z to undo", join(&rooms));
+        }
+    }
+
+    /// Open a hole through each selected floor face into the room below.
+    pub fn mesh_open_hole(&mut self) {
+        let quads = self.selected_quads();
+        let joined = self.mesh_edit("Opened", |level, room| {
+            if quads.is_empty() {
+                return Err("Select floor faces over the room below".into());
+            }
+            authoring::open_holes(level, room, &quads)
+        });
+        if let Some(rooms) = joined {
+            self.mesh_clear();
+            self.status = format!("Opened the floor into room {} - Ctrl+Z to undo", join(&rooms));
+        }
+    }
+
+    fn selected_quads(&self) -> Vec<usize> {
+        self.mesh.faces.iter().filter_map(|f| if let Face::Quad(i) = f { Some(*i) } else { None }).collect()
+    }
+
     /// Paint `faces` (or the selection) with the brush texture.
     pub fn mesh_paint(&mut self, faces: Option<Vec<Face>>) {
         let Some(texture) = self.mesh.brush else {
@@ -320,6 +354,10 @@ impl Editor {
         let vertices = self.mesh.vertices.iter().map(|&v| Element::Vertex(v));
         faces.chain(vertices).map(Element::name).collect::<Vec<_>>().join(",")
     }
+}
+
+fn join(rooms: &BTreeSet<usize>) -> String {
+    rooms.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(", ")
 }
 
 /// The selection, detached from the editor for use inside an edit.

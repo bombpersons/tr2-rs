@@ -88,7 +88,9 @@ One strip under the menu bar, in four groups:
    key and menu item, and is greyed out with a reason when it does not apply:
    - Objects: Frame, Select all.
    - Mesh: Raise (+), Lower (-), Push wall (P), Fill, Turn texture (R).
-   - Rooms: New room, Connect, Open hole, Split, Merge, Fix all (planned).
+   - Mesh also has Connect and Open hole, since they start from selected
+     faces; Disconnect is in the Rooms window.
+   - Rooms: New room, Split, Merge (planned).
 4. **Settings**: Snap in object mode (Ctrl inverts while dragging); in mesh
    mode the edited room with Frame room, and the brush swatch.
 
@@ -152,7 +154,7 @@ window, the map and clicking faces in mesh mode all choose the same room.
   inherited. Fixes: the mirror of a one-sided portal (all 7,478 two-sided
   imported pairs but 6 follow the mirror rule) and an object's room.
 
-### Editing across rooms
+### Editing across rooms (Connect, Open hole and Disconnect built)
 
 - **New room:** drag a rectangle on the map, choose floor and ceiling. The
   grid gets its solid ring and floor, ceiling and wall faces.
@@ -163,6 +165,8 @@ window, the map and clicking faces in mesh mode all choose the same room.
 - **Open hole / stack room:** select floor faces over another room (or over
   nothing, creating a room below). Set `below` / `above`, make the heights
   agree, add the vertical portal.
+  (Built for a room already below at the floor's height; creating the
+  room below belongs with New room.)
 - **Split room** along a sector line, or at a height. A height split is how
   an overhang or bridge is made without thinking about rooms.
 - **Merge** two adjacent compatible rooms.
@@ -212,6 +216,7 @@ nothing in the game.
 1. Toolbar and Paint tool. (Done.)
 2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics. (Done.)
-4. Connect / open hole, then split and merge, then new room.
+4. Connect / open hole (done, with Disconnect), then split and merge, then
+   new room.
 5. Navigation box rebuild.
 6. Lights and baking.

@@ -135,6 +135,12 @@ struct EditorCommand {
     mesh_extrude: i32,
     /// Push the selected wall faces out by a sector.
     mesh_push: bool,
+    /// Open doorways through the selected wall faces.
+    mesh_connect: bool,
+    /// Open holes through the selected floor faces.
+    mesh_hole: bool,
+    /// Close every doorway and hole between rooms "a,b".
+    disconnect: String,
     /// Paint the selected faces with this texture-table entry.
     mesh_paint: i64,
     /// Turn the selected faces' textures a quarter turn.
@@ -383,6 +389,21 @@ fn automation(
     if c.mesh_push {
         c.mesh_push = false;
         editor.mesh_push();
+    }
+    if c.mesh_connect {
+        c.mesh_connect = false;
+        editor.mesh_connect();
+    }
+    if c.mesh_hole {
+        c.mesh_hole = false;
+        editor.mesh_open_hole();
+    }
+    if !c.disconnect.is_empty() {
+        let text = std::mem::take(&mut c.disconnect);
+        match text.split(',').map(|n| n.trim().parse::<usize>()).collect::<Result<Vec<_>, _>>().as_deref() {
+            Ok(&[a, b]) => editor.disconnect(a, b),
+            _ => editor.status = "disconnect takes a,b".into(),
+        }
     }
     if !c.tool.is_empty() {
         let text = std::mem::take(&mut c.tool);

@@ -51,6 +51,13 @@ impl Editor {
         self.status = format!("Room {room}");
     }
 
+    /// Close every doorway and hole between rooms `a` and `b`.
+    pub fn disconnect(&mut self, a: usize, b: usize) {
+        if self.level_edit("Disconnected", |level| engine::editor::disconnect(level, a, b)).is_some() {
+            self.status = format!("Disconnected rooms {a} and {b} - Ctrl+Z to undo");
+        }
+    }
+
     /// Frame the current room in the 3D view.
     pub fn frame_room(&mut self) {
         self.frame = true;
@@ -196,6 +203,13 @@ fn details(ui: &mut egui::Ui, editor: &mut Editor, level: &Level, index: usize, 
             };
             if ui.button(format!("{} {room}", link_arrow(link))).on_hover_text(hint).clicked() {
                 editor.select_room(room);
+            }
+            if ui
+                .small_button("x")
+                .on_hover_text(format!("Disconnect room {room}: close every doorway and hole between the two rooms"))
+                .clicked()
+            {
+                editor.disconnect(index, room);
             }
         }
     });

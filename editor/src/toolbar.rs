@@ -221,6 +221,25 @@ fn mesh_actions(ui: &mut egui::Ui, editor: &mut Editor) {
     if action(ui, "Turn texture", "R", "Turn the selected faces' textures a quarter turn", faces) {
         editor.mesh_rotate_texture();
     }
+    ui.separator();
+    if action(
+        ui,
+        "Connect",
+        "",
+        "Open a doorway through the selected wall faces into the room beyond (its grid must overlap this one by two sectors)",
+        faces,
+    ) {
+        editor.mesh_connect();
+    }
+    if action(
+        ui,
+        "Open hole",
+        "",
+        "Open the selected floor faces into the room below, whose ceiling must be at the same height",
+        faces,
+    ) {
+        editor.mesh_open_hole();
+    }
 }
 
 fn mesh_settings(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, atlas: Option<egui::TextureId>) {
