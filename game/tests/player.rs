@@ -139,15 +139,43 @@ fn airborne_feet_can_clear_a_step_that_blocks_ground_movement() {
 }
 
 #[test]
-fn swim_uses_square_for_propulsion_and_up_for_pitch() {
+fn swim_uses_square_for_propulsion_and_up_for_downward_pitch() {
     let (mut app, entity) = app();
-    app.insert_resource(room(0, true));
-    app.world_mut().get_mut::<Player>(entity).unwrap().position = Vec3::new(1.5, 1.0, 1.0);
+    // Hand-authored two-state graph keeps this non-disc regression on the
+    // same authored-dispatch boundary as the measured submerged controller.
+    use engine::world::{Animation, format::StateChange};
+    use game::player::PlayerAnimations;
+    let mut data = (*room(0, true).data).clone();
+    data.animations = vec![
+        Animation {
+            state: 13,
+            frame_rate: 1,
+            frame_end: 100,
+            state_changes: vec![StateChange { state: 17, first_frame: 0, last_frame: 101, animation: 1, frame: 101 }],
+            ..default()
+        },
+        Animation {
+            state: 17,
+            frame_rate: 1,
+            frame_start: 101,
+            frame_end: 201,
+            next_animation: 1,
+            next_frame: 101,
+            ..default()
+        },
+    ];
+    app.insert_resource(PlayerAnimations::from(&data)).insert_resource(WorldGeometry::new(data));
+    {
+        let mut p = app.world_mut().get_mut::<Player>(entity).unwrap();
+        p.position = Vec3::new(1.5, 1.0, 1.0);
+        p.mode = PlayerMode::Swimming;
+    }
+    app.world_mut().get_mut::<game::player::Traversal>(entity).unwrap().goal = 13;
     app.run_tick(&[]);
     assert_eq!(player(&app, entity).mode, PlayerMode::Swimming);
     app.run_ticks(8, &[Button::Square, Button::Up]);
     assert!(player(&app, entity).position.z > 1.0);
-    assert!(player(&app, entity).position.y > 1.0);
+    assert!(player(&app, entity).position.y < 1.0);
     assert!(app.world().get::<Motion>(entity).unwrap().oxygen_seconds < 60.0);
 }
 

@@ -247,3 +247,9 @@ Navigation corridor queries read the existing `boxes` and `overlaps` fields.
 Box maxima are exclusive sector boundaries, matching the existing camera
 math. The authoring view and byte-exact save contract retain all navigation
 data; game-specific path decisions are not simulated in the editor.
+
+Submerged motion uses Lara's existing authored starts, strokes, glide links
+and tread clips. Preview placement8 with clip86 or108 in the Home level.
+The new rules add per-type tuning fields in the existing object-type JSON,
+without changing persistent level data or making the editor depend on the
+game. The preview remains an animation inspector rather than a swim simulator.

@@ -46,6 +46,8 @@ struct ObjectTypeData {
     creature: Option<CreatureData>,
     #[serde(default)]
     attendant: Option<crate::winston::WinstonTuning>,
+    #[serde(default)]
+    swimming: Option<crate::player::SwimmingTuning>,
 }
 
 #[derive(serde::Deserialize)]
@@ -137,6 +139,10 @@ fn object_types() -> Vec<ObjectTypeData> {
 /// The local attendant thresholds live with the existing per-type tuning data.
 pub(crate) fn winston_tuning() -> crate::winston::WinstonTuning {
     object_types().into_iter().find_map(|entry| entry.attendant).expect("attendant tuning is registered")
+}
+
+pub(crate) fn swimming_tuning() -> crate::player::SwimmingTuning {
+    object_types().into_iter().find_map(|entry|entry.swimming).expect("swimming tuning is registered")
 }
 
 /// Register every object type of `data/object_types.json` with the engine.

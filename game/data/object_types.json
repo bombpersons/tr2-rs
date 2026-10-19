@@ -1,9 +1,25 @@
 {
- "_comment": "Object types placed in Tomb Raider II levels and the game behaviours each one gets. Ids are the levels' object type ids. Creature radius is in world units (1024 per metre); health and damage in hit points (Lara has 1000).",
+ "_comment": "Object types placed in Tomb Raider II levels and the game behaviours each one gets. Ids are the levels' object type ids. Creature radius is in world units (1024 per metre); health and damage in hit points (Lara has 1000). Swimming speed tuning uses source units per authored tick; angular tuning uses65536 units per turn.",
  "types": [
   {
    "id": 0,
-   "name": "lara"
+   "name": "lara",
+   "swimming": {
+    "max_speed": 50.0,
+    "acceleration": 2.0,
+    "drag": 1.5,
+    "tread_threshold": 33.5,
+    "pitch_step": 364,
+    "pitch_limit": 15470,
+    "turn_push": 409,
+    "turn_limit": 1092,
+    "turn_drag": 364,
+    "bank_push": 546,
+    "bank_drag": 364,
+    "bank_limit": 4004,
+    "max_air_ticks": 1800,
+    "drowning_damage": 5
+   }
   },
   {
    "id": 36,
