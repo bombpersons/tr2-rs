@@ -95,7 +95,9 @@ fn owner(mut entity: Entity, hierarchy: &Hierarchy) -> (Option<usize>, Option<us
 }
 
 /// Click an object to select it; Shift or Ctrl adds or removes it. A click on
-/// a room or empty space clears the selection.
+/// a room or empty space clears the selection. Rooms are hit from the side
+/// their faces are drawn for, so objects inside a room are clicked through
+/// its outer shell.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn select(
     mut editor: ResMut<Editor>,
@@ -107,15 +109,24 @@ pub(super) fn select(
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
     mut ray_cast: MeshRayCast,
     hierarchy: Hierarchy,
+    level: Option<Res<engine::world::WorldGeometry>>,
 ) {
+    if editor.mesh.on {
+        return;
+    }
     if !focus.active || handles.busy() || editor.leaving.is_some() || !mouse.just_pressed(MouseButton::Left) {
         return;
     }
     let Some(cursor) = windows.single().ok().and_then(Window::cursor_position) else { return };
     let Ok((camera, transform)) = cameras.single() else { return };
     let Ok(ray) = camera.viewport_to_world(transform, cursor) else { return };
-    let hit = ray_cast.cast_ray(ray, &MeshRayCastSettings::default()).first().and_then(|(e, _)| owner(*e, &hierarchy).0);
-    let extend = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight, KeyCode::ControlLeft, KeyCode::ControlRight]);
+    let objects = |entity| owner(entity, &hierarchy).0.is_some();
+    let settings = MeshRayCastSettings::default().with_filter(&objects);
+    let object = ray_cast.cast_ray(ray, &settings).first().map(|(e, h)| (owner(*e, &hierarchy).0, h.distance));
+    let room = level.and_then(|level| crate::mesh::room_distance(&level.data, ray));
+    let hit = object.filter(|&(_, distance)| room.is_none_or(|room| distance <= room)).and_then(|(index, _)| index);
+    let extend =
+        keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight, KeyCode::ControlLeft, KeyCode::ControlRight]);
     editor.click(hit, extend);
 }
 
@@ -126,7 +137,7 @@ pub(super) fn highlight(
     meshes: Query<(Entity, &Aabb, &GlobalTransform), With<Mesh3d>>,
     mut gizmos: Gizmos<gizmo::OnTop>,
 ) {
-    if editor.selection.is_empty() {
+    if editor.selection.is_empty() || editor.mesh.on {
         return;
     }
     let mut bounds = std::collections::HashMap::<usize, (Vec3, Vec3)>::new();
@@ -174,8 +185,12 @@ pub(super) fn place(editor: Res<Editor>, mut objects: Query<(&WorldObject, &mut 
 }
 
 /// The selection's centre and size, for framing.
-fn selection_bounds(editor: &Editor) -> Option<(Vec3, f32)> {
-    let points: Vec<_> = editor.selection.iter().filter_map(|&i| placement_position(editor, i)).map(world).collect();
+fn selection_bounds(editor: &Editor, level: Option<&engine::world::WorldGeometry>) -> Option<(Vec3, f32)> {
+    let points: Vec<_> = if editor.mesh.on {
+        crate::mesh::selection_points(editor, level)
+    } else {
+        editor.selection.iter().filter_map(|&i| placement_position(editor, i)).map(world).collect()
+    };
     if points.is_empty() {
         return None;
     }
@@ -196,6 +211,7 @@ pub fn camera(
     focus: Res<ViewportFocus>,
     egui: Res<EguiWantsInput>,
     target: Res<EditorTarget>,
+    level: Option<Res<engine::world::WorldGeometry>>,
 ) {
     let Ok(mut transform) = cameras.single_mut() else { return };
     let typing = egui.wants_any_keyboard_input();
@@ -204,7 +220,7 @@ pub fn camera(
     }
     if editor.frame {
         editor.frame = false;
-        let selected = if editor.overview { None } else { selection_bounds(&editor) };
+        let selected = if editor.overview { None } else { selection_bounds(&editor, level.as_deref()) };
         let (center, distance) = selected.unwrap_or_else(|| room_bounds(&editor));
         editor.overview = false;
         // camera_transform takes level space; this is its own inverse.

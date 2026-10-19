@@ -136,3 +136,32 @@ fn save_replacing_overwrites_a_confirmed_destination_atomically() {
     assert_eq!(LevelDocument::open(&target).unwrap().level().unwrap().name, "replaced");
     assert!(!doc.is_dirty());
 }
+
+#[test]
+fn typed_level_edits_keep_unknown_fields_and_the_bytes_of_untouched_rooms() {
+    let path = fixture("typed");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    // Two rooms in a compact file; the first carries a property the format does not know.
+    let room = value["rooms"][0].clone();
+    value["rooms"].as_array_mut().unwrap().push(room);
+    value["rooms"][0]["sectors"][7]["note"] = serde_json::json!("keep me");
+    let bytes = serde_json::to_vec(&value).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let mut level = doc.level().unwrap();
+    level.rooms[0].sectors[7].floor = -256;
+    level.rooms[0].sectors[7].ceiling = -3072;
+    level.rooms[0].vertices.push([0, 0, 0, 128]);
+    doc.apply_level(&level).unwrap();
+    assert_eq!(doc.value()["rooms"][0]["sectors"][7]["note"], "keep me");
+    assert_eq!(doc.value()["rooms"][0]["sectors"][7]["floor"], -256);
+    doc.save().unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    let untouched = serde_json::to_string(&value["rooms"][1]).unwrap();
+    assert!(saved.contains(&untouched), "the untouched room keeps its exact text");
+    assert!(!saved.contains('\n'), "a compact file stays compact");
+    let reopened = LevelDocument::open(&path).unwrap();
+    assert_eq!(reopened.level().unwrap().rooms[0].vertices.len(), level.rooms[0].vertices.len());
+    assert!(doc.undo());
+    assert!(doc.is_dirty(), "undoing past a save differs from the file");
+}

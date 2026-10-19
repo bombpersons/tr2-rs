@@ -53,12 +53,17 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   are edited entry by entry instead. Strings need no quotes, and numbers stay
   numbers.
 - **Animation** previews authored clips (see below).
+- **Textures** shows the texture table cut from the atlas, for painting faces
+  in mesh mode (see "Mesh editing").
 
 In the 3D view, click an object to select it. Shift- or Ctrl-click adds it
 to the selection, or removes it. Clicking a room or empty space clears the
 selection. Selected objects get boxes drawn through walls; the active one is
 yellow. Room shells cull their outward faces, so from outside a room you
-look and click straight into it. Objects without a rendered model can still
+look and click straight into it. Imported rooms wind their faces clockwise
+as seen from the side they are drawn for (Bevy's back face), so the editor
+culls Bevy's front faces; the sandbox is wound the same way. Clicks pass
+through a room's outer side to the objects inside. Objects without a rendered model can still
 be selected through the Objects window.
 
 The selection's centre carries a handle. Drag an arrow to move every selected
@@ -83,6 +88,7 @@ the level format's units, with Y increasing downward.
 | Ctrl+Shift+S / File > Save As... | Native save dialog; continue editing the new file |
 | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z | Undo / redo (also under Edit) |
 | Ctrl+A / Edit > Select all objects | Select every placement |
+| Tab / Edit > Mesh mode | Switch between object and mesh mode (after clicking the view) |
 | Click / Shift-click / Ctrl-click | Select / add or remove (viewport and Objects window) |
 | F / View > Frame selection | Frame the selection (or the Data window's room) |
 | View > Overview | Frame the first room |
@@ -102,26 +108,81 @@ shows its textures. Discarding unsaved work to open another level keeps the
 current document until a valid level actually opens; canceling the dialog,
 or a level that fails to open, leaves the current work in place.
 
-Static scenery belongs to its room. Individual vertices, faces, unrendered
-placements and fixed camera markers are reached through the Data window.
-Geometry editing (vertex and face selection, extrusion and texture painting)
-is the next planned mode; see "Mesh editing" below. Sound tables are
+Static scenery belongs to its room. Unrendered placements and fixed camera
+markers are reached through the Data window; room geometry is edited in mesh
+mode (below). Sound tables are
 editable, but audio playback and atlas/image editing belong to future tools.
 There are no authored tuning RON assets in the current port; add an authoring
 surface when those formats become used, rather than inventing a controller
 schema for the editor.
 
-## Mesh editing (planned)
+## Mesh editing
 
 Rooms hold two layers: the render mesh (`vertices`, `quads`, `triangles`)
-and the sector grid (`sectors`, floor data and `portals`) used for collision.
-Geometry editing will keep them in step rather than move vertices freely.
-Selection works on grid-aligned quads and vertices: x and z stay on sector
-corners and heights move in 256-unit steps. Each edit re-derives the touched
-sectors' floor and ceiling heights and slopes, and rebuilds portals where a
-room's boundary changes. Extrude raises or lowers a floor region, or pushes
-a wall out to add sectors. A Texture window assigns texture-table entries to
-faces. Rooms that are not touched keep saving byte for byte.
+and the sector grid (`sectors`, `floor_infos` and `portals`). Collision,
+camera and trigger rules read only the grid (`WorldGeometry::floor_at` and
+friends); nothing reads the render mesh but the renderer. Mesh mode edits
+the mesh on the grid and re-derives the grid from it, so the two never
+disagree.
+
+The rule that links them: a sector's floor (or ceiling) is the one quad
+covering exactly that sector whose winding faces up (or down). Its height is
+the face's highest floor corner (lowest ceiling corner) and its floor-data
+slope is the corner difference across the sector in 256-unit steps, the
+inverse of `floor_at`'s slant arithmetic (`engine::editor::plane` and
+`corners`, unit-tested against `floor_at`). Every imported level agrees with
+this rule except 52 authored faces in CUT4, LIVING, OPERA and RIG (decorative
+faces away from their sector's floor, one not flat), which `level_assets.rs`
+pins. Sectors without a face of their own, such as doorway sectors, keep
+their stored heights.
+
+Press **Tab** (or Edit > Mesh mode) to edit the active object's room, or the
+room open in the Data window; the Properties window becomes the **Mesh**
+panel, and the status bar shows the mode. The room's sector grid is drawn at
+its lowest floor and its vertices as small crosses.
+
+- Click a vertex (within a few pixels) or a face to select it; Shift- or
+  Ctrl-click adds or removes. Clicking another room's face switches to that
+  room. Esc clears. Faces are hit from the side they are drawn for.
+- Drag a gizmo arrow to move the selection: x and z move in whole sectors
+  (1024 units) and height in 256-unit steps. The move shows in orange while
+  you drag and is applied as one undo step when you let go. Moving a vertex
+  moves every face that uses it, as imported rooms share corners: raising
+  one line of floor corners tilts the sectors on both sides of it.
+- **Raise / Lower** (+ / -) extrude the selected floor or ceiling faces by
+  256: their corners are split from their neighbours, moved, and joined back
+  with step faces seen from the lower side. Steps that would hide inside a
+  solid neighbour are left out, and lowering beside a wall only fills what
+  the wall does not already cover. Extruding back removes the steps again.
+- **Push wall out** (P) opens the solid sector behind a selected wall face
+  (one sector wide): the faces stacked on that edge move one sector out, and
+  the new sector gets a floor and ceiling at the wall's foot and top, plus
+  side walls against solid neighbours. When that sector was on the room's
+  border, the grid first grows by a row of solid sectors on that side; growing
+  toward negative x or z moves the room origin and re-expresses vertices and
+  portals so everything stays in place.
+- The **Textures** window (View > Textures) shows the texture table cut from
+  the atlas. Click one to make it the brush, then **Paint selection**, or
+  tick **Paint on click** and click faces. Painting sets a quad's fifth (a
+  triangle's fourth) field.
+
+Each edit re-derives every sector whose floor or ceiling face it touched,
+and refuses (with the reason in the status bar, leaving the document as it
+was) anything the grid cannot express: a floor that is not flat or evenly
+sloped, a slope that is not whole steps, a face no longer covering one
+sector, two floors in one sector, a floor above its ceiling, an open sector
+on the room border, or a wall face left standing in open floor between two
+sectors. That last rule (faces between open sectors may only fill their
+height difference) holds for all but 10 faces across the imported levels.
+Floor data shared between sectors is copied before its slope changes, and a
+sector that loses both its faces becomes solid. Navigation boxes are not
+rebuilt, so creature pathing over an edited area keeps its old boxes, and
+pushing a wall does not join it to a neighbouring room.
+
+The operations are engine code (`engine::editor::{move_vertices, extrude,
+push_wall, paint}`) over the typed `Level`; `LevelDocument::apply_level`
+turns the edited copy into JSON pointer edits for only the fields that
+changed, keeping properties the format does not know, as one undo step.
 
 ## Animation preview
 
@@ -150,8 +211,11 @@ describes the PSX checks behind the shared animation step.
 ## Files and validation
 
 An untouched save reproduces the original bytes exactly, including whitespace
-and final newline. Edit followed by undo does too. Changed files use pretty
-JSON. Unknown properties are kept because the document holds a JSON tree,
+and final newline. Edit followed by undo does too. A changed save rewrites
+only what changed: every unchanged value keeps its original text, and changed
+arrays and objects keep the file's separators, key order and spelling, so a
+compact imported level stays compact and an edit to one room leaves every
+other room's bytes as they were. Unknown properties are kept because the document holds a JSON tree,
 not just a deserialized `Level`. The preview receives a validated typed level
 through `engine::render::PreviewLevel`; no temporary saved file is needed.
 Each undo step holds every field one action changed, such as a group move.
@@ -201,13 +265,20 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
 checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
-references, the unsaved-changes question, save, and reopen in a new process,
+references, the unsaved-changes question, mesh mode (raise a floor, a refused unsnapped
+move, paint, the Textures window, push a wall, undo back to the original
+bytes, then save a raise and check the file's sectors against its faces and
+that every other room kept its bytes), save, and reopen in a new process,
 and records real 1280x800 screenshots and the MCP transcript. It never edits
 the source level. Unit tests cover click and Shift-click selection in the
 viewport (through posed model hierarchies, rooms and empty space) and in the
 shared selection model; relative drags and absolute typed values across
 several objects as one undo step; gizmo axis moves, snapping and ring turns
-about the centre; JSON drafts keeping their types; Save As replacing a file
+about the centre; mesh-mode selection, raising a floor as one undo step,
+refused moves, painting and lowering the sandbox block; the engine's sector
+derivation, slopes against `floor_at`, extrusion and its cancelling, wall
+pushing and grid growth, shared floor data, and format-preserving saves;
+JSON drafts keeping their types; Save As replacing a file
 and copying the atlas; and the unsaved-work question. All 25 baked levels
 pass the editor validator in `level_assets.rs`.
 
@@ -224,7 +295,13 @@ Use `game_query` on the exact entity `Editor` with `EditorStatus`. Set
 question) are one-shot booleans. `open` and `save_as` take a file path in place
 of the native dialogs; `select` takes placement numbers such as `"1,2"`, or
 `"none"`. Set `pointer` and `navigate: true` to open a field in the Data
-window. `EditorStatus` reports `selection` and `asking_to_save`. These commands use the UI's document
+window. `mode` takes `"mesh"` or `"object"`, `mesh_room` a room number,
+`mesh_select` elements such as `"q12,t3,v4"` (quads, triangles, vertices;
+`"none"` clears), `mesh_move` an offset `"0,-256,0"`, `mesh_extrude` a
+height step (negative raises), `mesh_paint` a texture number for the
+selection, and `mesh_push` and `show_textures` are one-shot booleans.
+`EditorStatus` reports `selection`, `asking_to_save`, `mode`, `mesh_room`
+and `mesh_selection`. These commands use the UI's document
 transactions. Headless `game_screenshot(target="screen")` captures the
 full-resolution editor; use `target="window"` in a desktop session.
 

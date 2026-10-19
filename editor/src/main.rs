@@ -3,6 +3,7 @@ mod animation;
 mod edit;
 mod files;
 mod gizmo;
+mod mesh;
 mod ui;
 mod viewport;
 use bevy::{
@@ -45,6 +46,8 @@ struct Editor {
     windows: ui::Windows,
     /// A native file dialog to show next.
     ask: Option<files::Ask>,
+    /// Mesh mode's room, selection and tools.
+    mesh: mesh::MeshEdit,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -72,6 +75,7 @@ impl Editor {
             leaving: None,
             windows: default(),
             ask: None,
+            mesh: default(),
         }
     }
 }
@@ -97,6 +101,23 @@ struct EditorCommand {
     select: String,
     /// Dismiss the unsaved-changes question, keeping the document.
     cancel: bool,
+    /// "object" or "mesh".
+    mode: String,
+    /// Mesh mode's room; negative leaves it.
+    mesh_room: i64,
+    /// Mesh elements such as "q12,v4" ("none" clears); Shift-click semantics
+    /// are not needed: the list replaces the selection.
+    mesh_select: String,
+    /// Move the mesh selection by "x,y,z" level units (snapped to the grid).
+    mesh_move: String,
+    /// Raise (negative) or lower the selected floor or ceiling faces.
+    mesh_extrude: i32,
+    /// Push the selected wall faces out by a sector.
+    mesh_push: bool,
+    /// Paint the selected faces with this texture-table entry.
+    mesh_paint: i64,
+    /// Open the Textures window.
+    show_textures: bool,
 }
 
 #[derive(Component, Reflect, Default)]
@@ -111,6 +132,9 @@ struct EditorStatus {
     placements: usize,
     selection: Vec<usize>,
     asking_to_save: bool,
+    mode: String,
+    mesh_room: usize,
+    mesh_selection: String,
 }
 
 fn main() -> AppExit {
@@ -178,7 +202,13 @@ fn main() -> AppExit {
         .add_systems(Startup, setup)
         .add_systems(Update, (automation, files::show, files::receive, preview).chain().before(LevelSystems::Load))
         .add_systems(Update, (standard_preview, status).chain().after(LevelSystems::Visibility))
-        .add_plugins((ui::UiPlugin, viewport::ViewportPlugin, gizmo::GizmoPlugin, animation::AnimationPreviewPlugin))
+        .add_plugins((
+            ui::UiPlugin,
+            viewport::ViewportPlugin,
+            gizmo::GizmoPlugin,
+            mesh::MeshPlugin,
+            animation::AnimationPreviewPlugin,
+        ))
         .init_resource::<files::FileDialogs>();
     // The MCP's `screen` is an ordinary full-resolution render target here;
     // no PS1 plugin, screen pass, quantization or affine shader is installed.
@@ -248,7 +278,7 @@ fn capture(mut commands: Commands, mut capture: ResMut<Capture>, target: Res<Edi
 fn setup(mut commands: Commands) {
     commands.spawn((
         Name::new("Editor"),
-        EditorCommand::default(),
+        EditorCommand { mesh_room: -1, mesh_paint: -1, ..default() },
         EditorStatus::default(),
         animation::AnimationPreview::default(),
     ));
@@ -256,6 +286,46 @@ fn setup(mut commands: Commands) {
 
 fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>) {
     let Ok(mut c) = command.single_mut() else { return };
+    if !c.mode.is_empty() {
+        let mode = std::mem::take(&mut c.mode);
+        editor.set_mesh_mode(mode == "mesh");
+    }
+    if c.mesh_room >= 0 {
+        let room = std::mem::replace(&mut c.mesh_room, -1);
+        editor.mesh_room(room as usize);
+    }
+    if !c.mesh_select.is_empty() {
+        let text = std::mem::take(&mut c.mesh_select);
+        editor.mesh_clear();
+        let room = editor.mesh.room;
+        for element in text.split(',').filter_map(mesh::Element::parse) {
+            editor.mesh_click(room, Some(element), true);
+        }
+    }
+    if !c.mesh_move.is_empty() {
+        let text = std::mem::take(&mut c.mesh_move);
+        match text.split(',').map(|n| n.trim().parse::<i32>()).collect::<Result<Vec<_>, _>>().as_deref() {
+            Ok(&[x, y, z]) => editor.mesh_move([x, y, z]),
+            _ => editor.status = "mesh_move takes x,y,z".into(),
+        }
+    }
+    if c.mesh_extrude != 0 {
+        let dy = std::mem::take(&mut c.mesh_extrude);
+        editor.mesh_extrude(dy);
+    }
+    if c.mesh_push {
+        c.mesh_push = false;
+        editor.mesh_push();
+    }
+    if c.show_textures {
+        c.show_textures = false;
+        editor.windows.textures = true;
+    }
+    if c.mesh_paint >= 0 {
+        let texture = std::mem::replace(&mut c.mesh_paint, -1);
+        editor.mesh.brush = Some(texture as usize);
+        editor.mesh_paint(None);
+    }
     if !c.open.is_empty() {
         let path = std::mem::take(&mut c.open);
         editor.request_leave(Leave::Open(Some(path.into())));
@@ -308,6 +378,11 @@ fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>
 }
 
 impl Editor {
+    /// The level's atlas as an asset path (the asset root is the filesystem root).
+    fn atlas(&self) -> String {
+        let atlas = self.doc.path().parent().unwrap().join("atlas.png");
+        atlas.to_string_lossy().trim_start_matches('/').into()
+    }
     fn result(&mut self, result: Result<(), String>, success: &str) {
         match result {
             Ok(()) => self.changed(success),
@@ -386,6 +461,8 @@ impl Editor {
                 self.recent.truncate(8);
                 self.doc = doc;
                 self.selection.clear();
+                self.mesh.room = 0;
+                self.mesh_clear();
                 self.overlay.clear();
                 self.navigate(String::new());
                 self.frame = true;
@@ -404,11 +481,7 @@ fn preview(mut editor: ResMut<Editor>, mut previews: MessageWriter<PreviewLevel>
     editor.preview = false;
     match editor.doc.level() {
         Ok(level) => {
-            let atlas = editor.doc.path().parent().unwrap().join("atlas.png");
-            previews.write(PreviewLevel {
-                data: Arc::new(level),
-                atlas: atlas.to_string_lossy().trim_start_matches('/').into(),
-            });
+            previews.write(PreviewLevel { data: Arc::new(level), atlas: editor.atlas() });
         }
         Err(error) => editor.status = error,
     }
@@ -417,7 +490,9 @@ fn preview(mut editor: ResMut<Editor>, mut previews: MessageWriter<PreviewLevel>
 // Reuse the engine's mesh construction and posing, then dress the preview
 // with ordinary Bevy materials. This adapter never changes the game renderer.
 // Room shells cull their outward-facing sides so the view and clicks reach
-// inside a room from outside it; objects stay double-sided.
+// inside a room from outside it; objects stay double-sided. Room faces are
+// wound clockwise as seen from the side they are drawn for, which is Bevy's
+// back face, so the culled side is Bevy's front.
 #[allow(clippy::type_complexity)]
 fn standard_preview(
     mut commands: Commands,
@@ -438,7 +513,7 @@ fn standard_preview(
                 standard.add(StandardMaterial {
                     base_color_texture: material.texture.clone(),
                     unlit: true,
-                    cull_mode: room.then_some(bevy::render::render_resource::Face::Back),
+                    cull_mode: room.then_some(bevy::render::render_resource::Face::Front),
                     alpha_mode: AlphaMode::Mask(0.5),
                     ..default()
                 })
@@ -476,6 +551,9 @@ fn status(editor: Res<Editor>, mut status: Query<&mut EditorStatus>) {
         status.placements = editor.doc.value()["placements"].as_array().map_or(0, Vec::len);
         status.selection = editor.selection.clone();
         status.asking_to_save = editor.leaving.is_some();
+        status.mode = if editor.mesh.on { "mesh" } else { "object" }.into();
+        status.mesh_room = editor.mesh.room;
+        status.mesh_selection = editor.mesh_selection_text();
     }
 }
 

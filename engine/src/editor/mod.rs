@@ -1,11 +1,15 @@
 //! Authoring the engine's formats, without game controllers or disc data.
 //!
 //! `LevelDocument` retains the original bytes and unknown JSON fields. A
-//! no-op save (including edit followed by undo) is byte-exact. Changes use
+//! no-op save (including edit followed by undo) is byte-exact, and a changed
+//! save rewrites only what changed, in the file's own formatting. Changes use
 //! the same typed format and reference validation as the preview.
+mod mesh;
+mod splice;
 mod validate;
 
 use crate::world::Level;
+pub use mesh::*;
 use serde_json::Value;
 use std::{
     fs,
@@ -102,6 +106,18 @@ impl LevelDocument {
         Ok(())
     }
 
+    /// Apply an edited copy of [`LevelDocument::level`] as one undo step.
+    /// Only the fields that differ are written; properties the typed format
+    /// does not know are kept, and an option that became empty is written as
+    /// `null`.
+    pub fn apply_level(&mut self, edited: &Level) -> Result<(), String> {
+        let before = serde_json::to_value(self.level()?).map_err(|e| e.to_string())?;
+        let after = serde_json::to_value(edited).map_err(|e| e.to_string())?;
+        let mut edits = vec![];
+        changes(&self.value, &before, &after, String::new(), &mut edits);
+        self.apply(edits)
+    }
+
     fn revert(value: &mut Value, changes: &[Change]) {
         for change in changes.iter().rev() {
             set(value, &change.pointer, change.before.clone());
@@ -110,6 +126,10 @@ impl LevelDocument {
 
     pub fn can_undo(&self) -> bool {
         !self.undo.is_empty()
+    }
+    /// How many steps undo can take back.
+    pub fn undo_steps(&self) -> usize {
+        self.undo.len()
     }
     pub fn can_redo(&self) -> bool {
         !self.redo.is_empty()
@@ -163,9 +183,9 @@ impl LevelDocument {
         }
         self.level()?;
         let bytes = if self.dirty {
-            let mut bytes = serde_json::to_vec_pretty(&self.value).map_err(|e| e.to_string())?;
-            bytes.push(b'\n');
-            bytes
+            // Unchanged parts keep their original text, so an edit to one
+            // room leaves every other room's bytes as they were.
+            splice::splice(&self.value, &self.saved, &self.bytes)
         } else {
             self.bytes.clone()
         };
@@ -205,6 +225,65 @@ impl LevelDocument {
         self.saved = self.value.clone();
         self.dirty = false;
         Ok(())
+    }
+}
+
+/// Pointer edits taking the document's `current` value from the typed
+/// `before` to `after`. Arrays that change length are written whole, merged
+/// over their current entries.
+fn changes(current: &Value, before: &Value, after: &Value, pointer: String, out: &mut Vec<(String, Value)>) {
+    if before == after {
+        return;
+    }
+    match (current, before, after) {
+        (Value::Object(c), Value::Object(b), Value::Object(a)) => {
+            for (key, value) in a {
+                let child = child_pointer(&pointer, key);
+                match (c.get(key), b.get(key)) {
+                    (Some(c), Some(b)) => changes(c, b, value, child, out),
+                    _ => out.push((child, value.clone())),
+                }
+            }
+            for key in b.keys().filter(|k| !a.contains_key(*k) && c.contains_key(*k)) {
+                out.push((child_pointer(&pointer, key), Value::Null));
+            }
+        }
+        (Value::Array(c), Value::Array(b), Value::Array(a)) if c.len() == a.len() && b.len() == a.len() => {
+            for (i, value) in a.iter().enumerate() {
+                changes(&c[i], &b[i], value, format!("{pointer}/{i}"), out);
+            }
+        }
+        _ => out.push((pointer, merged(current, before, after))),
+    }
+}
+
+/// `after`, keeping the properties of `current` that the typed format dropped.
+fn merged(current: &Value, before: &Value, after: &Value) -> Value {
+    match (current, before, after) {
+        (Value::Object(c), Value::Object(b), Value::Object(a)) => {
+            let mut out = c.clone();
+            for (key, value) in a {
+                let value = match (c.get(key), b.get(key)) {
+                    (Some(c), Some(b)) => merged(c, b, value),
+                    _ => value.clone(),
+                };
+                out.insert(key.clone(), value);
+            }
+            for key in b.keys().filter(|k| !a.contains_key(*k)) {
+                out.insert(key.clone(), Value::Null);
+            }
+            Value::Object(out)
+        }
+        (Value::Array(c), Value::Array(b), Value::Array(a)) => Value::Array(
+            a.iter()
+                .enumerate()
+                .map(|(i, value)| match (c.get(i), b.get(i)) {
+                    (Some(c), Some(b)) => merged(c, b, value),
+                    _ => value.clone(),
+                })
+                .collect(),
+        ),
+        _ => after.clone(),
     }
 }
 

@@ -1,6 +1,7 @@
 //! A move/turn handle around the selection's centre. Arrows move along one
 //! level axis; the ring turns every selected object about the centre. Hold
-//! Ctrl to snap to quarter-sector clicks (256 units) and 15 degrees.
+//! Ctrl to snap to quarter-sector clicks (256 units) and 15 degrees. In mesh
+//! mode only the arrows show, always snapped to the sector grid.
 use crate::{
     Editor,
     edit::TURN,
@@ -8,7 +9,11 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy_egui::input::EguiWantsInput;
-use engine::render::GameCamera;
+use engine::{
+    editor::{SECTOR, STEP},
+    render::GameCamera,
+    world::WorldGeometry,
+};
 use serde_json::Value;
 use std::f32::consts::{FRAC_PI_2, TAU};
 
@@ -68,8 +73,12 @@ fn direction(axis: usize) -> Vec3 {
 }
 
 /// Where the handles are and how big they look.
-fn layout(editor: &Editor, camera: &GlobalTransform) -> Option<(Vec3, f32)> {
-    let points: Vec<_> = editor.selection.iter().filter_map(|&i| placement_position(editor, i)).map(world).collect();
+fn layout(editor: &Editor, level: Option<&WorldGeometry>, camera: &GlobalTransform) -> Option<(Vec3, f32)> {
+    let points: Vec<_> = if editor.mesh.on {
+        crate::mesh::selection_points(editor, level)
+    } else {
+        editor.selection.iter().filter_map(|&i| placement_position(editor, i)).map(world).collect()
+    };
     if points.is_empty() {
         return None;
     }
@@ -118,6 +127,7 @@ pub fn interact(
     keys: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window>,
     cameras: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+    level: Option<Res<WorldGeometry>>,
 ) {
     let cursor = windows.single().ok().and_then(Window::cursor_position);
     let (Ok((camera, eye)), Some(cursor)) = (cameras.single(), cursor) else {
@@ -127,17 +137,30 @@ pub fn interact(
     let Ok(ray) = camera.viewport_to_world(eye, cursor) else { return };
     let snap = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     if let Some(drag) = &handles.drag {
-        if mouse.pressed(MouseButton::Left) {
+        let pressed = mouse.pressed(MouseButton::Left);
+        if editor.mesh.on {
+            let offset = mesh_offset(drag, ray);
+            if pressed {
+                if editor.mesh.dragging != Some(offset) {
+                    editor.mesh.dragging = Some(offset);
+                }
+            } else {
+                editor.mesh.dragging = None;
+                editor.mesh_move(offset);
+            }
+        } else if pressed {
             let edits = drag_edits(drag, ray, snap);
             editor.edit(edits, true);
         } else {
             editor.commit();
+        }
+        if !pressed {
             handles.drag = None;
         }
         return;
     }
     handles.hovered = None;
-    let Some((pivot, size)) = layout(&editor, eye) else { return };
+    let Some((pivot, size)) = layout(&editor, level.as_deref(), eye) else { return };
     if egui.wants_any_pointer_input() || editor.leaving.is_some() {
         return;
     }
@@ -151,7 +174,8 @@ pub fn interact(
             }
         }
     }
-    let ring: Vec<_> = ring_points(pivot, size * 1.3).filter_map(screen).collect();
+    let ring: Vec<_> =
+        if editor.mesh.on { vec![] } else { ring_points(pivot, size * 1.3).filter_map(screen).collect() };
     for pair in ring.windows(2) {
         let distance = segment_distance(cursor, pair[0], pair[1]);
         if distance < best.0 {
@@ -180,6 +204,16 @@ pub fn interact(
         })
         .collect();
     handles.drag = Some(Drag { handle, pivot, from, start });
+}
+
+/// How far a mesh-mode arrow drag has gone: whole sectors across, 256-unit steps up and down.
+fn mesh_offset(drag: &Drag, ray: Ray3d) -> [i32; 3] {
+    let Handle::Axis(axis) = drag.handle else { return [0; 3] };
+    let moved = along(drag.pivot, direction(axis), ray) - drag.from;
+    let step = f64::from(if axis == 1 { STEP } else { SECTOR });
+    let mut offset = [0; 3];
+    offset[axis] = ((file_offset(direction(axis) * moved)[axis] / step).round() * step) as i32;
+    offset
 }
 
 /// The fields a drag sets so far, measured from where it began.
@@ -219,14 +253,26 @@ fn drag_edits(drag: &Drag, ray: Ray3d, snap: bool) -> Vec<(String, Value)> {
     edits
 }
 
-fn draw(editor: Res<Editor>, handles: Res<Handles>, cameras: Query<&GlobalTransform, With<GameCamera>>, mut gizmos: Gizmos<OnTop>) {
+fn draw(
+    editor: Res<Editor>,
+    handles: Res<Handles>,
+    cameras: Query<&GlobalTransform, With<GameCamera>>,
+    level: Option<Res<WorldGeometry>>,
+    mut gizmos: Gizmos<OnTop>,
+) {
     let Ok(eye) = cameras.single() else { return };
-    let Some((pivot, size)) = layout(&editor, eye) else { return };
+    let Some((pivot, size)) = layout(&editor, level.as_deref(), eye) else { return };
     let current = handles.drag.as_ref().map(|d| d.handle).or(handles.hovered);
-    let shade = |handle: Handle, color: Color| if current == Some(handle) { Color::srgb(1.0, 0.95, 0.3) } else { color };
+    let shade =
+        |handle: Handle, color: Color| if current == Some(handle) { Color::srgb(1.0, 0.95, 0.3) } else { color };
     let colors = [Color::srgb(0.95, 0.25, 0.25), Color::srgb(0.3, 0.9, 0.3), Color::srgb(0.3, 0.5, 1.0)];
     for (axis, color) in colors.into_iter().enumerate() {
-        gizmos.arrow(pivot, pivot + direction(axis) * size, shade(Handle::Axis(axis), color)).with_tip_length(size * 0.2);
+        gizmos
+            .arrow(pivot, pivot + direction(axis) * size, shade(Handle::Axis(axis), color))
+            .with_tip_length(size * 0.2);
+    }
+    if editor.mesh.on {
+        return;
     }
     gizmos.circle(
         Isometry3d::new(pivot, Quat::from_rotation_x(FRAC_PI_2)),

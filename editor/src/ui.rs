@@ -7,7 +7,7 @@ use crate::{
 };
 use bevy::{camera::RenderTarget, prelude::*, window::WindowCloseRequested};
 use bevy_egui::{
-    EguiContexts, EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext,
+    EguiContexts, EguiGlobalSettings, EguiPlugin, EguiPrimaryContextPass, EguiTextureHandle, PrimaryEguiContext,
     egui::{self, Key, KeyboardShortcut, Modifiers, RichText},
 };
 use engine::{editor::child_pointer, objects::ObjectTypes, world::WorldGeometry};
@@ -20,12 +20,21 @@ pub struct Windows {
     pub properties: bool,
     pub data: bool,
     pub animation: bool,
+    pub textures: bool,
     pub group: Group,
     pub filter: String,
 }
 impl Default for Windows {
     fn default() -> Self {
-        Self { objects: true, properties: true, data: false, animation: false, group: Group::Room, filter: String::new() }
+        Self {
+            objects: true,
+            properties: true,
+            data: false,
+            animation: false,
+            textures: false,
+            group: Group::Room,
+            filter: String::new(),
+        }
     }
 }
 
@@ -81,7 +90,10 @@ fn ui(
     types: Option<Res<ObjectTypes>>,
     mut previews: Query<&mut AnimationPreview>,
     world: Option<Res<WorldGeometry>>,
+    server: Res<AssetServer>,
 ) -> Result {
+    let atlas = (editor.windows.textures)
+        .then(|| contexts.add_image(EguiTextureHandle::Strong(server.load::<Image>(editor.atlas()))));
     let ctx = contexts.ctx_mut()?;
     let editor = &mut *editor;
     let empty = ObjectTypes::default();
@@ -101,7 +113,13 @@ fn ui(
         .open(&mut windows.properties)
         .default_pos([area.right() - 318.0, top + 8.0])
         .default_width(310.0)
-        .show(ctx, |ui| show_data = properties(ui, editor, types));
+        .show(ctx, |ui| {
+            if editor.mesh.on {
+                crate::mesh::panel(ui, editor, world.as_deref());
+            } else {
+                show_data = properties(ui, editor, types);
+            }
+        });
     windows.data |= show_data;
     egui::Window::new("Data")
         .open(&mut windows.data)
@@ -115,6 +133,11 @@ fn ui(
             .default_width(560.0)
             .show(ctx, |ui| crate::animation::window(ui, editor, &mut preview, world.as_deref()));
     }
+    egui::Window::new("Textures")
+        .open(&mut windows.textures)
+        .default_pos([area.right() - 318.0, top + 300.0])
+        .default_size([310.0, 360.0])
+        .show(ctx, |ui| crate::mesh::textures(ui, editor, world.as_deref().map(|w| &*w.data), atlas));
     editor.windows = windows;
     leave_question(ctx, editor);
     Ok(())
@@ -175,49 +198,61 @@ fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
         .fixed_pos([0.0, 0.0])
         .order(egui::Order::Middle)
         .show(ctx, |ui| {
-            egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
-                ui.set_width(width - 16.0);
-                egui::MenuBar::new().ui(ui, |ui| {
-                    ui.menu_button("File", |ui| file_menu(ui, editor));
-                    ui.menu_button("Edit", |ui| {
-                        if shortcut(ui, "Undo", &UNDO, editor.doc.can_undo()) {
-                            editor.undo();
-                        }
-                        if shortcut(ui, "Redo", &REDO, editor.doc.can_redo()) {
-                            editor.redo();
-                        }
-                        ui.separator();
-                        if shortcut(ui, "Select all objects", &SELECT_ALL, true) {
-                            select_all(editor);
-                        }
-                        if ui.add_enabled(!editor.selection.is_empty(), egui::Button::new("Deselect all")).clicked() {
-                            editor.click(None, false);
-                        }
+            egui::Frame::side_top_panel(ui.style())
+                .show(ui, |ui| {
+                    ui.set_width(width - 16.0);
+                    egui::MenuBar::new().ui(ui, |ui| {
+                        ui.menu_button("File", |ui| file_menu(ui, editor));
+                        ui.menu_button("Edit", |ui| {
+                            if shortcut(ui, "Undo", &UNDO, editor.doc.can_undo()) {
+                                editor.undo();
+                            }
+                            if shortcut(ui, "Redo", &REDO, editor.doc.can_redo()) {
+                                editor.redo();
+                            }
+                            ui.separator();
+                            if shortcut(ui, "Select all objects", &SELECT_ALL, true) {
+                                select_all(editor);
+                            }
+                            if ui.add_enabled(!editor.selection.is_empty(), egui::Button::new("Deselect all")).clicked()
+                            {
+                                editor.click(None, false);
+                            }
+                            ui.separator();
+                            let mut mesh = editor.mesh.on;
+                            if ui
+                                .add(egui::Checkbox::new(&mut mesh, "Mesh mode"))
+                                .on_hover_text("Tab in the 3D view")
+                                .changed()
+                            {
+                                editor.set_mesh_mode(mesh);
+                            }
+                        });
+                        ui.menu_button("View", |ui| {
+                            let windows = &mut editor.windows;
+                            ui.checkbox(&mut windows.objects, "Objects");
+                            ui.checkbox(&mut windows.properties, "Properties");
+                            ui.checkbox(&mut windows.data, "Data");
+                            ui.checkbox(&mut windows.animation, "Animation");
+                            ui.checkbox(&mut windows.textures, "Textures");
+                            ui.separator();
+                            if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
+                                editor.frame = true;
+                            }
+                            if ui.button("Overview").clicked() {
+                                editor.frame = true;
+                                editor.overview = true;
+                            }
+                        });
+                        let name = editor.doc.value()["name"].as_str().unwrap_or("Untitled level").to_owned();
+                        let dirty = if editor.doc.is_dirty() { "  (unsaved)" } else { "" };
+                        ui.add_space(16.0);
+                        ui.label(RichText::new(format!("{name}{dirty}")).weak());
                     });
-                    ui.menu_button("View", |ui| {
-                        let windows = &mut editor.windows;
-                        ui.checkbox(&mut windows.objects, "Objects");
-                        ui.checkbox(&mut windows.properties, "Properties");
-                        ui.checkbox(&mut windows.data, "Data");
-                        ui.checkbox(&mut windows.animation, "Animation");
-                        ui.separator();
-                        if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
-                            editor.frame = true;
-                        }
-                        if ui.button("Overview").clicked() {
-                            editor.frame = true;
-                            editor.overview = true;
-                        }
-                    });
-                    let name = editor.doc.value()["name"].as_str().unwrap_or("Untitled level").to_owned();
-                    let dirty = if editor.doc.is_dirty() { "  (unsaved)" } else { "" };
-                    ui.add_space(16.0);
-                    ui.label(RichText::new(format!("{name}{dirty}")).weak());
-                });
-            })
-            .response
-            .rect
-            .height()
+                })
+                .response
+                .rect
+                .height()
         })
         .inner
 }
@@ -270,6 +305,10 @@ fn status_bar(ctx: &egui::Context, editor: &Editor) {
             egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
                 ui.set_width(rect.width() - 16.0);
                 ui.horizontal(|ui| {
+                    let mode =
+                        if editor.mesh.on { format!("Mesh: room {}", editor.mesh.room) } else { "Objects".into() };
+                    ui.label(RichText::new(mode).strong()).on_hover_text("Tab switches between object and mesh mode");
+                    ui.separator();
                     ui.label(&editor.status);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(RichText::new(editor.doc.path().display().to_string()).weak());

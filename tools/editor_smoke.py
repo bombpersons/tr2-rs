@@ -30,6 +30,158 @@ def command(client, **fields):
     return status(client)
 
 
+def settled(client, before, **fields):
+    """Send a command and wait for its result: a new revision or message."""
+    client.edit('Editor', 'EditorCommand', fields)
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        state = status(client)
+        if state['revision'] != before['revision'] or state['message'] != before['message']:
+            return state
+        time.sleep(0.1)
+    raise RuntimeError(f'no response to {fields}')
+
+
+SOLID = -32512
+
+
+def sector_corners(surface, height, tilt):
+    """Corner heights [x0z0, x1z0, x0z1, x1z1] of a sector's floor or ceiling (engine::editor::corners)."""
+    tx, tz = tilt[0] * 256, tilt[1] * 256
+    out = []
+    for i in range(4):
+        fx, fz = i & 1, i >> 1
+        if surface == 'floor':
+            d = (tx * (1 - fx) if tx > 0 else -tx * fx) + (tz * (1 - fz) if tz > 0 else -tz * fz)
+        else:
+            d = -(tx * fx if tx > 0 else -tx * (1 - fx)) - (tz * (1 - fz) if tz > 0 else -tz * fz)
+        out.append(height + d)
+    return out
+
+
+def sector_faces(level, index):
+    """Each quad covering one sector: (quad, x, z, 'floor'|'ceiling', corners)."""
+    room = level['rooms'][index]
+    vs = room['vertices']
+    for i, quad in enumerate(room['quads']):
+        ps = [vs[v] for v in quad[:4]]
+        x0, z0 = min(p[0] for p in ps), min(p[2] for p in ps)
+        if x0 % 1024 or z0 % 1024 or x0 < 0 or z0 < 0:
+            continue
+        corners, seen = [0] * 4, set()
+        for p in ps:
+            dx, dz = p[0] - x0, p[2] - z0
+            if dx not in (0, 1024) or dz not in (0, 1024):
+                break
+            k = (dx > 0) + 2 * (dz > 0)
+            seen.add(k)
+            corners[k] = p[1]
+        else:
+            n = sum((ps[k][2] - ps[(k + 1) % 4][2]) * (ps[k][0] + ps[(k + 1) % 4][0]) for k in range(4))
+            x, z = x0 // 1024, z0 // 1024
+            if len(seen) == 4 and n and x < room['x_sectors'] and z < room['z_sectors']:
+                yield i, x, z, 'floor' if n > 0 else 'ceiling', corners
+
+
+def check_sectors(level, index):
+    """Every floor and ceiling face of a room is where its sector's collision is."""
+    room = level['rooms'][index]
+    for _, x, z, surface, corners in sector_faces(level, index):
+        sector = room['sectors'][x * room['z_sectors'] + z]
+        info = level['floor_infos'][sector['floor_info']] if sector.get('floor_info') is not None else {}
+        height = sector[surface]
+        tilt = info.get('floor_slope' if surface == 'floor' else 'ceiling_slope', [0, 0])
+        assert height != SOLID and sector_corners(surface, height, tilt) == corners, (index, x, z, surface)
+
+
+def wall_candidates(level, index):
+    """Wall quads one sector wide, seen from an open sector, with a solid sector behind."""
+    room = level['rooms'][index]
+    vs, depth = room['vertices'], room['z_sectors']
+    for i, quad in enumerate(room['quads']):
+        ps = [vs[v] for v in quad[:4]]
+        for axis, other in ((0, 2), (2, 0)):
+            if len({p[axis] for p in ps}) != 1 or ps[0][axis] % 1024:
+                continue
+            low, high = min(p[other] for p in ps), max(p[other] for p in ps)
+            if low % 1024 or high - low != 1024:
+                continue
+            line, along = ps[0][axis] // 1024, low // 1024
+            cells = [(line - 1, along), (line, along)] if axis == 0 else [(along, line - 1), (along, line)]
+            ok = all(0 <= c[0] < room['x_sectors'] and 0 <= c[1] < depth for c in cells)
+            if ok:
+                floors = [room['sectors'][c[0] * depth + c[1]]['floor'] for c in cells]
+                if (floors[0] == SOLID) != (floors[1] == SOLID):
+                    yield i
+
+
+def mesh_smoke(client, copy, level, captures):
+    """Mesh mode on a real document: select, raise, paint, push a wall, undo, save."""
+    original = copy.read_bytes()
+    state = command(client, select='none', mode='mesh', mesh_room=0)
+    assert state['mode'] == 'mesh', state
+    rooms = range(len(level['rooms']))
+    raised = None
+    for index in rooms:
+        for quad, x, z, surface, _ in sector_faces(level, index):
+            if surface != 'floor':
+                continue
+            state = command(client, mesh_room=index, mesh_select=f'q{quad}', frame=True)
+            assert state['mesh_selection'] == f'q{quad}' and state['mesh_room'] == index, state
+            state = settled(client, state, mesh_extrude=-256)
+            if state['message'].startswith('Raised'):
+                raised = (index, quad, x, z)
+                break
+        if raised:
+            break
+    assert raised, 'no floor face could be raised'
+    index, quad, x, z = raised
+    assert state['dirty'], state
+    time.sleep(2)
+    captures.append(client.capture('mesh-raised'))
+    state = settled(client, state, mesh_move='0,100,0')
+    assert '256' in state['message'], state
+    state = settled(client, state, mesh_paint=1)
+    assert state['message'].startswith('Painted'), state
+    client.edit('Editor', 'EditorCommand', {'show_textures': True})
+    time.sleep(2)
+    captures.append(client.capture('mesh-textures'))
+    pushed = False
+    for wall in list(wall_candidates(level, index))[:40]:
+        state = command(client, mesh_select=f'q{wall}')
+        state = settled(client, state, mesh_push=True)
+        if state['message'].startswith('Pushed'):
+            pushed = True
+            break
+    if pushed:
+        time.sleep(2)
+        captures.append(client.capture('mesh-pushed'))
+    # Undo everything: the file is untouched again.
+    undone = 0
+    while state['dirty'] and undone < 6:
+        state = settled(client, state, undo=True)
+        undone += 1
+    assert not state['dirty'] and undone == (3 if pushed else 2), (undone, state)
+    state = command(client, save=True)
+    assert copy.read_bytes() == original, 'mesh edits undone changed bytes'
+    # Keep one raise, save it, and check what reached the file.
+    state = settled(client, state, redo=True)
+    state = command(client, save=True)
+    assert not state['dirty'], state
+    saved = json.loads(copy.read_bytes())
+    room = saved['rooms'][index]
+    sector = room['sectors'][x * room['z_sectors'] + z]
+    assert sector['floor'] == level['rooms'][index]['sectors'][x * room['z_sectors'] + z]['floor'] - 256, sector
+    check_sectors(saved, index)
+    text = copy.read_text()
+    compact = '\n' not in original.decode().strip()
+    for other, before in enumerate(level['rooms']):
+        if other != index and compact:
+            assert json.dumps(before, separators=(',', ':')) in text, f'untouched room {other} changed bytes'
+    command(client, mode='object')
+    return {'room': index, 'raised_face': quad, 'sector': [x, z], 'pushed_wall': pushed}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', type=Path, default=ROOT / 'engine/assets/levels/sandbox/level.json')
@@ -119,6 +271,7 @@ def main():
         assert saved == before, 'save lost unrelated data'
         state = command(client, select='1', frame=True)
         captures.append(client.capture('edited'))
+        mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
     # A new process proves that the saved engine file, rather than transient
@@ -137,7 +290,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 
