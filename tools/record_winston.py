@@ -13,6 +13,14 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'contact_walk_heldout': (160, [{'frame': 0, 'buttons': ['DOWN','R1'], 'until': 96}], True),
+    'contact_air_delayed_heldout': (150, [
+        {'frame': 8, 'buttons': ['SQUARE'], 'until': 20},
+        {'frame': 38, 'buttons': ['DOWN'], 'until': 64}], True),
+    'contact_walk_release_heldout': (150, [{'frame': 16, 'buttons': ['DOWN','R1'], 'until': 78}], True),
+    'contact_back': (110, [
+        {'frame': 0, 'buttons': ['SQUARE'], 'until': 8},
+        {'frame': 28, 'buttons': ['DOWN'], 'until': 50}], False),
     'local_run': (600, [{'frame': 0, 'buttons': ['UP'], 'until': 86}], False),
     'heldout_short': (520, [{'frame': 0, 'buttons': ['UP'], 'until': 70}], True),
     'heldout_turn': (700, [
@@ -39,6 +47,8 @@ def record(name):
     for addr, fmt, label in [(0x801826f8, 'i16', 'max_turn'),
             (0x80182728, 'i32', 'target_x'), (0x80182730, 'i32', 'target_z')]:
         samples.append(f'{addr:x}:{fmt}:{label}')
+    samples.append('8017c8cc:u32:actor_contact_mask')
+    samples.append('8008c572:i16:lara_movement_heading')
     for prefix, base in [('camera', 0x8008b258), ('look', 0x8008b268)]:
         for i, axis in enumerate('xyz'):
             samples.append(f'{base+4*i:x}:i32:{prefix}_{axis}')
@@ -51,7 +61,7 @@ def record(name):
                     fields=fields, input=inputs, independent=independent, pokes=[], command=command,
                     build=json.loads((out / "report.json").read_text())["build"],
                     samples_sha256=hashlib.sha256((out / "samples.csv").read_bytes()).hexdigest(),
-                    scope='Local same-floor follow, authored start/stop and turning; no contact or cross-box navigation')
+                    scope=('Animated attendant contact and avatar pushing' if name.startswith('contact') else 'Local same-floor follow, authored start/stop and turning; no contact or cross-box navigation'))
     destination = ROOT / 'game/tests/data/original'
     (destination / f'winston_{name}.csv').write_bytes((out / 'samples.csv').read_bytes())
     (destination / f'winston_{name}.json').write_text(json.dumps(metadata, indent=2)+'\n')

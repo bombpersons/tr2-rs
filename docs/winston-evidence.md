@@ -57,11 +57,11 @@ level fields or editor dependency on the game were introduced.
 This milestone verifies open, flat, local movement with a direct path target.
 The older `away`/`turn` investigation routes cross navigation boxes, where the
 original can clamp its target to a corridor. Full path search, step/ledge
-avoidance, obstacle avoidance, Lara contact/pushing, controller-triggered voice
+avoidance, obstacle avoidance, controller-triggered voice
 sounds, random sounds and creature activation scheduling remain unported.
 The current floor guard refuses movement onto a different height; it is a
 bounded fallback, not a verified reconstruction of creature navigation.
-Mesh-sphere contact requires separate verification before extending this claim.
+The animated contact milestone below verifies ordinary open-space Lara pushing.
 
 Milestone checks: `cargo test --workspace --all-features` and Clippy completed;
 Clippy's existing warnings remain outside this controller. The engine sandbox
@@ -72,3 +72,70 @@ views centered on the attendant. Original and rebuilt route views, the posed
 attendant, editor preview and sandbox screenshots were visually inspected.
 The workspace formatting check reports pre-existing differences elsewhere;
 the new controller/tests and changed heading module pass rustfmt directly.
+
+## Animated contact and avatar pushing
+
+The contact milestone replaces pass-through for type260 with the sequence
+observed in its collision callback `0x8001C65C`: coarse animated bounds,
+posed mesh spheres, then an expanded-box push. It does not use an always-solid
+capsule or the whole model's static bounds.
+
+`0x8001CCA4` chooses the nearest authored key for both vertical intervals;
+strict touching endpoints do not overlap. It rotates Lara's origin into the
+obstacle's frame and tests XZ inclusively against that key's bounds expanded
+by the100-unit Lara context radius (`0x800381E8`). `0x800289D4` chooses the
+next key only beyond halfway; ties choose the earlier key. The shortened
+last-interval test retains the source's comparison with absolute clip end.
+The engine exposes this separately from interpolated clearance bounds.
+
+The sphere generator `0x8005BAF8` uses the same single key, its root offset,
+authored joint tree and every mesh's center/radius. The overlap test
+`0x8005B990` uses strict3D squared distance and stores an obstacle-mesh mask.
+No extra runtime joint rotations are read in the four retained calls; the
+attendant's skeleton flags use only stack push/pop bits. The Bevy implementation
+uses ordinary posed transforms. The82 independently captured sphere centers
+are within1.022 source units of the original, with exact radii and masks
+0x10000/0x110000 in the two complete actor-pair fixtures. A4-unit regression
+bound explicitly allows intermediate GTE truncation differences; this is not
+an implementation of GTE arithmetic. `tools/inspect_winston.py
+--record-contact-spheres` reproduces the two native instruction traces and
+exports the actual output stores, without reconstructing the transforms.
+The checked-in JSON retains commands, frame/clip/root identity and trace hashes.
+
+On sphere overlap, `0x8001C890` selects the closest expanded-box edge with
+tie priority minX, maxX, maxZ, minZ. Local/world products are summed before
+the arithmetic shift; this makes the final integer edge corrections exact.
+Type260 passes the non-stagger option, preserving Lara's animation and speed.
+AnimateItem clears last tick's contacts at `0x8001DDC8`, after the attendant's
+controller has had a chance to read them. Contact then publishes this tick's
+new mask. The port keeps those boundaries explicitly.
+
+`game/tests/winston_contact.rs` runs both real controllers and the same pad
+inputs for285 ticks across four complete ordinary routes: airborne backward
+contact, a delayed airborne hop, sustained backward walking and walking
+release/recovery. The last three were first recorded after implementation.
+All18 compared columns match each tick, including Lara position, signed speed,
+yaw, animation, state and goal, plus the attendant's pose and mesh contact mask.
+No state or position is supplied after tick0. Engine tests also distinguish
+nearest-key contact from clearance interpolation and retain joint ids when a
+mesh has no positive-radius sphere.
+
+World validation currently bounds pushes using floor/body-clearance probes
+and restores the tick's original XZ if rejected. The original's general
+collision call uses body height762, upward tolerance384 and a temporary
+movement heading (`0x8001CBC8..0x8001CC6C`). These four routes accept their
+candidates in open space. Wall/static/step rejection, room-list traversal,
+context-bit changes in special player modes, multiple-object ordering and the
+source's object-contact-before-avatar-state-collision boundary still require
+separate runtime verification. The current combined avatar motion/collision
+phase has not been generalized on the strength of these open-space routes.
+
+Contact checks: the all-features workspace tests and Clippy completed; existing
+unrelated warnings remain. All four full-game MCP contact replays pass14
+checkpoints each (56 total), including sampled masks, exact Lara corrections,
+authored poses and separate attendant-centered views. The immediate walking
+fixture seeds the checkpoint's sampled prior collision heading after the
+bootstrap tick; no gameplay correction is applied during replay. Native/rebuilt
+contact views and attendant poses were visually inspected. The rebuilt engine
+sandbox ran and the editor Home idle-pose preview and untouched save passed.
+No template or persistent level-format changes were needed.

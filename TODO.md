@@ -126,7 +126,9 @@ it off. Record partial progress below without checking the parent item.
   start/stop and turning now match1260 PSX ticks across four ordinary routes,
   including three independent recordings. [Evidence](docs/winston-evidence.md),
   [tests](game/tests/winston.rs). Cross-box navigation, room obstacles and
-  Lara contact/pushing remain.
+  blocked-world contact and unusual player modes remain. Ordinary animated
+  contact/pushing now matches285 additional ticks, with three independent
+  routes and retained native sphere-output fixtures.
 
 
 - [ ] Pistols: draw/holster, firing cadence, targeting and shot/damage timing.
