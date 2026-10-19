@@ -144,9 +144,13 @@ window, the map and clicking faces in mesh mode all choose the same room.
   them in another room, so recomputing it outright would rewrite authored
   data. A move into solid ground keeps the room and warns. Lights will do
   the same.
-- **Diagnostics:** one-sided portals, sector portals without a render
-  portal, mismatched heights across a link, objects in the wrong room, stale
-  navigation boxes. A fix button where the fix is unambiguous.
+- **Diagnostics (built):** one-sided portals, links without a render
+  portal or into solid, mismatched heights across a link, objects in another
+  room or in solid, sectors outside or without a navigation box, and boxes
+  stale since the level was opened. Imported data breaks most of these on
+  purpose, so problems are split into new (since the file was opened) and
+  inherited. Fixes: the mirror of a one-sided portal (all 7,478 two-sided
+  imported pairs but 6 follow the mirror rule) and an object's room.
 
 ### Editing across rooms
 
@@ -207,7 +211,7 @@ nothing in the game.
 
 1. Toolbar and Paint tool. (Done.)
 2. Rooms window, map view, automatic object room. (Done.)
-3. Diagnostics.
+3. Diagnostics. (Done.)
 4. Connect / open hole, then split and merge, then new room.
 5. Navigation box rebuild.
 6. Lights and baking.

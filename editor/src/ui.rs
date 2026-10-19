@@ -23,6 +23,7 @@ pub struct Windows {
     pub textures: bool,
     pub rooms: bool,
     pub map: bool,
+    pub diagnostics: bool,
     pub map_view: crate::rooms::MapView,
     pub group: Group,
     pub filter: String,
@@ -37,6 +38,7 @@ impl Default for Windows {
             textures: false,
             rooms: false,
             map: false,
+            diagnostics: false,
             map_view: default(),
             group: Group::Room,
             filter: String::new(),
@@ -107,6 +109,9 @@ fn ui(
     let empty = ObjectTypes::default();
     let types = types.as_deref().unwrap_or(&empty);
     shortcuts(ctx, editor);
+    if let Some(world) = world.as_deref() {
+        editor.diagnostics.refresh(&world.data);
+    }
     let top = menu_bar(ctx, editor);
     let top = top + crate::toolbar::toolbar(ctx, editor, top, world.as_deref().map(|w| &*w.data), atlas);
     status_bar(ctx, editor);
@@ -142,6 +147,11 @@ fn ui(
             let level = world.as_deref().map(|w| &*w.data);
             crate::rooms::map(ui, editor, &mut windows.map_view, level, cameras.single().ok())
         });
+    egui::Window::new("Diagnostics")
+        .open(&mut windows.diagnostics)
+        .default_pos([290.0, area.bottom() - 330.0])
+        .default_size([560.0, 290.0])
+        .show(ctx, |ui| crate::diagnostics::window(ui, editor, world.as_deref().map(|w| &*w.data)));
     windows.data |= show_data;
     egui::Window::new("Data")
         .open(&mut windows.data)
@@ -259,6 +269,7 @@ fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
                             ui.checkbox(&mut windows.textures, "Textures");
                             ui.checkbox(&mut windows.rooms, "Rooms");
                             ui.checkbox(&mut windows.map, "Map");
+                            ui.checkbox(&mut windows.diagnostics, "Diagnostics");
                             ui.separator();
                             if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
                                 editor.frame = true;
@@ -320,7 +331,7 @@ fn file_menu(ui: &mut egui::Ui, editor: &mut Editor) {
     }
 }
 
-fn status_bar(ctx: &egui::Context, editor: &Editor) {
+fn status_bar(ctx: &egui::Context, editor: &mut Editor) {
     let rect = ctx.viewport_rect();
     egui::Area::new("status bar".into())
         .fixed_pos([0.0, rect.bottom() - 26.0])
@@ -333,6 +344,15 @@ fn status_bar(ctx: &egui::Context, editor: &Editor) {
                         if editor.mesh.on { format!("Mesh: room {}", editor.mesh.room) } else { "Objects".into() };
                     ui.label(RichText::new(mode).strong()).on_hover_text("Tab switches between object and mesh mode");
                     ui.separator();
+                    let new = editor.diagnostics.new_count();
+                    if new > 0 {
+                        let text = RichText::new(format!("{new} new problem{}", if new == 1 { "" } else { "s" }))
+                            .color(ui.visuals().warn_fg_color);
+                        if ui.link(text).on_hover_text("Open Diagnostics").clicked() {
+                            editor.windows.diagnostics = true;
+                        }
+                        ui.separator();
+                    }
                     ui.label(&editor.status);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(RichText::new(editor.doc.path().display().to_string()).weak());

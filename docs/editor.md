@@ -73,6 +73,25 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   its clicks) to rooms overlapping a height range, starting from the current
   room's. While Rooms or Map is open, the 3D view outlines the current
   room's box and its portals in the same colours.
+- **Diagnostics** (View > Diagnostics, or the status bar's "N new problems")
+  checks how rooms join, where objects stand and the navigation boxes:
+  one-sided portals; doorway, floor and ceiling links with no render portal,
+  or into solid ground; heights that differ across a link; objects standing
+  in another room or in solid ground; sectors outside their navigation box
+  or open without one; and boxes left stale by a floor that changed since the
+  level was opened. Imported levels break most of these rules on purpose
+  (WALL has 744 such problems, many of them doorways into rooms on another
+  layer), so problems the file had when it was opened are counted as
+  inherited and hidden until **Show inherited** is ticked; the status bar
+  counts only new ones. **Go to** selects the object, or chooses and frames
+  the room (and in mesh mode selects the sector's floor). **Fix** appears
+  where only one fix makes sense: adding the mirror of a one-sided portal to
+  the other room (the way imported portal pairs are built: same opening,
+  opposite normal, reversed winding, one unit short of the plane on the
+  positive side), or setting an object's room to the one it stands in.
+  **Fix all new** applies every fix offered for new problems as one undo
+  step. There is no fix for heights or navigation boxes; rebuilding boxes is
+  planned (docs/editor-design.md).
 
 The **toolbar** has four groups. Each button runs the same function as its
 key and menu item, and a button that does not apply is greyed out with the
@@ -321,9 +340,13 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
 checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
-references, the unsaved-changes question, the Rooms and Map windows with the
-current room's outline, carrying an object through a doorway into the next
-room (on levels with several rooms) and undoing it, mesh mode (raise a floor, a refused unsnapped
+references, the unsaved-changes question, clicking a framed object in the 3D
+view and Shift-clicking it off with the Select tool (automation's `click`
+goes through the same systems as the mouse, so this runs headless), the
+Rooms and Map windows with the current room's outline, carrying an object
+through a doorway into the next room (on levels with several rooms) and
+undoing it, Diagnostics reporting a deleted return portal as new and Fix all
+new restoring it, mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

@@ -221,6 +221,45 @@ def click_smoke(client, level, preferred):
     raise AssertionError('clicking a framed object never selected it')
 
 
+def diagnostics_smoke(client, level, captures):
+    """Delete a room's portal back to a neighbour: Diagnostics reports a new
+    one-sided portal (the file's own quirks stay inherited), and Fix all new
+    restores a portal back."""
+    state = command(client, show_diagnostics=True)
+    # Earlier steps may have left new problems (the sandbox object moved
+    # into the solid border is one); count from here.
+    before = state['problems_new']
+    pair = next(((i, k) for i, r in enumerate(level['rooms']) for k, p in enumerate(r['portals'])
+                 if any(q['room'] == i for q in level['rooms'][p['room']]['portals'])), None)
+    if pair is None:
+        time.sleep(1)
+        captures.append(client.capture('diagnostics'))
+        return {'new': before, 'total': state['problems'], 'fixed': None}
+    room, portal = pair
+    target = level['rooms'][room]['portals'][portal]['room']
+    kept = [q for q in level['rooms'][target]['portals'] if q['room'] != room]
+    state = settled(client, state, pointer=f'/rooms/{target}/portals', json=json.dumps(kept), apply=True)
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] == before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] > before, state
+    time.sleep(1)
+    captures.append(client.capture('diagnostics'))
+    state = settled(client, state, fix_new=True)
+    assert state['message'].startswith('Fixed'), state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    # The doorway sectors' links would stay new if the fix were missing.
+    state = status(client)
+    assert state['problems_new'] == before, state
+    state = settled(client, state, undo=True)
+    state = settled(client, state, undo=True)
+    assert not state['dirty'], state
+    return {'new': before, 'total': state['problems'], 'fixed': {'room': room, 'portal': portal, 'into': target}}
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -350,6 +389,7 @@ def main():
         state = command(client, select='1', frame=True)
         captures.append(client.capture('edited'))
         rooms = rooms_smoke(client, saved, captures)
+        diagnostics = diagnostics_smoke(client, saved, captures)
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -369,7 +409,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

@@ -4,12 +4,14 @@
 //! no-op save (including edit followed by undo) is byte-exact, and a changed
 //! save rewrites only what changed, in the file's own formatting. Changes use
 //! the same typed format and reference validation as the preview.
+mod diagnostics;
 mod mesh;
 mod rooms;
 mod splice;
 mod validate;
 
 use crate::world::Level;
+pub use diagnostics::*;
 pub use mesh::*;
 pub use rooms::*;
 use serde_json::Value;

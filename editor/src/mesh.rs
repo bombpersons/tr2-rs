@@ -151,10 +151,17 @@ impl Editor {
 
     /// Run a grid-aware edit on a copy of the level and keep it as one undo step.
     fn mesh_edit<T>(&mut self, done: &str, op: impl FnOnce(&mut Level, usize) -> Result<T, String>) -> Option<T> {
+        let room = self.mesh.room;
+        self.level_edit(done, |level| op(level, room))
+    }
+
+    /// Run an edit on a copy of the typed level and keep it as one undo step,
+    /// reporting `done` or why it was refused.
+    pub fn level_edit<T>(&mut self, done: &str, op: impl FnOnce(&mut Level) -> Result<T, String>) -> Option<T> {
         self.commit();
         let steps = self.doc.undo_steps();
         let result = self.doc.level().and_then(|mut level| {
-            let value = op(&mut level, self.mesh.room)?;
+            let value = op(&mut level)?;
             self.doc.apply_level(&level)?;
             Ok(value)
         });

@@ -1,5 +1,6 @@
 //! A full-resolution authoring app over engine formats, with no game dependency.
 mod animation;
+mod diagnostics;
 mod edit;
 mod files;
 mod gizmo;
@@ -56,6 +57,7 @@ struct Editor {
     snap: bool,
     /// The next framing shows the current room rather than the selection.
     frame_room: bool,
+    diagnostics: diagnostics::Diagnostics,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,6 +69,7 @@ enum Leave {
 
 impl Editor {
     fn new(doc: LevelDocument) -> Self {
+        let opened = doc.level().ok();
         Self {
             doc,
             selection: vec![],
@@ -87,6 +90,7 @@ impl Editor {
             tool: default(),
             snap: false,
             frame_room: false,
+            diagnostics: diagnostics::Diagnostics::opened(opened),
         }
     }
 }
@@ -143,6 +147,10 @@ struct EditorCommand {
     room: i64,
     /// Frame the current room.
     frame_room: bool,
+    /// Open the Diagnostics window.
+    show_diagnostics: bool,
+    /// Apply every fix offered for a new problem.
+    fix_new: bool,
     /// "select", "move", "rotate" or "paint".
     tool: String,
 }
@@ -164,6 +172,9 @@ struct EditorStatus {
     mesh_selection: String,
     tool: String,
     brush: i64,
+    /// Problems an edit introduced, and every problem found.
+    problems_new: usize,
+    problems: usize,
 }
 
 fn main() -> AppExit {
@@ -397,6 +408,16 @@ fn automation(
         c.frame_room = false;
         editor.frame_room();
     }
+    if c.show_diagnostics {
+        c.show_diagnostics = false;
+        editor.windows.diagnostics = true;
+    }
+    if c.fix_new {
+        c.fix_new = false;
+        let fixable: Vec<_> =
+            editor.diagnostics.problems.iter().filter(|(p, i)| !i && p.fix.is_some()).map(|(p, _)| p.clone()).collect();
+        editor.fix_problems(&fixable);
+    }
     if c.show_textures {
         c.show_textures = false;
         editor.windows.textures = true;
@@ -553,6 +574,7 @@ impl Editor {
                 self.recent.retain(|p| p != &old && p != doc.path());
                 self.recent.insert(0, old);
                 self.recent.truncate(8);
+                self.diagnostics = diagnostics::Diagnostics::opened(doc.level().ok());
                 self.doc = doc;
                 self.selection.clear();
                 self.mesh.room = 0;
@@ -651,6 +673,8 @@ fn status(editor: Res<Editor>, mut status: Query<&mut EditorStatus>) {
         status.mesh_selection = editor.mesh_selection_text();
         status.tool = editor.tool.name().to_lowercase();
         status.brush = editor.mesh.brush.map_or(-1, |b| b as i64);
+        status.problems_new = editor.diagnostics.new_count();
+        status.problems = editor.diagnostics.problems.len();
     }
 }
 
