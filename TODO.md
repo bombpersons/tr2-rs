@@ -11,11 +11,12 @@ it off. Record partial progress below without checking the parent item.
 
 ## Recent rendering and collision fixes
 
-- [ ] Oblique Home room-wall contact after a left turn: the full-game
-  `winston_nav_turn_heldout` route exposes an avatar Z95536 vs PSX95550
-  settling difference. The item-only navigation route matches; correct the
-  avatar branch and retain independent collision validation.
-
+- [x] Frontal oblique running room-wall contact: restore the tick's previous
+  tangent coordinate; use verified quantized ground/braking motion. The former
+  navigation diagnostic and five additional routes match2745 ticks, including
+  two fresh combined-rule validations. [Evidence](docs/oblique-wall-evidence.md),
+  [tests](game/tests/winston_contact.rs). Side/corner/static/ceiling combinations
+  remain separate work.
 
 - [x] Missing room geometry at the Wall entrance and Home training course:
   mesh/material restoration and portal traversal ordering, with pixel-checked

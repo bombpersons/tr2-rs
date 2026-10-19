@@ -1,0 +1,160 @@
+{
+  "source": "Supplied USA Rev3 disc through psx native runtime, no pokes",
+  "calibration_for": "Frontal oblique run wall tangent restoration; nav_turn was not held out for this correction",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/home_runway_start/state.bin",
+    "--frames",
+    "270",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"UP\"], \"until\": 150}, {\"frame\": 150, \"buttons\": [\"LEFT\"], \"until\": 174}, {\"frame\": 174, \"buttons\": [\"UP\"], \"until\": 238}]",
+    "--out",
+    "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/oblique-wall/calibration-trace",
+    "--trace",
+    "--trace-from-frame",
+    "224",
+    "--trace-frames",
+    "2",
+    "--watch",
+    "8017c8b0:12",
+    "--watch-changes-only",
+    "--max-events",
+    "20000",
+    "--summary",
+    "--trace-range",
+    "3A844-3AA20",
+    "--trace-range",
+    "1B018-1BC00",
+    "--trace-range",
+    "1C0AC-1C0E8",
+    "--trace-range",
+    "3C544-3C5F4"
+  ],
+  "checkpoint_sha256": "8f452c632c140047141e9dbf539f042cdb70f4e4e9e7d560ebda6466f57e41de",
+  "build": {
+    "id": "src-6406590b7cd127b1-release",
+    "profile": "release",
+    "source_sha256": "6406590b7cd127b1dfc1222afa4a416e0653cac479c3af1ced1c87ea0947bd38",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "trace_sha256": "af5b7c7501966ce03ee9dfc51113f47f41526a5c202c960ff113ae41d6181f08",
+  "writes_sha256": "8dead5ae78755dd9bdc373fbe2467c23d633b828b7aa67218b6c38feab9dddf5",
+  "trace_complete": true,
+  "watch_complete": true,
+  "run_field": 225,
+  "prior_position": [
+    16492,
+    2560,
+    95550
+  ],
+  "proposed_position": [
+    16446,
+    2560,
+    95536
+  ],
+  "observed_context_stores": [
+    {
+      "pc": "0x0001b838",
+      "address": "0x807ffe68",
+      "value": 39
+    },
+    {
+      "pc": "0x0001b840",
+      "address": "0x807ffe70",
+      "value": 14
+    },
+    {
+      "pc": "0x0001b9b4",
+      "address": "0x807ffe8a",
+      "value": 1
+    },
+    {
+      "pc": "0x0001c0ac",
+      "address": "0x0017c8b0",
+      "value": 16485
+    },
+    {
+      "pc": "0x0001c0d4",
+      "address": "0x0017c8b8",
+      "value": 95550
+    }
+  ],
+  "observed_position_writes": [
+    {
+      "address": 1558704,
+      "address_hex": "0x0017C8B0",
+      "cycle": 8813016858,
+      "frame": 15597,
+      "old": 16492,
+      "old_hex": "0x0000406C",
+      "old_signed": 16492,
+      "pc": 275060,
+      "pc_hex": "0x00043274",
+      "run_frame": 225,
+      "value": 16446,
+      "value_hex": "0x0000403E",
+      "value_signed": 16446,
+      "width": 4,
+      "writer": "cpu"
+    },
+    {
+      "address": 1558712,
+      "address_hex": "0x0017C8B8",
+      "cycle": 8813016916,
+      "frame": 15597,
+      "old": 95550,
+      "old_hex": "0x0001753E",
+      "old_signed": 95550,
+      "pc": 275108,
+      "pc_hex": "0x000432A4",
+      "run_frame": 225,
+      "value": 95536,
+      "value_hex": "0x00017530",
+      "value_signed": 95536,
+      "width": 4,
+      "writer": "cpu"
+    },
+    {
+      "address": 1558704,
+      "address_hex": "0x0017C8B0",
+      "cycle": 8813022968,
+      "frame": 15597,
+      "old": 16446,
+      "old_hex": "0x0000403E",
+      "old_signed": 16446,
+      "pc": 114860,
+      "pc_hex": "0x0001C0AC",
+      "run_frame": 225,
+      "value": 16485,
+      "value_hex": "0x00004065",
+      "value_signed": 16485,
+      "width": 4,
+      "writer": "cpu"
+    },
+    {
+      "address": 1558712,
+      "address_hex": "0x0017C8B8",
+      "cycle": 8813022988,
+      "frame": 15597,
+      "old": 95536,
+      "old_hex": "0x00017530",
+      "old_signed": 95536,
+      "pc": 114900,
+      "pc_hex": "0x0001C0D4",
+      "run_frame": 225,
+      "value": 95550,
+      "value_hex": "0x0001753E",
+      "value_signed": 95550,
+      "width": 4,
+      "writer": "cpu"
+    }
+  ],
+  "settled_position": [
+    16485,
+    2560,
+    95550
+  ]
+}
