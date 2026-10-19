@@ -96,6 +96,7 @@ pub(super) fn step(
         PlayerMode::JumpingUp { .. }
             | PlayerMode::JumpingForward
             | PlayerMode::FastFalling
+            | PlayerMode::FatalLanding
             | PlayerMode::JumpImpact
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
@@ -176,6 +177,12 @@ pub(super) fn step(
         }
     }
     let state = clips.state(animation.animation).unwrap_or(2);
+    if mode == PlayerMode::FatalLanding {
+        // Fatal fast-fall collision leaves the fall clip with goal8; its
+        // authored dispatch enters25, whose final frame holds the body.
+        motion.velocity = Vec3::ZERO;
+        return true;
+    }
     if mode == PlayerMode::JumpImpact && animation.animation == STANDING_CLIP {
         // AnimateLara's natural end link restores the destination state
         // (0x80042FAC). Until then state14 overrides clip31's state2.
@@ -591,7 +598,14 @@ fn jump_motion(
             motion.grounded = true;
             motion.air_animation = 0;
             if player.health <= 0 {
-                motion.velocity = Vec3::ZERO;
+                if matches!(mode, PlayerMode::FastFalling) {
+                    //0x8003AF54..0x8003AF60 requests death without replacing
+                    // the current fast-fall clip on the contact tick.
+                    traversal.goal = 8;
+                    player.mode = PlayerMode::FatalLanding;
+                } else {
+                    motion.velocity = Vec3::ZERO;
+                }
                 return true;
             }
             traversal.goal = if state == 3 && pad.held(Button::Up) && !pad.held(Button::R1) { 1 } else { 2 };

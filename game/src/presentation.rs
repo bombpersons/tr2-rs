@@ -146,7 +146,7 @@ fn update_hud(session:Res<Session>,active:Option<Res<ActiveLevel>>,players:Query
         label.0=format!("{}\n\n{menu}\n\n{}",if session.inventory {"INVENTORY"}else{"PAUSED"},session.message);
     } else if let Some(active)=active {
         let title=LEVELS.iter().find(|(n,_)|*n==active.name).map(|(_,t)|*t).unwrap_or(&active.name);
-        label.0=if players.single().is_ok_and(|(p,_)|p.health==0) {format!("{title}\n\nLara has died\nSTART for menu")}else{String::new()};
+        label.0=if players.single().is_ok_and(|(p,_)|p.health<=0) {format!("{title}\n\nLara has died\nSTART for menu")}else{String::new()};
     }
     if let Ok((p,_))=players.single(){if let Ok((mut sprite,mut t,mut vis))=health.single_mut(){let width=(p.health as f32/10.0).clamp(0.0,100.0);sprite.custom_size=Some(Vec2::new(width,4.0));t.translation.x=-145.0+width/2.0;*vis=if session.title {Visibility::Hidden}else{Visibility::Inherited};}}
 }

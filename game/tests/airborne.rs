@@ -31,13 +31,27 @@ fn compare_case(csv: &str, metadata: &str) {
     let frame = original.get(0, "animation_frame").unwrap() as f32 - starts[clip] as f32;
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins(PlayerRulesPlugin).insert_resource(clips).insert_resource(WorldGeometry::new(data));
-    let entity = app
-        .world_mut()
-        .spawn((
-            Player::at(position, yaw, original.get(0, "room").unwrap() as usize),
-            AnimationState::at_frame(clip, frame),
-        ))
-        .id();
+    let mut actor = Player::at(position, yaw, original.get(0, "room").unwrap() as usize);
+    actor.health = original.get(0, "health").unwrap() as i32;
+    let falling_fixture = metadata["initial_mode"] == "fast_falling";
+    if falling_fixture {
+        actor.mode = PlayerMode::FastFalling;
+    } else if metadata["initial_mode"] == "fatal_landing" {
+        actor.mode = PlayerMode::FatalLanding;
+    }
+    let entity = app.world_mut().spawn((actor, AnimationState::at_frame(clip, frame))).id();
+    if falling_fixture {
+        let speed = original.get(0, "speed").unwrap() as f32 * 30.0 / 1024.0;
+        let fall = original.get(0, "fall_speed").unwrap() as f32 * 30.0 / 1024.0;
+        let mut motion = app.world_mut().get_mut::<Motion>(entity).unwrap();
+        motion.grounded = false;
+        motion.velocity = (Vec3::new(yaw.sin(), 0.0, yaw.cos()) * speed).with_y(-fall);
+        motion.movement_heading = Some(yaw);
+        app.world_mut().get_mut::<Traversal>(entity).unwrap().goal = original.get(0, "goal").unwrap() as usize;
+    }
+    if metadata["initial_mode"] == "fatal_landing" {
+        app.world_mut().get_mut::<Traversal>(entity).unwrap().goal = original.get(0, "goal").unwrap() as usize;
+    }
     let inputs = replay.tick_inputs(alignment, original.ticks() - 1).unwrap();
     let columns = [
         "x",
@@ -193,6 +207,19 @@ fn heldout_early_release_and_recovery_jump_under_a_low_ceiling() {
 }
 
 recorded_case!(original_forward_jump_rebounds_into_fast_fall_and_heavy_landing, "forward_wall");
+recorded_case!(original_fast_fall_at_140_lands_without_damage, "fall_damage_140");
+recorded_case!(original_fast_fall_at_141_loses_five_health, "fall_damage_141");
+recorded_case!(original_fast_fall_at_153_loses_862_health, "fall_damage_153");
+recorded_case!(original_fast_fall_above_154_uses_the_authored_fatal_landing, "fall_damage_155_impact");
+recorded_case!(
+    original_fatal_landing_plays_and_holds_the_authored_body_pose_after_the_native_wait,
+    "fall_damage_fatal_pose"
+);
+recorded_case!(heldout_fast_fall_at_142_ignores_jump_during_heavy_recovery, "fall_damage_142_heldout");
+recorded_case!(heldout_fast_fall_at_147_recovers_then_walks_with_reduced_health, "fall_damage_147_heldout");
+recorded_case!(heldout_fast_fall_at_154_reaches_zero_health_on_contact, "fall_damage_154_heldout");
+recorded_case!(heldout_moving_fatal_fast_fall_retains_contact_speed_and_displacement, "fall_damage_155_moving_heldout");
+recorded_case!(heldout_fatal_ground_pose_ignores_movement_and_jump_input, "fall_damage_fatal_pose_heldout");
 recorded_case!(original_walk_wall_retains_standing_before_a_blocked_start, "walk_wall");
 recorded_case!(original_walk_ledge_uses_the_foot_stop_with_standing_control, "walk_ledge");
 recorded_case!(original_walk_steps_up_through_authored_foot_clips, "walk_step_up");

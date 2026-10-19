@@ -3,6 +3,16 @@
 from backward_collision_smoke import main
 
 CAPTURES = {
+    'fall_damage_140': [2, 4, 40, 78, 80, 82, 84, 130],
+    'fall_damage_141': [2, 4, 40, 78, 80, 82, 84, 130],
+    'fall_damage_153': [2, 4, 40, 78, 80, 82, 84, 130],
+    'fall_damage_155_impact': [2],
+    'fall_damage_fatal_pose': [2, 4, 20, 28, 30, 32, 60, 110],
+    'fall_damage_142_heldout': [2, 10, 12, 40, 42, 80, 82, 84, 150],
+    'fall_damage_147_heldout': [2, 80, 82, 84, 88, 90, 108, 114, 116, 118, 150],
+    'fall_damage_154_heldout': [2],
+    'fall_damage_155_moving_heldout': [2],
+    'fall_damage_fatal_pose_heldout': [2, 12, 14, 20, 28, 30, 32, 60, 62, 130],
     'roll_during_walk_heldout': [38, 40, 42, 62, 64, 66, 94, 96, 120, 124, 128, 160, 200, 230],
     'roll_runway': [2, 14, 16, 18, 40, 42, 44, 58, 60, 62],
     'roll_step_up': [2, 14, 16, 18, 28, 30, 40, 42, 44, 58, 60, 62],
