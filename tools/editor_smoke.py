@@ -349,6 +349,39 @@ def hole_smoke(client, level, captures):
     return {'rooms': [a, b], 'cells': count}
 
 
+def new_room_smoke(client, level, captures):
+    """Draw a 2 x 2 room on the map beside the sandbox room's open floor,
+    create it, and connect it through its first wall (cutting the sandbox's
+    room-wide wall down to one sector). The only new problems are the new
+    room's missing navigation boxes."""
+    rooms = len(level['rooms'])
+    state = command(client, mode='object', room=0)
+    before = state['problems_new']
+    state = command(client, draft_room='5,3,7,5,0,-2048')
+    time.sleep(1)
+    captures.append(client.capture('new-room-draft'))
+    state = settled(client, state, create_room=True)
+    assert state['rooms'] == rooms + 1 and state['message'].startswith(f'Created room {rooms}'), state
+    # Its first wall faces in from the -x border, beside the sandbox's floor.
+    state = command(client, mode='mesh', mesh_room=rooms)
+    state = command(client, mesh_select='q2')
+    state = settled(client, state, mesh_connect=True)
+    assert state['message'].startswith('Opened a doorway into room 0'), state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before + 4 and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before + 4, state
+    state = command(client, frame_room=True)
+    time.sleep(1.5)
+    captures.append(client.capture('new-room-connected'))
+    state = settled(client, state, undo=True)
+    state = settled(client, state, undo=True)
+    assert state['rooms'] == rooms, state
+    command(client, mode='object', room=0)
+    return {'room': rooms, 'connected_to': 0}
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -481,6 +514,7 @@ def main():
         diagnostics = diagnostics_smoke(client, saved, captures)
         connected = connect_smoke(client, saved, captures)
         holes = hole_smoke(client, saved, captures)
+        built = new_room_smoke(client, saved, captures) if source.parent.name == 'sandbox' else None
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -500,7 +534,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

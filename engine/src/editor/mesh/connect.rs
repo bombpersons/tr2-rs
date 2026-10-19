@@ -107,6 +107,7 @@ fn add_face(room: &mut Room, points: [[i32; 3]; 4], toward: [i32; 3], texture: u
 fn clear_plane(room: &mut Room, axis: usize, at: i32, along: i32) -> Option<usize> {
     let other = 2 - axis;
     let (lo, hi) = (along * SECTOR, along * SECTOR + SECTOR);
+    split_walls(room, axis, at, lo, hi);
     let inside = |corners: &[usize], room: &Room| {
         corners.iter().all(|&v| {
             let p = point(room, v);
@@ -135,6 +136,63 @@ fn clear_plane(room: &mut Room, axis: usize, at: i32, along: i32) -> Option<usiz
     }
     collect_unused(room, &gone);
     texture
+}
+
+/// Cut quads in the plane `axis` = `at` that cross `lo..hi` on the other
+/// axis but reach past it into one quad per sector, so one sector of a long
+/// wall can open (the sandbox's walls span the whole room). Only walls with
+/// two vertical edges are cut; heights between them are interpolated.
+fn split_walls(room: &mut Room, axis: usize, at: i32, lo: i32, hi: i32) {
+    let other = 2 - axis;
+    let mut cut = vec![];
+    for (i, q) in room.quads.iter().enumerate() {
+        let points: Vec<[i32; 3]> = q[..4].iter().map(|&v| point(room, v)).collect();
+        if points.iter().any(|p| p[axis] != at) {
+            continue;
+        }
+        let ends: BTreeSet<i32> = points.iter().map(|p| p[other]).collect();
+        let [start, end] = ends.iter().copied().collect::<Vec<_>>()[..] else { continue };
+        if end <= lo || start >= hi || (start >= lo && end <= hi) {
+            continue;
+        }
+        let span = |at: i32| {
+            let ys: Vec<i32> = points.iter().filter(|p| p[other] == at).map(|p| p[1]).collect();
+            [*ys.iter().min().unwrap(), *ys.iter().max().unwrap()]
+        };
+        let toward = if normal(&points, axis) > 0 { -1 } else { 1 };
+        cut.push((i, start, end, span(start), span(end), toward, q[4]));
+    }
+    if cut.is_empty() {
+        return;
+    }
+    let gone: Vec<usize> = cut.iter().map(|c| c.0).collect();
+    let corners: BTreeSet<usize> = gone.iter().flat_map(|&i| room.quads[i][..4].to_vec()).collect();
+    let mut index = 0;
+    room.quads.retain(|_| {
+        index += 1;
+        !gone.contains(&(index - 1))
+    });
+    for (_, start, end, a, b, toward, texture) in cut {
+        let y = |x: i32, k: usize| a[k] + ((b[k] - a[k]) as i64 * (x - start) as i64 / (end - start) as i64) as i32;
+        let mut stops: Vec<i32> =
+            (start.div_euclid(SECTOR) + 1..=(end - 1).div_euclid(SECTOR)).map(|s| s * SECTOR).collect();
+        stops.insert(0, start);
+        stops.push(end);
+        let mut dir = [0; 3];
+        dir[axis] = toward;
+        for pair in stops.windows(2) {
+            let p = |x: i32, y: i32| {
+                let mut p = [0; 3];
+                p[axis] = at;
+                p[other] = x;
+                p[1] = y;
+                p
+            };
+            let (x0, x1) = (pair[0], pair[1]);
+            add_face(room, [p(x0, y(x0, 1)), p(x1, y(x1, 1)), p(x1, y(x1, 0)), p(x0, y(x0, 0))], dir, texture);
+        }
+    }
+    collect_unused(room, &corners);
 }
 
 /// Any texture the room uses for `surface`, else for anything.

@@ -10,13 +10,14 @@ use crate::{
     viewport::{file_offset, world},
 };
 use bevy::prelude::*;
-use bevy_egui::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2 as EVec2};
+use bevy_egui::egui::{self, Color32, Pos2, Rect, RichText, Sense, Stroke, Vec2 as EVec2};
 use engine::{
     editor::{Link, neighbours},
     render::GameCamera,
     world::{Level, Room, WorldGeometry, format::SOLID},
 };
 use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
 
 const SECTOR: f32 = 1024.0;
 
@@ -30,11 +31,86 @@ pub struct MapView {
     pub fit: bool,
     /// Show only rooms overlapping this height range (level y, down).
     pub slice: Option<[i32; 2]>,
+    /// The New room tool: dragging draws a room's open floor.
+    pub drawing: bool,
+    /// Where a drag began and where it is now (level x, z).
+    drag: Option<([f32; 2], [f32; 2])>,
+    /// A drawn room waiting for its heights.
+    pub draft: Option<Draft>,
 }
 impl Default for MapView {
     fn default() -> Self {
-        Self { center: [0.0; 2], scale: 0.01, fit: true, slice: None }
+        Self { center: [0.0; 2], scale: 0.01, fit: true, slice: None, drawing: false, drag: None, draft: None }
     }
+}
+
+/// A room drawn on the map: its open floor in world sector numbers, and heights.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Draft {
+    pub x: [i32; 2],
+    pub z: [i32; 2],
+    pub floor: i32,
+    pub ceiling: i32,
+}
+
+impl Draft {
+    /// The sectors between two level points, inclusive.
+    fn between(a: [f32; 2], b: [f32; 2], (floor, ceiling): (i32, i32)) -> Self {
+        let cells = |i: usize| {
+            let (lo, hi) = (a[i].min(b[i]), a[i].max(b[i]));
+            [(lo / SECTOR).floor() as i32, (hi / SECTOR).floor() as i32 + 1]
+        };
+        Draft { x: cells(0), z: cells(1), floor, ceiling }
+    }
+}
+
+/// The floor and ceiling most of a room's open sectors have, for a new room
+/// beside it.
+fn usual_heights(level: &Level, room: usize) -> (i32, i32) {
+    let mut counts = BTreeMap::<(i32, i32), usize>::new();
+    for s in level.rooms[room].sectors.iter().filter(|s| s.floor > SOLID) {
+        *counts.entry((s.floor, s.ceiling)).or_default() += 1;
+    }
+    counts.into_iter().max_by_key(|&(_, n)| n).map_or((0, -2048), |(h, _)| h)
+}
+
+/// What a drawn room would overlap, and which rooms it could be connected to.
+fn draft_notes(level: &Level, d: &Draft) -> Vec<String> {
+    let (mut overlaps, mut beside) = (BTreeSet::new(), BTreeSet::new());
+    let meets = |s: &engine::world::Sector| s.floor > SOLID && s.ceiling < d.floor && s.floor > d.ceiling;
+    for (i, r) in level.rooms.iter().enumerate() {
+        for sx in 1..r.x_sectors.saturating_sub(1) {
+            for sz in 1..r.z_sectors.saturating_sub(1) {
+                if !meets(&r.sectors[sx * r.z_sectors + sz]) {
+                    continue;
+                }
+                let (x, z) = (r.origin[0].div_euclid(1024) + sx as i32, r.origin[2].div_euclid(1024) + sz as i32);
+                let inside = (d.x[0]..d.x[1]).contains(&x) && (d.z[0]..d.z[1]).contains(&z);
+                let ring = (d.x[0] - 1..=d.x[1]).contains(&x) && (d.z[0] - 1..=d.z[1]).contains(&z);
+                let corner = (x == d.x[0] - 1 || x == d.x[1]) && (z == d.z[0] - 1 || z == d.z[1]);
+                if inside {
+                    overlaps.insert(i);
+                } else if ring && !corner {
+                    beside.insert(i);
+                }
+            }
+        }
+    }
+    let list = |set: &BTreeSet<usize>| set.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(", ");
+    let mut notes = vec![];
+    if !beside.is_empty() {
+        notes.push(format!(
+            "Shares an edge with room {}: select walls there in mesh mode and press Connect",
+            list(&beside)
+        ));
+    }
+    if !overlaps.is_empty() {
+        notes.push(format!(
+            "Overlaps room {}'s space: allowed (rooms can overlap unseen), but they cannot be connected",
+            list(&overlaps)
+        ));
+    }
+    notes
 }
 
 pub struct RoomsPlugin;
@@ -55,6 +131,31 @@ impl Editor {
     pub fn disconnect(&mut self, a: usize, b: usize) {
         if self.level_edit("Disconnected", |level| engine::editor::disconnect(level, a, b)).is_some() {
             self.status = format!("Disconnected rooms {a} and {b} - Ctrl+Z to undo");
+        }
+    }
+
+    /// Build a drawn room in the style of the current room, and make it current.
+    pub fn create_room(&mut self, draft: Draft) {
+        let template = self.mesh.room;
+        let created = self.level_edit("Created a room", |level| {
+            let template = template.min(level.rooms.len() - 1);
+            let spec = engine::editor::NewRoom {
+                x: draft.x,
+                z: draft.z,
+                floor: draft.floor,
+                ceiling: draft.ceiling,
+                textures: engine::editor::typical_textures(level, template),
+                shade: engine::editor::typical_shade(level, template),
+                ambient: level.rooms[template].ambient,
+            };
+            engine::editor::new_room(level, &spec)
+        });
+        if let Some(room) = created {
+            self.select_room(room);
+            self.frame_room();
+            self.status = format!(
+                "Created room {room} - connect it by selecting its walls beside another room in mesh mode (Ctrl+Z to undo)"
+            );
         }
     }
 
@@ -293,6 +394,12 @@ pub fn map(
         if ui.button("Fit").on_hover_text("Show every room in the slice").clicked() {
             view.fit = true;
         }
+        let hint =
+            "Drag a rectangle of open floor. Draw it beside another room's floor, sharing an edge, to connect them";
+        if ui.selectable_label(view.drawing, "New room").on_hover_text(hint).clicked() {
+            view.drawing = !view.drawing;
+            view.drag = None;
+        }
         let mut slicing = view.slice.is_some();
         if ui.checkbox(&mut slicing, "Slice").on_hover_text("Show only rooms within a height range").changed() {
             let r = &level.rooms[current];
@@ -311,6 +418,34 @@ pub fn map(
             }
         }
     });
+    if let Some(mut d) = view.draft {
+        let mut create = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(format!("New room: {} x {} sectors", d.x[1] - d.x[0], d.z[1] - d.z[0])).strong());
+            ui.label("floor");
+            ui.add(egui::DragValue::new(&mut d.floor).speed(32.0).range(d.ceiling + 256..=65536))
+                .on_hover_text("Floor height (y down; whole 256-unit steps)");
+            ui.label("ceiling");
+            ui.add(egui::DragValue::new(&mut d.ceiling).speed(32.0).range(-65536..=d.floor - 256))
+                .on_hover_text("Ceiling height (above the floor, so smaller)");
+            (d.floor, d.ceiling) = (d.floor.div_euclid(256) * 256, d.ceiling.div_euclid(256) * 256);
+            create = ui.button("Create").clicked();
+            if ui.button("Cancel").clicked() {
+                view.draft = None;
+            }
+        });
+        for note in draft_notes(level, &d) {
+            ui.label(RichText::new(note).weak());
+        }
+        if view.draft.is_some() {
+            view.draft = Some(d);
+        }
+        if create {
+            view.draft = None;
+            view.drawing = false;
+            editor.create_room(d);
+        }
+    }
     let (response, painter) =
         ui.allocate_painter(ui.available_size().max(EVec2::splat(120.0)), Sense::click_and_drag());
     let rect = response.rect;
@@ -329,8 +464,13 @@ pub fn map(
             (rect.width() / (hi[0] - lo[0]).max(SECTOR)).min(rect.height() / (hi[1] - lo[1]).max(SECTOR)) * 0.92;
         view.fit = false;
     }
-    // Pan by dragging; zoom about the cursor.
-    if response.dragged() {
+    // Pan by dragging (the right or middle button while drawing); zoom about the cursor.
+    let panning = if view.drawing {
+        response.dragged_by(egui::PointerButton::Secondary) || response.dragged_by(egui::PointerButton::Middle)
+    } else {
+        response.dragged()
+    };
+    if panning {
         let d = response.drag_delta() / view.scale;
         view.center = [view.center[0] - d.x, view.center[1] + d.y];
     }
@@ -434,7 +574,40 @@ pub fn map(
             painter.add(egui::Shape::convex_polygon(points, Color32::WHITE, Stroke::NONE));
         }
     }
-    if let Some(cursor) = response.hover_pos() {
+    if view.drawing {
+        let at = response.interact_pointer_pos().map(|p| t.level(p));
+        if response.drag_started_by(egui::PointerButton::Primary)
+            && let Some(at) = at
+        {
+            view.drag = Some((at, at));
+        }
+        if let (Some((start, _)), Some(at)) = (view.drag, at)
+            && response.dragged_by(egui::PointerButton::Primary)
+        {
+            view.drag = Some((start, at));
+        }
+        let heights = view.draft.map_or_else(|| usual_heights(level, current), |d| (d.floor, d.ceiling));
+        if response.drag_stopped_by(egui::PointerButton::Primary)
+            && let Some((start, end)) = view.drag.take()
+        {
+            view.draft = Some(Draft::between(start, end, heights));
+        } else if response.clicked()
+            && let Some(at) = at
+        {
+            view.draft = Some(Draft::between(at, at, heights));
+        }
+        let shown = view.drag.map(|(a, b)| Draft::between(a, b, heights)).or(view.draft);
+        if let Some(d) = shown {
+            let (x0, z0) = (d.x[0] as f32 * SECTOR, d.z[0] as f32 * SECTOR);
+            let (x1, z1) = (d.x[1] as f32 * SECTOR, d.z[1] as f32 * SECTOR);
+            let area = Rect::from_two_pos(t.screen(x0, z0), t.screen(x1, z1));
+            painter.rect_filled(area, 0.0, Color32::from_rgba_unmultiplied(90, 230, 110, 60));
+            painter.rect_stroke(area, 0.0, Stroke::new(2.0, Color32::from_rgb(90, 230, 110)), egui::StrokeKind::Inside);
+            // The solid border ring the room gets around its floor.
+            let ring = Rect::from_two_pos(t.screen(x0 - SECTOR, z0 - SECTOR), t.screen(x1 + SECTOR, z1 + SECTOR));
+            painter.rect_stroke(ring, 0.0, Stroke::new(1.0, Color32::from_rgb(60, 140, 70)), egui::StrokeKind::Inside);
+        }
+    } else if let Some(cursor) = response.hover_pos() {
         let [x, z] = t.level(cursor);
         let found = rooms_at(level, view.slice, x, z);
         if !found.is_empty() {
@@ -453,7 +626,11 @@ pub fn map(
     painter.text(
         rect.left_bottom() + EVec2::new(6.0, -6.0),
         egui::Align2::LEFT_BOTTOM,
-        "Drag: pan   Scroll: zoom   Click: choose (again: next in a stack)   Double-click: frame",
+        if view.drawing {
+            "New room: drag its floor   Right-drag: pan   Scroll: zoom"
+        } else {
+            "Drag: pan   Scroll: zoom   Click: choose (again: next in a stack)   Double-click: frame"
+        },
         egui::FontId::proportional(11.0),
         Color32::from_gray(140),
     );
@@ -534,5 +711,31 @@ mod tests {
         assert!(!editor.doc.is_dirty());
         editor.frame_room();
         assert!(editor.frame && editor.frame_room);
+    }
+
+    #[test]
+    fn a_drawn_rectangle_becomes_a_room_beside_the_one_it_was_drawn_next_to() {
+        let mut editor = crate::sandbox();
+        let level = editor.doc.level().unwrap();
+        // Dragging from one point to another takes every sector they touch, either way round.
+        let d = Draft::between([5600.0, 7000.0], [5200.0, 3100.0], (0, -2048));
+        assert_eq!((d.x, d.z), ([5, 6], [3, 7]));
+        assert_eq!(usual_heights(&level, 0), (0, -2048));
+        // The sandbox's open floor is sectors 1..5 on both axes.
+        let beside = Draft { x: [5, 7], z: [2, 4], floor: 0, ceiling: -2048 };
+        assert!(draft_notes(&level, &beside)[0].contains("room 0"), "{:?}", draft_notes(&level, &beside));
+        let over = Draft { x: [3, 7], ..beside };
+        assert!(draft_notes(&level, &over).iter().any(|n| n.starts_with("Overlaps room 0")));
+        let above = Draft { floor: -4096, ceiling: -6144, ..over };
+        assert!(draft_notes(&level, &above).is_empty(), "above the sandbox room nothing meets it");
+        editor.create_room(beside);
+        assert_eq!(editor.doc.value()["rooms"].as_array().unwrap().len(), 2);
+        assert_eq!(editor.mesh.room, 1, "the new room becomes current");
+        assert!(editor.frame && editor.frame_room);
+        assert!(editor.status.starts_with("Created room 1"), "{}", editor.status);
+        editor.undo();
+        assert!(!editor.doc.is_dirty());
+        editor.create_room(Draft { floor: -4096, ceiling: -2048, ..beside });
+        assert!(!editor.doc.is_dirty(), "a floor above its ceiling is refused: {}", editor.status);
     }
 }

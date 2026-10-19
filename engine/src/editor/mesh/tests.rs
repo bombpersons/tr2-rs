@@ -434,3 +434,73 @@ fn several_faces_join_in_one_edit_even_as_faces_come_and_go() {
     assert_eq!(zs, BTreeSet::from([SECTOR, 3 * SECTOR]));
     assert_eq!(link_problems(&level), Vec::<String>::new());
 }
+
+fn spec(x: [i32; 2], z: [i32; 2]) -> NewRoom {
+    NewRoom { x, z, floor: 0, ceiling: -2048, textures: [0, 0, 1], shade: 128, ambient: Default::default() }
+}
+
+#[test]
+fn a_new_room_is_built_like_an_imported_one_and_connects_to_its_neighbour() {
+    let mut level = box_level(4, 3);
+    // Open floor beside room 0's, sharing an edge: the grids overlap by two sectors.
+    assert_eq!(new_room(&mut level, &spec([3, 5], [1, 2])), Ok(1));
+    let built = &level.rooms[1];
+    let expected = &neighbours().rooms[1];
+    assert_eq!((built.origin, built.x_sectors, built.z_sectors), (expected.origin, 4, 3));
+    assert_eq!(built.vertices, expected.vertices);
+    assert_eq!(built.quads, expected.quads);
+    assert!(sector_mismatches(&level, 1).is_empty() && wall_mismatches(&level, 1).is_empty());
+    crate::editor::validate_level(&level).unwrap();
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+    let wall = shared_wall(&level);
+    assert_eq!(connect(&mut level, 0, wall), Ok(1));
+    assert_eq!(room_at(&level, 0, [3584, -512, 1536]), Some(1));
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+    for bad in [
+        NewRoom { x: [3, 3], ..spec([3, 5], [1, 2]) },
+        NewRoom { floor: -2048, ceiling: 0, ..spec([3, 5], [1, 2]) },
+        NewRoom { floor: 100, ..spec([3, 5], [1, 2]) },
+        NewRoom { textures: [0, 0, 9], ..spec([3, 5], [1, 2]) },
+    ] {
+        assert!(new_room(&mut level, &bad).is_err(), "{bad:?}");
+    }
+    assert_eq!(typical_textures(&level, 1), [0, 0, 1]);
+    assert_eq!(typical_shade(&level, 1), 128);
+}
+
+#[test]
+fn connecting_cuts_a_room_wide_wall_down_to_the_doorway() {
+    let text = include_str!("../../../assets/levels/sandbox/level.json");
+    let mut level: Level = serde_json::from_str(text).unwrap();
+    let wide = |room: &Room| {
+        let in_plane = |q: &&[usize; 5]| q[..4].iter().all(|&v| room.vertices[v][0] == 5 * SECTOR);
+        let span = |q: &[usize; 5]| {
+            let zs: Vec<i32> = q[..4].iter().map(|&v| room.vertices[v][2]).collect();
+            zs.iter().max().unwrap() - zs.iter().min().unwrap()
+        };
+        room.quads.iter().filter(in_plane).filter(|q| span(q) > SECTOR).count()
+    };
+    assert_eq!(wide(&level.rooms[0]), 1, "the sandbox's +x wall is one face across the room");
+    let room = new_room(&mut level, &spec([5, 7], [3, 4])).unwrap();
+    let r = &level.rooms[room];
+    let wall = (0..r.quads.len())
+        .find(|&i| wall_face(r, &r.quads[i][..4]).is_some_and(|w| (w.axis, w.at) == (0, SECTOR)))
+        .unwrap();
+    assert_eq!(connect(&mut level, room, wall), Ok(0));
+    // What is left of the wall covers the rest of the edge, in sector pieces.
+    let s = &level.rooms[0];
+    let spans: BTreeSet<_> = s
+        .quads
+        .iter()
+        .map(|q| q[..4].iter().map(|&v| point(s, v)).collect::<Vec<_>>())
+        .filter(|p| p.iter().all(|p| p[0] == 5 * SECTOR))
+        .map(|p| (p.iter().map(|p| p[2]).min().unwrap(), p.iter().map(|p| p[2]).max().unwrap()))
+        .collect();
+    assert!(!spans.contains(&(3 * SECTOR, 4 * SECTOR)), "the doorway is open: {spans:?}");
+    assert!(spans.contains(&(SECTOR, 2 * SECTOR)) && spans.contains(&(4 * SECTOR, 5 * SECTOR)), "{spans:?}");
+    assert_eq!(wide(&level.rooms[0]), 0);
+    assert_eq!(room_at(&level, 0, [4608, -512, 3584]), Some(0));
+    assert_eq!(room_at(&level, 0, [5632, -512, 3584]), Some(room));
+    assert!(wall_mismatches(&level, 0).is_empty());
+    assert_eq!(link_problems(&level), Vec::<String>::new());
+}

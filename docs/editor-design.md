@@ -90,7 +90,7 @@ One strip under the menu bar, in four groups:
    - Mesh: Raise (+), Lower (-), Push wall (P), Fill, Turn texture (R).
    - Mesh also has Connect and Open hole, since they start from selected
      faces; Disconnect is in the Rooms window.
-   - Rooms: New room, Split, Merge (planned).
+   - Rooms: New room is on the Map; Split and Merge are planned.
 4. **Settings**: Snap in object mode (Ctrl inverts while dragging); in mesh
    mode the edited room with Frame room, and the brush swatch.
 
@@ -156,8 +156,11 @@ window, the map and clicking faces in mesh mode all choose the same room.
 
 ### Editing across rooms (Connect, Open hole and Disconnect built)
 
-- **New room:** drag a rectangle on the map, choose floor and ceiling. The
-  grid gets its solid ring and floor, ceiling and wall faces.
+- **New room (built):** drag a rectangle on the map, choose floor and
+  ceiling. The grid gets its solid ring and floor, ceiling and wall faces,
+  in the current room's textures, shade and ambient. Drawn beside another
+  room's floor it overlaps that room's grid by two sectors, ready for
+  Connect. Navigation boxes wait for the rebuild.
 - **Connect / open doorway:** select a wall face where two rooms meet. Check
   the two-sector overlap, open the matching sectors in both rooms, set
   `floor_info.portal` both ways, remove the wall faces, add the render
@@ -216,7 +219,7 @@ nothing in the game.
 1. Toolbar and Paint tool. (Done.)
 2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics. (Done.)
-4. Connect / open hole (done, with Disconnect), then split and merge, then
-   new room.
+4. Connect / open hole (done, with Disconnect), new room (done), then
+   split and merge.
 5. Navigation box rebuild.
 6. Lights and baking.

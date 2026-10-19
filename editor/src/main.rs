@@ -141,6 +141,11 @@ struct EditorCommand {
     mesh_hole: bool,
     /// Close every doorway and hole between rooms "a,b".
     disconnect: String,
+    /// Draw a new room on the map: "x0,z0,x1,z1,floor,ceiling" (world
+    /// sectors, open floor x0..x1 by z0..z1), waiting for Create.
+    draft_room: String,
+    /// Create the drawn room, as the map's Create button does.
+    create_room: bool,
     /// Paint the selected faces with this texture-table entry.
     mesh_paint: i64,
     /// Turn the selected faces' textures a quarter turn.
@@ -397,6 +402,26 @@ fn automation(
     if c.mesh_hole {
         c.mesh_hole = false;
         editor.mesh_open_hole();
+    }
+    if !c.draft_room.is_empty() {
+        let text = std::mem::take(&mut c.draft_room);
+        match text.split(',').map(|n| n.trim().parse::<i32>()).collect::<Result<Vec<_>, _>>().as_deref() {
+            Ok(&[x0, z0, x1, z1, floor, ceiling]) => {
+                editor.windows.map = true;
+                let view = &mut editor.windows.map_view;
+                view.drawing = true;
+                view.draft = Some(rooms::Draft { x: [x0, x1], z: [z0, z1], floor, ceiling });
+            }
+            _ => editor.status = "draft_room takes x0,z0,x1,z1,floor,ceiling".into(),
+        }
+    }
+    if c.create_room {
+        c.create_room = false;
+        let view = &mut editor.windows.map_view;
+        if let Some(draft) = view.draft.take() {
+            view.drawing = false;
+            editor.create_room(draft);
+        }
     }
     if !c.disconnect.is_empty() {
         let text = std::mem::take(&mut c.disconnect);

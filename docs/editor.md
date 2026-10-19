@@ -75,6 +75,17 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   its clicks) to rooms overlapping a height range, starting from the current
   room's. While Rooms or Map is open, the 3D view outlines the current
   room's box and its portals in the same colours.
+  **New room** arms drawing: drag a rectangle of open floor (a click takes
+  one sector; right- or middle-drag pans meanwhile). The drawn floor shows in
+  green with the solid border ring it will get, and a row above the map sets
+  its floor and ceiling (whole 256-unit steps, starting from the current
+  room's usual heights) and says which rooms it shares an edge with, or
+  overlaps. **Create** builds it in the current room's style (its usual
+  floor, ceiling and wall textures, middle vertex shade and ambient) and
+  makes it current. Draw the floor beside another room's floor, sharing an
+  edge, and the two grids overlap by two sectors as imported neighbours do,
+  so Connect can join them (see "Joining rooms"). New rooms have no
+  navigation boxes yet, which Diagnostics reports.
 - **Diagnostics** (View > Diagnostics, or the status bar's "N new problems")
   checks how rooms join, where objects stand and the navigation boxes:
   one-sided portals; doorway, floor and ceiling links with no render portal,
@@ -270,8 +281,12 @@ problems afterwards.
   no new diagnostics problems (the smoke test does this for rooms 0 and 3,
   and for the 90-sector hole between rooms 6 and 13).
 
+Connect cuts a wall that spans several sectors (the sandbox's walls each
+span the room) into one face per sector first, so only the doorway's sector
+opens.
+
 The operations are `engine::editor::{connect_faces, open_holes,
-disconnect}`. Creating rooms, and splitting or merging them, are next
+disconnect, new_room}`. Splitting and merging rooms are next
 (docs/editor-design.md).
 
 Each edit re-derives every sector whose floor or ceiling face it touched,
@@ -380,7 +395,8 @@ Rooms and Map windows with the current room's outline, carrying an object
 through a doorway into the next room (on levels with several rooms) and
 undoing it, Diagnostics reporting a deleted return portal as new and Fix all
 new restoring it, disconnecting a doorway and a hole and opening them again
-with Connect and Open hole (on levels that have them), mesh mode (raise a floor, a refused unsnapped
+with Connect and Open hole (on levels that have them), drawing a room beside
+the sandbox room on the map and connecting it, mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,
