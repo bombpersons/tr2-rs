@@ -279,15 +279,15 @@ impl Opening {
 /// `at`, spanning `low..high` on the other two axes (`[x, y, z]` with the
 /// plane's axis ignored).
 #[derive(Clone, Copy, Debug)]
-struct Window {
-    axis: usize,
-    at: i32,
-    low: [i32; 3],
-    high: [i32; 3],
+pub(super) struct Window {
+    pub(super) axis: usize,
+    pub(super) at: i32,
+    pub(super) low: [i32; 3],
+    pub(super) high: [i32; 3],
 }
 
 impl Window {
-    fn union(self, o: Window) -> Window {
+    pub(super) fn union(self, o: Window) -> Window {
         Window {
             low: [0, 1, 2].map(|i| self.low[i].min(o.low[i])),
             high: [0, 1, 2].map(|i| self.high[i].max(o.high[i])),
@@ -334,7 +334,7 @@ impl Window {
 
 /// Widen (or add) `from`'s portal into `to` facing `normal` to cover
 /// `window`, and give `to` its mirror.
-fn open_window(level: &mut Level, from: usize, to: usize, normal: [i32; 3], window: Window) {
+pub(super) fn open_window(level: &mut Level, from: usize, to: usize, normal: [i32; 3], window: Window) {
     let existing = level.rooms[from].portals.iter().position(|p| p.room == to && p.normal == normal);
     let window = existing
         .and_then(|i| Window::of(level, from, &level.rooms[from].portals[i]))

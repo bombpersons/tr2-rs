@@ -12,7 +12,7 @@ use crate::{
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32, Pos2, Rect, RichText, Sense, Stroke, Vec2 as EVec2};
 use engine::{
-    editor::{Link, neighbours},
+    editor::{Link, STEP, neighbours},
     render::GameCamera,
     world::{Level, Room, WorldGeometry, format::SOLID},
 };
@@ -41,6 +41,22 @@ pub struct MapView {
 impl Default for MapView {
     fn default() -> Self {
         Self { center: [0.0; 2], scale: 0.01, fit: true, slice: None, drawing: false, drag: None, draft: None }
+    }
+}
+
+/// The Rooms window's split and merge choices; the planned cut is drawn in
+/// the 3D view while the window is open.
+pub struct RoomTools {
+    /// 0 splits across x, 2 across z, 1 at a height.
+    pub axis: usize,
+    /// The sector line to split along, in the room's grid.
+    pub line: usize,
+    pub height: i32,
+    pub merge_with: Option<usize>,
+}
+impl Default for RoomTools {
+    fn default() -> Self {
+        Self { axis: 0, line: 2, height: -1024, merge_with: None }
     }
 }
 
@@ -123,8 +139,33 @@ impl Plugin for RoomsPlugin {
 impl Editor {
     /// Make `room` the current room, as mesh mode edits it.
     pub fn select_room(&mut self, room: usize) {
+        if room != self.mesh.room {
+            self.room_tools.merge_with = None;
+        }
         self.mesh_room(room);
         self.status = format!("Room {room}");
+    }
+
+    /// Split `room` as the Rooms window's tools say.
+    pub fn split_room(&mut self, room: usize) {
+        let RoomTools { axis, line, height, .. } = self.room_tools;
+        let part = self.level_edit("Split", |level| match axis {
+            1 => engine::editor::split_height(level, room, height),
+            _ => engine::editor::split_along(level, room, axis, line),
+        });
+        if let Some(part) = part {
+            self.status = format!("Split room {room} into rooms {room} and {part} - Ctrl+Z to undo");
+        }
+    }
+
+    /// Merge room `b` into room `a` and make the result current.
+    pub fn merge_room(&mut self, a: usize, b: usize) {
+        if let Some(room) = self.level_edit("Merged", |level| engine::editor::merge_rooms(level, a, b)) {
+            self.mesh.room = usize::MAX;
+            self.select_room(room);
+            self.room_tools.merge_with = None;
+            self.status = format!("Merged room {b} into room {room} - Ctrl+Z to undo");
+        }
     }
 
     /// Close every doorway and hole between rooms `a` and `b`.
@@ -325,6 +366,76 @@ fn details(ui: &mut egui::Ui, editor: &mut Editor, level: &Level, index: usize, 
                 editor.click(Some(i), false);
             }
         }
+    });
+    split_and_merge(ui, editor, level, index);
+}
+
+fn split_and_merge(ui: &mut egui::Ui, editor: &mut Editor, level: &Level, index: usize) {
+    let r = &level.rooms[index];
+    egui::CollapsingHeader::new("Split and merge").default_open(true).show(ui, |ui| {
+        let tools = &mut editor.room_tools;
+        ui.horizontal(|ui| {
+            ui.label("Split");
+            ui.selectable_value(&mut tools.axis, 0, "across x");
+            ui.selectable_value(&mut tools.axis, 2, "across z");
+            ui.selectable_value(&mut tools.axis, 1, "at a height");
+        });
+        let mut can = true;
+        ui.horizontal(|ui| {
+            if tools.axis == 1 {
+                ui.label("height");
+                let (low, high) = (r.top.div_euclid(STEP) * STEP + STEP, r.bottom.div_euclid(STEP) * STEP - STEP);
+                can = low <= high;
+                tools.height = tools.height.clamp(low.min(high), high.max(low)).div_euclid(STEP) * STEP;
+                ui.add(egui::DragValue::new(&mut tools.height).speed(32.0).range(low..=high))
+                    .on_hover_text("y of the cut (up is negative), in whole 256-unit steps; drawn in magenta");
+            } else {
+                ui.label("sector line");
+                let size = if tools.axis == 0 { r.x_sectors } else { r.z_sectors };
+                can = size >= 4;
+                tools.line = tools.line.clamp(2, size.saturating_sub(2).max(2));
+                ui.add(egui::DragValue::new(&mut tools.line).range(2..=size.saturating_sub(2).max(2)))
+                    .on_hover_text("Each part keeps at least one sector of open floor; drawn in magenta");
+            }
+        });
+        let hint = if tools.axis == 1 {
+            "Stack two rooms joined through holes wherever the space reaches across the height"
+        } else {
+            "Two rooms overlapping by two sectors, joined by doorways wherever their space meets"
+        };
+        if ui.add_enabled(can, egui::Button::new("Split")).on_hover_text(hint).clicked() {
+            editor.split_room(index);
+        }
+        let joined: Vec<usize> =
+            neighbours(level, index).into_iter().map(|(room, _)| room).collect::<BTreeSet<_>>().into_iter().collect();
+        ui.horizontal(|ui| {
+            ui.label("Merge with");
+            let mut with = editor
+                .room_tools
+                .merge_with
+                .filter(|w| *w != index && *w < level.rooms.len())
+                .or(joined.first().copied());
+            egui::ComboBox::from_id_salt("merge with")
+                .selected_text(with.map_or("choose".into(), |w| format!("room {w}")))
+                .show_ui(ui, |ui| {
+                    for room in (0..level.rooms.len()).filter(|&r| r != index) {
+                        let label = if joined.contains(&room) {
+                            format!("room {room} (joined)")
+                        } else {
+                            format!("room {room}")
+                        };
+                        ui.selectable_value(&mut with, Some(room), label);
+                    }
+                });
+            editor.room_tools.merge_with = with;
+            let help =
+                "Rooms joined only by doorways along one line (or side by side), or only by holes over the same grid";
+            if ui.add_enabled(with.is_some(), egui::Button::new("Merge")).on_hover_text(help).clicked()
+                && let Some(with) = with
+            {
+                editor.merge_room(index, with);
+            }
+        });
     });
 }
 
@@ -660,6 +771,29 @@ fn outline(
     for (x, z) in [(x0, z0), (x1, z0), (x1, z1), (x0, z1)] {
         gizmos.line(world([x, top, z]), world([x, bottom, z]), color);
     }
+    // The planned split, in magenta.
+    if editor.windows.rooms {
+        let cut = Color::srgb(0.95, 0.3, 0.85);
+        let tools = &editor.room_tools;
+        let corners = match tools.axis {
+            1 => {
+                let y = tools.height as f64;
+                [[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]]
+            }
+            0 => {
+                let x = x0 + tools.line as f64 * 1024.0;
+                [[x, top, z0], [x, top, z1], [x, bottom, z1], [x, bottom, z0]]
+            }
+            _ => {
+                let z = z0 + tools.line as f64 * 1024.0;
+                [[x0, top, z], [x1, top, z], [x1, bottom, z], [x0, bottom, z]]
+            }
+        };
+        let points = corners.map(world);
+        gizmos.linestrip(points.iter().copied().chain([points[0]]), cut);
+        gizmos.line(points[0], points[2], cut);
+        gizmos.line(points[1], points[3], cut);
+    }
     for p in &r.portals {
         let color = match p.normal[1] {
             0 => Color::srgb(0.35, 0.9, 0.45),
@@ -737,5 +871,33 @@ mod tests {
         assert!(!editor.doc.is_dirty());
         editor.create_room(Draft { floor: -4096, ceiling: -2048, ..beside });
         assert!(!editor.doc.is_dirty(), "a floor above its ceiling is refused: {}", editor.status);
+    }
+
+    #[test]
+    fn splitting_and_merging_from_the_rooms_window_are_single_undo_steps() {
+        let mut editor = crate::sandbox();
+        let before = editor.doc.value().clone();
+        let rooms = |e: &Editor| e.doc.value()["rooms"].as_array().unwrap().len();
+        editor.room_tools = RoomTools { axis: 0, line: 3, ..Default::default() };
+        editor.split_room(0);
+        assert_eq!(rooms(&editor), 2, "{}", editor.status);
+        assert!(editor.status.starts_with("Split room 0 into rooms 0 and 1"));
+        editor.merge_room(0, 1);
+        assert_eq!(rooms(&editor), 1, "{}", editor.status);
+        assert_eq!(editor.mesh.room, 0);
+        editor.room_tools = RoomTools { axis: 1, height: -1024, ..Default::default() };
+        editor.split_room(0);
+        assert_eq!(rooms(&editor), 2, "{}", editor.status);
+        let level = editor.doc.level().unwrap();
+        assert_eq!(level.rooms[1].sectors[2 * 6 + 2].below, Some(0), "the upper part opens down");
+        editor.merge_room(1, 0);
+        assert_eq!(rooms(&editor), 1, "{}", editor.status);
+        for _ in 0..4 {
+            editor.undo();
+        }
+        assert_eq!(editor.doc.value(), &before);
+        editor.room_tools = RoomTools { axis: 0, line: 1, ..Default::default() };
+        editor.split_room(0);
+        assert_eq!(rooms(&editor), 1, "too near the edge is refused: {}", editor.status);
     }
 }

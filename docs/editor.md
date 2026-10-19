@@ -63,7 +63,10 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   portals ("-> 4" a doorway, "v 77" a hole in the floor, "^ 13" an opening
   in the ceiling), flip partner and objects are buttons that jump to them.
   The **x** beside a portal disconnects that room: every doorway and hole
-  between the two closes (see "Joining rooms").
+  between the two closes (see "Joining rooms"). **Split and merge** splits
+  the current room across x or z at a sector line, or at a height, with the
+  planned cut drawn in magenta in the 3D view, and merges it with another
+  room (see "Splitting and merging rooms").
 - **Map** (View > Map) draws the rooms from above: open sectors filled (blue
   for water rooms), the current room outlined in yellow and the rooms its
   portals open into in cyan, its doorways as green lines and its floor and
@@ -305,13 +308,50 @@ both the normal and flipped arrays), merging zones a new box joins. Sectors
 over a hole take the box of the floor beneath. Rebuilt boxes lose the
 authored blockable and blocked bits that doors use.
 
+### Splitting and merging rooms
+
+A split **across x or z** at a sector line leaves two rooms overlapping by
+two sectors, as imported neighbours do: each part's border sector over the
+other's open floor becomes a doorway wherever their space meets, and a
+mirrored portal pair covers the opening. Where the space does not meet (a
+wall stands between), the border stays solid. Each part keeps at least one
+sector of open floor. A split **at a height** (a whole 256-unit step) stacks
+two rooms over the same grid: every sector reaching across the height
+becomes a hole, the upper part's floor and the lower part's ceiling linked
+`below` / `above` under a horizontal portal pair; sectors wholly above or
+below go to that part. A floor or ceiling sloping across the height is
+refused, as are rooms that flip with another room.
+
+Faces crossing the cut are cut in two (positions and shades interpolated).
+Everything that pointed at the room follows the part it now belongs to:
+other rooms' doorways, holes and portals (clipped at the cut), objects,
+cameras and static meshes; lights are copied to both parts, so lit objects
+look the same. The part below the line (or the lower part) keeps the room's
+number; the other is added at the end.
+
+**Merge** is the inverse: two rooms joined only by doorways along one line
+(or sitting side by side unjoined, with no floor open in both), or only by
+holes over the same grid, with the same water, wind and flags. Their grids
+are united, keeping each sector's open floor over the other's border or
+doorway; portals between them go; everything that named the removed room
+names the merged one, and later rooms are renumbered.
+
+Checked on WALL, BOAT, CATACOMB, VENICE and OPERA by splitting every room at
+its middle across x, across z and at its middle height: in all 1,561
+accepted splits collision finds the same floor and ceiling at every open
+sector, and every merge restores the room's sectors. 1,550 leave no new
+diagnostics problems; 11 report a doorway whose stored heights differ from
+the part it now enters, where an imported doorway's heights never matched
+its opening (collision is unchanged there). Diagnostics identifies problems
+by world place rather than room number, so splitting and merging do not make
+a file's own problems look new.
+
 Connect cuts a wall that spans several sectors (the sandbox's walls each
 span the room) into one face per sector first, so only the doorway's sector
 opens.
 
 The operations are `engine::editor::{connect_faces, open_holes,
-disconnect, new_room}`. Splitting and merging rooms are next
-(docs/editor-design.md).
+disconnect, new_room, split_along, split_height, merge_rooms}`.
 
 Each edit re-derives every sector whose floor or ceiling face it touched,
 and refuses (with the reason in the status bar, leaving the document as it
@@ -420,8 +460,9 @@ through a doorway into the next room (on levels with several rooms) and
 undoing it, Diagnostics reporting a deleted return portal as new and Fix all
 new restoring it, disconnecting a doorway and a hole and opening them again
 with Connect and Open hole (on levels that have them), drawing a room beside
-the sandbox room on the map, connecting it and rebuilding navigation, mesh
-mode (raise a floor, a refused unsnapped
+the sandbox room on the map, connecting it and rebuilding navigation,
+splitting room 0 across x and at a height and merging it back each time,
+mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

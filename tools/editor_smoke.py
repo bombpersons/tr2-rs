@@ -391,6 +391,41 @@ def new_room_smoke(client, level, captures):
     return {'room': rooms, 'connected_to': 0}
 
 
+def split_smoke(client, level, captures):
+    """Split room 0 across x and merge it back, then at a height and merge
+    it back: no new problems, and undo returns the file."""
+    rooms = len(level['rooms'])
+    r = level['rooms'][0]
+    if r['x_sectors'] < 4:
+        return None
+    state = command(client, mode='object', room=0, show_rooms=True)
+    before = state['problems_new']
+    line = r['x_sectors'] // 2
+    state = settled(client, state, split_room=f'x,{line}')
+    assert state['rooms'] == rooms + 1, state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before, state
+    state = command(client, frame_room=True)
+    time.sleep(1.5)
+    captures.append(client.capture('split'))
+    state = settled(client, state, merge_room=rooms)
+    assert state['rooms'] == rooms and state['message'].startswith('Merged'), state
+    steps = 2
+    middle = ((r['top'] + r['bottom']) // 2) // 256 * 256
+    state = settled(client, state, split_room=f'y,{middle}')
+    if state['rooms'] == rooms + 1:
+        state = settled(client, state, merge_room=rooms)
+        assert state['rooms'] == rooms, state
+        steps += 2
+    for _ in range(steps):
+        state = settled(client, state, undo=True)
+    assert not state['dirty'], state
+    return {'room': 0, 'line': line, 'height': middle, 'steps': steps}
+
+
 def doorway(level):
     """A placement and the offset that carries it through one of its room's
     doorways: the centre of a border sector whose floor data leads on."""
@@ -524,6 +559,7 @@ def main():
         connected = connect_smoke(client, saved, captures)
         holes = hole_smoke(client, saved, captures)
         built = new_room_smoke(client, saved, captures) if source.parent.name == 'sandbox' else None
+        split = split_smoke(client, saved, captures)
         mesh = mesh_smoke(client, copy, saved, captures)
     finally:
         client.close()
@@ -543,7 +579,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

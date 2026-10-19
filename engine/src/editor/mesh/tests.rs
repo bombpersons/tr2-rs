@@ -504,3 +504,97 @@ fn connecting_cuts_a_room_wide_wall_down_to_the_doorway() {
     assert!(wall_mismatches(&level, 0).is_empty());
     assert_eq!(link_problems(&level), Vec::<String>::new());
 }
+
+/// Sector values with floor data resolved, for comparing rooms rebuilt
+/// with different floor-data indices.
+type SectorValues = (i32, i32, Option<usize>, Option<usize>, FloorInfo);
+
+fn sector_values(level: &Level, room: usize) -> Vec<SectorValues> {
+    level.rooms[room]
+        .sectors
+        .iter()
+        .map(|s| (s.floor, s.ceiling, s.below, s.above, level.floor_info(s).clone()))
+        .collect()
+}
+
+fn joins_cleanly(level: &Level) {
+    assert_eq!(link_problems(level), Vec::<String>::new());
+    for room in 0..level.rooms.len() {
+        assert!(sector_mismatches(level, room).is_empty(), "room {room}: {:?}", sector_mismatches(level, room));
+        assert!(wall_mismatches(level, room).is_empty(), "room {room}: {:?}", wall_mismatches(level, room));
+    }
+    crate::editor::validate_level(level).unwrap();
+}
+
+#[test]
+fn splitting_along_a_line_makes_two_joined_rooms_and_merging_restores_one() {
+    let mut level = box_level(5, 3);
+    let original = sector_values(&level, 0);
+    level.placements.push(crate::world::Placement {
+        kind: 1,
+        room: 0,
+        position: [3584, 0, 1536],
+        ..Default::default()
+    });
+    assert_eq!(split_along(&mut level, 0, 0, 2), Ok(1));
+    let (a, b) = (&level.rooms[0], &level.rooms[1]);
+    assert_eq!((a.x_sectors, b.x_sectors, b.origin[0]), (3, 4, SECTOR));
+    assert_eq!(level.floor_info(&a.sectors[2 * 3 + 1]).portal, Some(1), "A's new border is a doorway");
+    assert_eq!(level.floor_info(&b.sectors[1]).portal, Some(0));
+    assert!(a.vertices.iter().all(|v| v[0] <= 2 * SECTOR), "A keeps only its side's faces");
+    assert_eq!((a.portals[0].room, a.portals[0].normal), (1, [-1, 0, 0]));
+    assert_eq!(level.placements[0].room, 1, "objects follow their side");
+    joins_cleanly(&level);
+    // Each part's doorway sector leads into the other.
+    assert_eq!(room_at(&level, 0, [2560, -512, 1536]), Some(1));
+    assert_eq!(room_at(&level, 1, [1536, -512, 1536]), Some(0));
+    assert_eq!(merge_rooms(&mut level, 0, 1), Ok(0));
+    assert_eq!(level.rooms.len(), 1);
+    assert_eq!(sector_values(&level, 0), original);
+    assert!(level.rooms[0].portals.is_empty());
+    assert_eq!(level.placements[0].room, 0);
+    joins_cleanly(&level);
+}
+
+#[test]
+fn splitting_a_joined_room_hands_its_doorways_to_the_part_they_open_into() {
+    let mut level = neighbours();
+    let wall = shared_wall(&level);
+    connect(&mut level, 0, wall).unwrap();
+    // Room 1 spans x 2048..6144; its open floor is x 3072..5120.
+    assert_eq!(split_along(&mut level, 1, 0, 2), Ok(2));
+    // Room 0's doorway lands in the part over x 3072..4096: room 1.
+    assert_eq!(room_at(&level, 0, [3584, -512, 1536]), Some(1));
+    assert_eq!(room_at(&level, 1, [4608, -512, 1536]), Some(2));
+    assert!(level.rooms[0].portals.iter().all(|p| p.room == 1));
+    joins_cleanly(&level);
+    assert!(split_along(&mut level, 1, 0, 1).is_err(), "too near the edge");
+    assert!(merge_rooms(&mut level, 0, 2).is_err(), "rooms 0 and 2 are not joined");
+}
+
+#[test]
+fn splitting_at_a_height_stacks_two_rooms_and_merging_restores_one() {
+    let mut level = box_level(4, 3);
+    let original = sector_values(&level, 0);
+    level.placements.push(crate::world::Placement {
+        kind: 1,
+        room: 0,
+        position: [1536, -1536, 1536],
+        ..Default::default()
+    });
+    assert!(split_height(&mut level, 0, -1000).is_err(), "whole steps only");
+    assert!(split_height(&mut level, 0, 0).is_err(), "inside the room only");
+    assert_eq!(split_height(&mut level, 0, -1024), Ok(1));
+    let (low, high) = (&level.rooms[0], &level.rooms[1]);
+    assert_eq!((low.sectors[4].floor, low.sectors[4].ceiling, low.sectors[4].above), (0, -1024, Some(1)));
+    assert_eq!((high.sectors[4].floor, high.sectors[4].ceiling, high.sectors[4].below), (-1024, -2048, Some(0)));
+    assert!(high.vertices.iter().all(|v| v[1] <= -1024) && low.vertices.iter().all(|v| v[1] >= -1024));
+    assert_eq!(level.placements[0].room, 1);
+    joins_cleanly(&level);
+    assert_eq!(room_at(&level, 0, [1536, -1536, 1536]), Some(1));
+    assert_eq!(room_at(&level, 1, [1536, -512, 1536]), Some(0));
+    assert_eq!(merge_rooms(&mut level, 1, 0), Ok(0));
+    assert_eq!(sector_values(&level, 0), original);
+    assert_eq!(level.placements[0].room, 0);
+    joins_cleanly(&level);
+}

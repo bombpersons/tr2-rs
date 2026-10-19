@@ -58,6 +58,8 @@ struct Editor {
     /// The next framing shows the current room rather than the selection.
     frame_room: bool,
     diagnostics: diagnostics::Diagnostics,
+    /// The Rooms window's split and merge choices.
+    room_tools: rooms::RoomTools,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -91,6 +93,7 @@ impl Editor {
             snap: false,
             frame_room: false,
             diagnostics: diagnostics::Diagnostics::opened(opened),
+            room_tools: default(),
         }
     }
 }
@@ -146,6 +149,10 @@ struct EditorCommand {
     draft_room: String,
     /// Create the drawn room, as the map's Create button does.
     create_room: bool,
+    /// Split the current room: "x,line", "z,line" or "y,height".
+    split_room: String,
+    /// Merge this room into the current room; negative leaves it.
+    merge_room: i64,
     /// Paint the selected faces with this texture-table entry.
     mesh_paint: i64,
     /// Turn the selected faces' textures a quarter turn.
@@ -333,7 +340,7 @@ fn capture(mut commands: Commands, mut capture: ResMut<Capture>, target: Res<Edi
 fn setup(mut commands: Commands) {
     commands.spawn((
         Name::new("Editor"),
-        EditorCommand { mesh_room: -1, mesh_paint: -1, room: -1, ..default() },
+        EditorCommand { mesh_room: -1, mesh_paint: -1, room: -1, merge_room: -1, ..default() },
         EditorStatus::default(),
         animation::AnimationPreview::default(),
     ));
@@ -416,6 +423,34 @@ fn automation(
             }
             _ => editor.status = "draft_room takes x0,z0,x1,z1,floor,ceiling".into(),
         }
+    }
+    if !c.split_room.is_empty() {
+        let text = std::mem::take(&mut c.split_room);
+        let parts: Vec<&str> = text.split(',').map(str::trim).collect();
+        let axis = match parts.first() {
+            Some(&"x") => Some(0),
+            Some(&"z") => Some(2),
+            Some(&"y") => Some(1),
+            _ => None,
+        };
+        match (axis, parts.get(1).and_then(|n| n.parse::<i32>().ok())) {
+            (Some(axis), Some(n)) => {
+                editor.room_tools.axis = axis;
+                if axis == 1 {
+                    editor.room_tools.height = n;
+                } else {
+                    editor.room_tools.line = n.max(0) as usize;
+                }
+                let room = editor.mesh.room;
+                editor.split_room(room);
+            }
+            _ => editor.status = "split_room takes x,line or z,line or y,height".into(),
+        }
+    }
+    if c.merge_room >= 0 {
+        let with = std::mem::replace(&mut c.merge_room, -1) as usize;
+        let room = editor.mesh.room;
+        editor.merge_room(room, with);
     }
     if c.create_room {
         c.create_room = false;

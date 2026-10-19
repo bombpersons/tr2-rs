@@ -13,7 +13,7 @@ use engine::{
 };
 use std::{collections::HashSet, sync::Arc};
 
-type Key = (Check, usize, Option<(usize, usize)>, Option<usize>);
+type Key = engine::editor::ProblemKey;
 
 /// The problems of the previewed level, and the level as it was opened.
 #[derive(Default)]

@@ -90,13 +90,21 @@ pub struct Problem {
     pub other: Option<usize>,
     pub detail: String,
     pub fix: Option<Fix>,
+    /// Where the problem is, independent of room numbers: a sector's world
+    /// sector, floor, ceiling and link kind; a portal's world bounds; an
+    /// object's index. Splitting or merging rooms renumbers them, and must
+    /// not make the problems a file already had look new.
+    pub place: [i32; 6],
 }
+
+/// A problem's identity across edits: see [`Problem::place`].
+pub type ProblemKey = (Check, [i32; 6]);
 
 impl Problem {
     /// Identifies the problem across edits, to tell those an edit introduced
     /// from those the file already had.
-    pub fn key(&self) -> (Check, usize, Option<(usize, usize)>, Option<usize>) {
-        (self.check, self.room, self.sector, self.other)
+    pub fn key(&self) -> ProblemKey {
+        (self.check, self.place)
     }
 }
 
@@ -139,6 +147,13 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
         for (k, p) in r.portals.iter().enumerate() {
             let Some(target) = rooms.get(p.room) else { continue };
             if !target.portals.iter().any(|q| q.room == i) {
+                let world = p.vertices.iter().map(|v| [v[0] + r.origin[0], v[1], v[2] + r.origin[2]]);
+                let (low, high) = world.fold(([i32::MAX; 3], [i32::MIN; 3]), |(lo, hi), w| {
+                    (
+                        [lo[0].min(w[0]), lo[1].min(w[1]), lo[2].min(w[2])],
+                        [hi[0].max(w[0]), hi[1].max(w[1]), hi[2].max(w[2])],
+                    )
+                });
                 out.push(Problem {
                     check: Check::OneSidedPortal,
                     room: i,
@@ -146,6 +161,12 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                     other: Some(p.room),
                     detail: format!("Room {i} sees into room {} but not back", p.room),
                     fix: Some(Fix::ReturnPortal { room: i, portal: k }),
+                    // The plane, not the extent: splitting a room clips portals into it.
+                    place: {
+                        let axis = (0..3).find(|&a| p.normal[a] != 0).unwrap_or(1);
+                        let plane = if p.normal[axis] > 0 { high[axis] + 1 } else { low[axis] };
+                        [axis as i32, plane, p.normal[axis].signum(), 0, 0, 0]
+                    },
                 });
             }
         }
@@ -156,18 +177,21 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 let s = &r.sectors[sx * r.z_sectors + sz];
                 let (x, z) = (r.origin[0] + sx as i32 * 1024 + 512, r.origin[2] + sz as i32 * 1024 + 512);
                 let at = Some((sx, sz));
-                let mut problem = |check, other, detail: String| {
-                    out.push(Problem { check, room: i, sector: at, other, detail, fix: None });
+                let (gx, gz) = (r.origin[0].div_euclid(1024) + sx as i32, r.origin[2].div_euclid(1024) + sz as i32);
+                let mut problem = |check, other, kind: i32, detail: String| {
+                    let place = [gx, gz, s.floor, s.ceiling, kind, 0];
+                    out.push(Problem { check, room: i, sector: at, other, detail, fix: None, place });
                 };
                 let doorway = level.floor_info(s).portal;
                 // Doorways, holes and openings: (target, kind, render portal facing).
                 let links = [(doorway, "doorway", 0), (s.below, "floor", -1), (s.above, "ceiling", 1)];
-                for (to, kind, facing) in links {
+                for (code, (to, kind, facing)) in (1..).zip(links) {
                     let Some(to) = to.filter(|&to| to != i) else { continue };
                     if !has_portal(to, facing) {
                         problem(
                             Check::LinkWithoutPortal,
                             Some(to),
+                            code,
                             format!(
                                 "Room {i} sector ({sx}, {sz}) {kind} leads into room {to} with no portal to draw it"
                             ),
@@ -177,6 +201,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                         problem(
                             Check::LinkIntoSolid,
                             Some(to),
+                            code,
                             format!("Room {i} sector ({sx}, {sz}) {kind} leads into solid ground or outside room {to}"),
                         );
                         continue;
@@ -191,6 +216,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                         problem(
                             Check::HeightMismatch,
                             Some(to),
+                            code,
                             format!("Room {i} sector ({sx}, {sz}) {kind} at {mine} meets room {to} at {theirs}"),
                         );
                     }
@@ -198,12 +224,11 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 let open = s.floor > SOLID;
                 match s.nav_box.map(|b| (b, level.boxes.get(b))) {
                     Some((b, Some(nav))) => {
-                        let (gx, gz) =
-                            (r.origin[0].div_euclid(1024) + sx as i32, r.origin[2].div_euclid(1024) + sz as i32);
                         if !(nav.x_min <= gx && gx < nav.x_max && nav.z_min <= gz && gz < nav.z_max) {
                             problem(
                                 Check::NavBoxOutside,
                                 None,
+                                0,
                                 format!("Room {i} sector ({sx}, {sz}) is outside navigation box {b}"),
                             );
                         }
@@ -212,6 +237,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                     None if open && doorway.is_none() && s.below.is_none() => problem(
                         Check::NavBoxMissing,
                         None,
+                        0,
                         format!("Room {i} sector ({sx}, {sz}) is open but has no navigation box"),
                     ),
                     None => (),
@@ -226,6 +252,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                     problem(
                         Check::NavBoxStale,
                         None,
+                        0,
                         format!(
                             "Sector ({sx}, {sz}) floor changed from {} to {}; navigation box {b} was not rebuilt",
                             old.floor, s.floor
@@ -248,6 +275,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 other: Some(index),
                 detail: format!("Object {index} is authored in room {} but stands in room {room}", p.room),
                 fix: Some(Fix::ObjectRoom { placement: index, room }),
+                place: [index as i32, 0, 0, 0, 0, 0],
             }),
             None => out.push(Problem {
                 check: Check::ObjectOutside,
@@ -256,6 +284,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 other: Some(index),
                 detail: format!("Object {index} is in solid ground or outside room {}", p.room),
                 fix: None,
+                place: [index as i32, 0, 0, 0, 0, 0],
             }),
         }
     }
@@ -389,6 +418,6 @@ mod tests {
             [Check::NavBoxMissing, Check::LinkIntoSolid, Check::NavBoxOutside, Check::ObjectOutside]
         );
         let key = diagnose(&level, None)[0].key();
-        assert_eq!(key, (Check::NavBoxMissing, 0, Some((1, 1)), None));
+        assert_eq!(key, (Check::NavBoxMissing, [1, 1, 0, -2048, 0, 0]), "keyed by world place, not room number");
     }
 }

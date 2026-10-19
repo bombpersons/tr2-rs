@@ -90,7 +90,7 @@ One strip under the menu bar, in four groups:
    - Mesh: Raise (+), Lower (-), Push wall (P), Fill, Turn texture (R).
    - Mesh also has Connect and Open hole, since they start from selected
      faces; Disconnect is in the Rooms window.
-   - Rooms: New room is on the Map; Split and Merge are planned.
+   - Rooms: New room is on the Map; Split and Merge are in the Rooms window.
 4. **Settings**: Snap in object mode (Ctrl inverts while dragging); in mesh
    mode the edited room with Frame room, and the brush swatch.
 
@@ -170,9 +170,10 @@ window, the map and clicking faces in mesh mode all choose the same room.
   agree, add the vertical portal.
   (Built for a room already below at the floor's height; creating the
   room below belongs with New room.)
-- **Split room** along a sector line, or at a height. A height split is how
-  an overhang or bridge is made without thinking about rooms.
-- **Merge** two adjacent compatible rooms.
+- **Split room (built)** along a sector line, or at a height. A height split
+  is the first step to an overhang or bridge; closing part of the resulting
+  hole (to make the bridge's floor) still needs a "close hole" tool.
+- **Merge (built)** two joined or side-by-side compatible rooms.
 - **Push wall** into a neighbouring room offers to connect instead of
   refusing.
 
@@ -220,7 +221,7 @@ nothing in the game.
 1. Toolbar and Paint tool. (Done.)
 2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics. (Done.)
-4. Connect / open hole (done, with Disconnect), new room (done), then
-   split and merge.
+4. Connect / open hole (done, with Disconnect), new room, split and merge
+   (done). Next: closing part of a hole, flip rooms.
 5. Navigation box rebuild. (Done: incremental, for missing and stale boxes.)
 6. Lights and baking.
