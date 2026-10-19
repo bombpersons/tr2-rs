@@ -1,0 +1,940 @@
+{
+  "source": "Supplied USA Rev3 disc via psx native",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "validation/drowning/moving_death_menu_diagnostic_start/state.bin",
+    "--frames",
+    "220",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"SQUARE\", \"LEFT\", \"DOWN\"], \"until\": 180}]",
+    "--trace",
+    "--trace-from-frame",
+    "124",
+    "--trace-frames",
+    "12",
+    "--trace-range",
+    "8001d9fc-8001dac8",
+    "--trace-range",
+    "8001dd60-8001dd98",
+    "--max-events",
+    "20000",
+    "--sample",
+    "8008c502:i16:death_ticks",
+    "--sample",
+    "8008aad4:u32:input",
+    "--sample",
+    "80089cf4:i32:death_flow_gate",
+    "--out",
+    "validation/drowning/death_flow",
+    "--summary"
+  ],
+  "checkpoint_sha256": "a4e620e0a27196b7d23756cf4536a90acd0d916f6fb5a9df3f65399e018b63cc",
+  "build": {
+    "id": "src-6406590b7cd127b1-release",
+    "profile": "release",
+    "source_sha256": "6406590b7cd127b1dfc1222afa4a416e0653cac479c3af1ced1c87ea0947bd38",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.1.0",
+    "bios": "/home/maisy/.local/share/psx/bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "validation/drowning/moving_death_menu_diagnostic_start/state.bin",
+    "media": "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 8,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "trace": {
+    "coverage": {
+      "runs": 734,
+      "unique_instructions": 16916
+    },
+    "distinct_call_targets": 279,
+    "exceptions": {
+      "syscall": 2
+    },
+    "instructions": 3390264,
+    "interrupts": 16,
+    "lines": 86,
+    "lines_dropped": 0,
+    "max_lines": 20000,
+    "started": {
+      "cycle": 8567197168,
+      "frame": 15162,
+      "run_frame": 124
+    },
+    "stopped": {
+      "cycle": 8573977728,
+      "frame": 15174,
+      "run_frame": 136
+    },
+    "top_calls": [
+      {
+        "address": 521272,
+        "address_hex": "0x0007F438",
+        "callers": [
+          {
+            "count": 21025,
+            "pc": 516892,
+            "pc_hex": "0x0007E31C"
+          },
+          {
+            "count": 21024,
+            "pc": 516940,
+            "pc_hex": "0x0007E34C"
+          },
+          {
+            "count": 636,
+            "pc": 509384,
+            "pc_hex": "0x0007C5C8"
+          },
+          {
+            "count": 5,
+            "pc": 502008,
+            "pc_hex": "0x0007A8F8"
+          },
+          {
+            "count": 5,
+            "pc": 507536,
+            "pc_hex": "0x0007BE90"
+          },
+          {
+            "count": 5,
+            "pc": 507600,
+            "pc_hex": "0x0007BED0"
+          },
+          {
+            "count": 3,
+            "pc": 509304,
+            "pc_hex": "0x0007C578"
+          },
+          {
+            "count": 1,
+            "pc": 469140,
+            "pc_hex": "0x00072894"
+          },
+          {
+            "count": 1,
+            "pc": 516388,
+            "pc_hex": "0x0007E124"
+          },
+          {
+            "count": 1,
+            "pc": 516780,
+            "pc_hex": "0x0007E2AC"
+          }
+        ],
+        "count": 42706,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15173,
+        "last_run_frame": 135
+      },
+      {
+        "address": 475624,
+        "address_hex": "0x000741E8",
+        "callers": [
+          {
+            "count": 20910,
+            "pc": 299876,
+            "pc_hex": "0x00049364"
+          },
+          {
+            "count": 2,
+            "pc": 475948,
+            "pc_hex": "0x0007432C"
+          }
+        ],
+        "count": 20912,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15167,
+        "last_run_frame": 129
+      },
+      {
+        "address": 86232,
+        "address_hex": "0x000150D8",
+        "callers": [
+          {
+            "count": 4184,
+            "pc": 86984,
+            "pc_hex": "0x000153C8"
+          }
+        ],
+        "count": 4184,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15166,
+        "last_run_frame": 128
+      },
+      {
+        "address": 86816,
+        "address_hex": "0x00015320",
+        "callers": [
+          {
+            "count": 4182,
+            "pc": 299832,
+            "pc_hex": "0x00049338"
+          },
+          {
+            "count": 2,
+            "pc": 89624,
+            "pc_hex": "0x00015E18"
+          }
+        ],
+        "count": 4184,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15166,
+        "last_run_frame": 128
+      },
+      {
+        "address": 299700,
+        "address_hex": "0x000492B4",
+        "callers": [
+          {
+            "count": 4182,
+            "pc": 447536,
+            "pc_hex": "0x0006D430"
+          }
+        ],
+        "count": 4182,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15166,
+        "last_run_frame": 128
+      },
+      {
+        "address": 447528,
+        "address_hex": "0x0006D428",
+        "callers": [
+          {
+            "count": 4182,
+            "pc": 475972,
+            "pc_hex": "0x00074344"
+          }
+        ],
+        "count": 4182,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15166,
+        "last_run_frame": 128
+      },
+      {
+        "address": 401348,
+        "address_hex": "0x00061FC4",
+        "callers": [
+          {
+            "count": 544,
+            "pc": 402392,
+            "pc_hex": "0x000623D8"
+          },
+          {
+            "count": 471,
+            "pc": 399788,
+            "pc_hex": "0x000619AC"
+          },
+          {
+            "count": 46,
+            "pc": 403892,
+            "pc_hex": "0x000629B4"
+          }
+        ],
+        "count": 1061,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 401192,
+        "address_hex": "0x00061F28",
+        "callers": [
+          {
+            "count": 1016,
+            "pc": 399612,
+            "pc_hex": "0x000618FC"
+          },
+          {
+            "count": 8,
+            "pc": 400472,
+            "pc_hex": "0x00061C58"
+          }
+        ],
+        "count": 1024,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 522112,
+        "address_hex": "0x0007F780",
+        "callers": [
+          {
+            "count": 636,
+            "pc": 509584,
+            "pc_hex": "0x0007C690"
+          },
+          {
+            "count": 5,
+            "pc": 507800,
+            "pc_hex": "0x0007BF98"
+          }
+        ],
+        "count": 641,
+        "first_frame": 15167,
+        "first_run_frame": 129,
+        "function": null,
+        "last_frame": 15168,
+        "last_run_frame": 130
+      },
+      {
+        "address": 401620,
+        "address_hex": "0x000620D4",
+        "callers": [
+          {
+            "count": 148,
+            "pc": 402112,
+            "pc_hex": "0x000622C0"
+          },
+          {
+            "count": 148,
+            "pc": 402132,
+            "pc_hex": "0x000622D4"
+          },
+          {
+            "count": 148,
+            "pc": 402152,
+            "pc_hex": "0x000622E8"
+          },
+          {
+            "count": 148,
+            "pc": 402172,
+            "pc_hex": "0x000622FC"
+          }
+        ],
+        "count": 592,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 409460,
+        "address_hex": "0x00063F74",
+        "callers": [
+          {
+            "count": 44,
+            "pc": 409556,
+            "pc_hex": "0x00063FD4"
+          },
+          {
+            "count": 44,
+            "pc": 409848,
+            "pc_hex": "0x000640F8"
+          },
+          {
+            "count": 44,
+            "pc": 410140,
+            "pc_hex": "0x0006421C"
+          },
+          {
+            "count": 20,
+            "pc": 415592,
+            "pc_hex": "0x00065768"
+          },
+          {
+            "count": 18,
+            "pc": 410456,
+            "pc_hex": "0x00064358"
+          },
+          {
+            "count": 17,
+            "pc": 415256,
+            "pc_hex": "0x00065618"
+          },
+          {
+            "count": 16,
+            "pc": 169988,
+            "pc_hex": "0x00029804"
+          },
+          {
+            "count": 12,
+            "pc": 410744,
+            "pc_hex": "0x00064478"
+          },
+          {
+            "count": 10,
+            "pc": 123356,
+            "pc_hex": "0x0001E1DC"
+          },
+          {
+            "count": 6,
+            "pc": 415928,
+            "pc_hex": "0x000658B8"
+          },
+          {
+            "count": 3,
+            "pc": 447072,
+            "pc_hex": "0x0006D260"
+          },
+          {
+            "count": 2,
+            "pc": 85936,
+            "pc_hex": "0x00014FB0"
+          },
+          {
+            "count": 2,
+            "pc": 99056,
+            "pc_hex": "0x000182F0"
+          },
+          {
+            "count": 2,
+            "pc": 103068,
+            "pc_hex": "0x0001929C"
+          },
+          {
+            "count": 2,
+            "pc": 103160,
+            "pc_hex": "0x000192F8"
+          },
+          {
+            "count": 2,
+            "pc": 110992,
+            "pc_hex": "0x0001B190"
+          }
+        ],
+        "count": 262,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15167,
+        "last_run_frame": 129
+      },
+      {
+        "address": 409456,
+        "address_hex": "0x00063F70",
+        "callers": [
+          {
+            "count": 44,
+            "pc": 409568,
+            "pc_hex": "0x00063FE0"
+          },
+          {
+            "count": 44,
+            "pc": 409860,
+            "pc_hex": "0x00064104"
+          },
+          {
+            "count": 44,
+            "pc": 410152,
+            "pc_hex": "0x00064228"
+          },
+          {
+            "count": 20,
+            "pc": 415604,
+            "pc_hex": "0x00065774"
+          },
+          {
+            "count": 18,
+            "pc": 410468,
+            "pc_hex": "0x00064364"
+          },
+          {
+            "count": 17,
+            "pc": 415268,
+            "pc_hex": "0x00065624"
+          },
+          {
+            "count": 16,
+            "pc": 170036,
+            "pc_hex": "0x00029834"
+          },
+          {
+            "count": 12,
+            "pc": 410756,
+            "pc_hex": "0x00064484"
+          },
+          {
+            "count": 10,
+            "pc": 123396,
+            "pc_hex": "0x0001E204"
+          },
+          {
+            "count": 6,
+            "pc": 415940,
+            "pc_hex": "0x000658C4"
+          },
+          {
+            "count": 2,
+            "pc": 85892,
+            "pc_hex": "0x00014F84"
+          },
+          {
+            "count": 2,
+            "pc": 99112,
+            "pc_hex": "0x00018328"
+          },
+          {
+            "count": 2,
+            "pc": 103032,
+            "pc_hex": "0x00019278"
+          },
+          {
+            "count": 2,
+            "pc": 103196,
+            "pc_hex": "0x0001931C"
+          },
+          {
+            "count": 2,
+            "pc": 275072,
+            "pc_hex": "0x00043280"
+          },
+          {
+            "count": 2,
+            "pc": 283228,
+            "pc_hex": "0x0004525C"
+          }
+        ],
+        "count": 259,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 401552,
+        "address_hex": "0x00062090",
+        "callers": [
+          {
+            "count": 118,
+            "pc": 400248,
+            "pc_hex": "0x00061B78"
+          },
+          {
+            "count": 100,
+            "pc": 399948,
+            "pc_hex": "0x00061A4C"
+          },
+          {
+            "count": 4,
+            "pc": 403936,
+            "pc_hex": "0x000629E0"
+          }
+        ],
+        "count": 222,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 17500,
+        "address_hex": "0x0000445C",
+        "callers": [
+          {
+            "count": 24,
+            "pc": 17728,
+            "pc_hex": "0x00004540"
+          },
+          {
+            "count": 24,
+            "pc": 17800,
+            "pc_hex": "0x00004588"
+          },
+          {
+            "count": 24,
+            "pc": 17884,
+            "pc_hex": "0x000045DC"
+          },
+          {
+            "count": 12,
+            "pc": 17968,
+            "pc_hex": "0x00004630"
+          },
+          {
+            "count": 12,
+            "pc": 18164,
+            "pc_hex": "0x000046F4"
+          },
+          {
+            "count": 12,
+            "pc": 18368,
+            "pc_hex": "0x000047C0"
+          },
+          {
+            "count": 12,
+            "pc": 18632,
+            "pc_hex": "0x000048C8"
+          }
+        ],
+        "count": 120,
+        "first_frame": 15162,
+        "first_run_frame": 124,
+        "function": null,
+        "last_frame": 15173,
+        "last_run_frame": 135
+      },
+      {
+        "address": 401628,
+        "address_hex": "0x000620DC",
+        "callers": [
+          {
+            "count": 100,
+            "pc": 400020,
+            "pc_hex": "0x00061A94"
+          }
+        ],
+        "count": 100,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 129740,
+        "address_hex": "0x0001FACC",
+        "callers": [
+          {
+            "count": 88,
+            "pc": 124192,
+            "pc_hex": "0x0001E520"
+          },
+          {
+            "count": 6,
+            "pc": 124856,
+            "pc_hex": "0x0001E7B8"
+          },
+          {
+            "count": 4,
+            "pc": 285140,
+            "pc_hex": "0x000459D4"
+          }
+        ],
+        "count": 98,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 403668,
+        "address_hex": "0x000628D4",
+        "callers": [
+          {
+            "count": 94,
+            "pc": 403596,
+            "pc_hex": "0x0006288C"
+          }
+        ],
+        "count": 94,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 123932,
+        "address_hex": "0x0001E41C",
+        "callers": [
+          {
+            "count": 16,
+            "pc": 114708,
+            "pc_hex": "0x0001C014"
+          },
+          {
+            "count": 16,
+            "pc": 170080,
+            "pc_hex": "0x00029860"
+          },
+          {
+            "count": 8,
+            "pc": 100240,
+            "pc_hex": "0x00018790"
+          },
+          {
+            "count": 4,
+            "pc": 130484,
+            "pc_hex": "0x0001FDB4"
+          },
+          {
+            "count": 4,
+            "pc": 130644,
+            "pc_hex": "0x0001FE54"
+          },
+          {
+            "count": 4,
+            "pc": 285392,
+            "pc_hex": "0x00045AD0"
+          },
+          {
+            "count": 2,
+            "pc": 92244,
+            "pc_hex": "0x00016854"
+          },
+          {
+            "count": 2,
+            "pc": 92400,
+            "pc_hex": "0x000168F0"
+          },
+          {
+            "count": 2,
+            "pc": 92420,
+            "pc_hex": "0x00016904"
+          },
+          {
+            "count": 2,
+            "pc": 94628,
+            "pc_hex": "0x000171A4"
+          },
+          {
+            "count": 2,
+            "pc": 94784,
+            "pc_hex": "0x00017240"
+          },
+          {
+            "count": 2,
+            "pc": 98196,
+            "pc_hex": "0x00017F94"
+          },
+          {
+            "count": 2,
+            "pc": 98924,
+            "pc_hex": "0x0001826C"
+          },
+          {
+            "count": 2,
+            "pc": 106836,
+            "pc_hex": "0x0001A154"
+          },
+          {
+            "count": 2,
+            "pc": 110752,
+            "pc_hex": "0x0001B0A0"
+          },
+          {
+            "count": 2,
+            "pc": 111272,
+            "pc_hex": "0x0001B2A8"
+          }
+        ],
+        "count": 88,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 411652,
+        "address_hex": "0x00064804",
+        "callers": [
+          {
+            "count": 18,
+            "pc": 152192,
+            "pc_hex": "0x00025280"
+          },
+          {
+            "count": 15,
+            "pc": 164340,
+            "pc_hex": "0x000281F4"
+          },
+          {
+            "count": 12,
+            "pc": 198096,
+            "pc_hex": "0x000305D0"
+          },
+          {
+            "count": 6,
+            "pc": 148252,
+            "pc_hex": "0x0002431C"
+          },
+          {
+            "count": 6,
+            "pc": 152048,
+            "pc_hex": "0x000251F0"
+          },
+          {
+            "count": 5,
+            "pc": 163280,
+            "pc_hex": "0x00027DD0"
+          },
+          {
+            "count": 2,
+            "pc": 194580,
+            "pc_hex": "0x0002F814"
+          },
+          {
+            "count": 2,
+            "pc": 194960,
+            "pc_hex": "0x0002F990"
+          },
+          {
+            "count": 2,
+            "pc": 195076,
+            "pc_hex": "0x0002FA04"
+          },
+          {
+            "count": 2,
+            "pc": 195248,
+            "pc_hex": "0x0002FAB0"
+          },
+          {
+            "count": 2,
+            "pc": 195488,
+            "pc_hex": "0x0002FBA0"
+          },
+          {
+            "count": 2,
+            "pc": 420000,
+            "pc_hex": "0x000668A0"
+          },
+          {
+            "count": 1,
+            "pc": 155096,
+            "pc_hex": "0x00025DD8"
+          },
+          {
+            "count": 1,
+            "pc": 155180,
+            "pc_hex": "0x00025E2C"
+          },
+          {
+            "count": 1,
+            "pc": 155300,
+            "pc_hex": "0x00025EA4"
+          },
+          {
+            "count": 1,
+            "pc": 155556,
+            "pc_hex": "0x00025FA4"
+          }
+        ],
+        "count": 83,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      },
+      {
+        "address": 411324,
+        "address_hex": "0x000646BC",
+        "callers": [
+          {
+            "count": 14,
+            "pc": 163640,
+            "pc_hex": "0x00027F38"
+          },
+          {
+            "count": 14,
+            "pc": 163676,
+            "pc_hex": "0x00027F5C"
+          },
+          {
+            "count": 12,
+            "pc": 197768,
+            "pc_hex": "0x00030488"
+          },
+          {
+            "count": 2,
+            "pc": 165744,
+            "pc_hex": "0x00028770"
+          },
+          {
+            "count": 2,
+            "pc": 194560,
+            "pc_hex": "0x0002F800"
+          },
+          {
+            "count": 2,
+            "pc": 194612,
+            "pc_hex": "0x0002F834"
+          },
+          {
+            "count": 2,
+            "pc": 194716,
+            "pc_hex": "0x0002F89C"
+          },
+          {
+            "count": 2,
+            "pc": 194992,
+            "pc_hex": "0x0002F9B0"
+          },
+          {
+            "count": 2,
+            "pc": 195096,
+            "pc_hex": "0x0002FA18"
+          },
+          {
+            "count": 2,
+            "pc": 195144,
+            "pc_hex": "0x0002FA48"
+          },
+          {
+            "count": 2,
+            "pc": 195268,
+            "pc_hex": "0x0002FAC4"
+          },
+          {
+            "count": 2,
+            "pc": 195312,
+            "pc_hex": "0x0002FAF0"
+          },
+          {
+            "count": 2,
+            "pc": 195436,
+            "pc_hex": "0x0002FB6C"
+          },
+          {
+            "count": 2,
+            "pc": 195520,
+            "pc_hex": "0x0002FBC0"
+          },
+          {
+            "count": 2,
+            "pc": 195604,
+            "pc_hex": "0x0002FC14"
+          },
+          {
+            "count": 1,
+            "pc": 155232,
+            "pc_hex": "0x00025E60"
+          }
+        ],
+        "count": 81,
+        "first_frame": 15163,
+        "first_run_frame": 125,
+        "function": null,
+        "last_frame": 15165,
+        "last_run_frame": 127
+      }
+    ]
+  },
+  "trace_sha256": "b4a01506f308c8842def56ecaabb053859c7150e5021ef920e04cbffb15b45f5",
+  "samples_sha256": "d825bfa6c45eccc576491ce598628dbcef03b709995318ac054ca194a9a7e873",
+  "observed": "At run field129 ControlPhase reads death ticks61, input0x16 and gate0, then returns0x500 at0x8001DA74/0x8001DD90. No later player logic is observed in the220-field capture."
+}

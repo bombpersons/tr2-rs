@@ -146,6 +146,12 @@ pub(super) fn control(
     motion.oxygen_seconds = water.air_ticks.max(0) as f32 / ORIGINAL_FPS;
     motion.turn_rate = 0;
     let Some(state) = clips.and_then(|c| c.state(animation.animation)) else { return };
+    if state == 44 {
+        // Surface wrapper0x80044364 uses the same state44 controller as
+        // submerged motion. Surface death is authored clip132, not124.
+        swimming::death_control(motion, water, tuning);
+        return;
+    }
     let controls = GroundControls::read(pad);
     let held = |x: f32| {
         if x < -0.1 {
@@ -260,6 +266,7 @@ pub(super) fn step(
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
     action: bool,
+    tuning: &SwimmingTuning,
     dt: f32,
 ) {
     let Some(clips) = clips else { return };
@@ -283,6 +290,11 @@ pub(super) fn step(
     motion.grounded = false;
     let Some(world) = world else { return };
     let state = clips.state(animation.animation).unwrap_or(TREAD);
+    if state == 44 {
+        swimming::death_collision(player, motion, water, Some(world), old, tuning, dt);
+        player.room = super::body_room(world, player.position, player.room, -100.0);
+        return;
+    }
     if state == TREAD && traversal.goal == 17 {
         dive(player, motion, water, animation);
     }

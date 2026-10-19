@@ -83,10 +83,11 @@ fn compare_case(csv: &str, metadata: &str) {
             ("room", p.room as i32),
             ("air", s.air_ticks),
             ("health", p.health),
+            ("water_mode", if p.mode == PlayerMode::Surface { 2 } else { 1 }),
         ] {
             assert_eq!(actual, at(row, name), "field{} {name}", at(row, "run_frame"));
         }
-        assert_eq!(p.mode, PlayerMode::Swimming);
+        assert!(matches!(p.mode, PlayerMode::Swimming | PlayerMode::Surface));
     }
 }
 
@@ -160,3 +161,29 @@ fn heldout_rising_stroke_slides_under_the_tunnel_ceiling() {
         include_str!("data/original/swim_collision_tunnel_ceiling.json"),
     );
 }
+
+macro_rules! drowning_case {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            compare_case(
+                include_str!(concat!("data/original/drowning_", $case, ".csv")),
+                include_str!(concat!("data/original/drowning_", $case, ".json")),
+            );
+        }
+    };
+}
+
+drowning_case!(original_oxygen_exhaustion_damages_only_after_the_zero_tick, "exhaustion");
+drowning_case!(original_drowning_uses_authored_death_and_floats_to_a_submerged_stop, "tread_death");
+drowning_case!(original_moving_drowning_brakes_levels_pitch_and_ignores_steering, "moving_death");
+drowning_case!(heldout_exhausted_swimming_still_steers_and_uses_authored_strokes, "exhaustion_heldout");
+drowning_case!(calibration_upward_drowning_surfaces_into_its_authored_floating_death, "rising_death_heldout");
+drowning_case!(heldout_opposite_turn_drowning_recovers_bank_and_holds_the_terminal_pose, "opposite_death_heldout");
+drowning_case!(heldout_full_air_countdown_reaches_drowning_without_counter_pokes, "full_air_heldout");
+drowning_case!(
+    heldout_rising_drowning_validates_the_submerged_to_surface_death_transition,
+    "surface_death_validation_heldout"
+);
+drowning_case!(heldout_late_rising_drowning_reaches_and_holds_the_surface_death_pose, "surface_death_late_heldout");
+drowning_case!(heldout_exhausted_survivor_surfaces_and_refills_air, "air_recovery_heldout");

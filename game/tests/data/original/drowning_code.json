@@ -1,0 +1,111 @@
+{
+  "source": "Supplied USA Rev3 disc via psx; Home runtime code",
+  "ram_sha256": "d3c15ce08786be4c31a123a8b54c1cc2f8e24179937e3039f66e50378b8e4367",
+  "functions": [
+    {
+      "start": "0x1d9fc",
+      "end_exclusive": "0x1dac8",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x1d9fc",
+        "--count",
+        "51",
+        "--text"
+      ],
+      "bytes_sha256": "65035ffb394c08884a468c57f3e8da1fe7bba40692bb0cc38b028a4f5f606285",
+      "listing_sha256": "96e96ebc9d2ee4302193ee95c1177f389005f83ba564662520c58d2618a405b4"
+    },
+    {
+      "start": "0x1dd60",
+      "end_exclusive": "0x1dd98",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x1dd60",
+        "--count",
+        "14",
+        "--text"
+      ],
+      "bytes_sha256": "7fb7a164a594e05364e156c39fbfabd974905f4122fcbf32fb7d0067dec6fec3",
+      "listing_sha256": "bc321315b2651f6b16b5b0a4b4641a2e90537a95c50784366ae6496cfc361c63"
+    },
+    {
+      "start": "0x429a4",
+      "end_exclusive": "0x42ca8",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x429a4",
+        "--count",
+        "193",
+        "--text"
+      ],
+      "bytes_sha256": "e45032c2e070aac425eb92c27237784ee4b4d2a6f955ae724a7252d4ef65704d",
+      "listing_sha256": "27493f3bc5d2c62cc450664f5e7b71ffdf9b7c3647cbf231b42afa18e33c5893"
+    },
+    {
+      "start": "0x44264",
+      "end_exclusive": "0x444c0",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x44264",
+        "--count",
+        "151",
+        "--text"
+      ],
+      "bytes_sha256": "ff77bc26243cc376b0f43ba188dd5e4a425375fe28a5039231a8f6abeda3172d",
+      "listing_sha256": "6eb58eccba1e850234141da6eae95016c79db33a151cce645440cfad8a3a5e89"
+    },
+    {
+      "start": "0x44fc4",
+      "end_exclusive": "0x45384",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x44fc4",
+        "--count",
+        "240",
+        "--text"
+      ],
+      "bytes_sha256": "18af5be2de1c5d4e42dd7257756d9f191d4d92d276fc584753a3ca8614b86f93",
+      "listing_sha256": "43259112d19bd840e2c3c396b93aa8dc91de2cbbb8c9bf0d619ff4caea17c5d8"
+    },
+    {
+      "start": "0x45384",
+      "end_exclusive": "0x458ac",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/home_start",
+        "--addr",
+        "0x45384",
+        "--count",
+        "330",
+        "--text"
+      ],
+      "bytes_sha256": "71e8450dc32e6cf19db1dc8d258de86334aef6213b323e8d604864ab12ac28dc",
+      "listing_sha256": "b5c305191b450924969ca7e17a0aeb50b689d756084ee186ef9c175e91deb3f5"
+    }
+  ],
+  "death_state": 44,
+  "control": "0x8004570c",
+  "collision": "0x80045810"
+}

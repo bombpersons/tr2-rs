@@ -564,11 +564,16 @@ pub fn disconnect(level: &mut Level, a: usize, b: usize) -> Result<(), String> {
 fn close_link(level: &mut Level, room: usize, at: (usize, usize), surface: Surface) -> bool {
     let Some(c) = sector_corners(level, room, at.0, at.1, surface) else { return false };
     let r = &mut level.rooms[room];
-    let (x0, z0) = (at.0 as i32 * SECTOR, at.1 as i32 * SECTOR);
-    let p = |i: usize| [x0 + (i & 1) as i32 * SECTOR, c[i], z0 + (i >> 1) as i32 * SECTOR];
-    let toward = if surface == Surface::Floor { [0, -1, 0] } else { [0, 1, 0] };
-    let texture = some_texture(r, Some(surface));
-    add_face(r, [p(0), p(1), p(3), p(2)], toward, texture);
+    // Renderable surfaces may cover a sector whose collision still links
+    // through to a neighbour. Reuse that face, including its texture/shades,
+    // instead of making an overlapping duplicate when the link closes.
+    if !sector_faces(r).contains_key(&(at.0, at.1, surface)) {
+        let (x0, z0) = (at.0 as i32 * SECTOR, at.1 as i32 * SECTOR);
+        let p = |i: usize| [x0 + (i & 1) as i32 * SECTOR, c[i], z0 + (i >> 1) as i32 * SECTOR];
+        let toward = if surface == Surface::Floor { [0, -1, 0] } else { [0, 1, 0] };
+        let texture = some_texture(r, Some(surface));
+        add_face(r, [p(0), p(1), p(3), p(2)], toward, texture);
+    }
     let s = sector_mut(level, room, at);
     if surface == Surface::Floor {
         s.below = None;

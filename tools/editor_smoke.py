@@ -286,8 +286,15 @@ def connect_smoke(client, level, captures):
     before = state['problems_new']
     state = settled(client, state, disconnect=f'{a},{b}')
     assert state['message'].startswith('Disconnected'), state
-    # The closing wall is the newest face of room a (one face out, one in).
-    wall = len(level['rooms'][a]['quads']) - 1
+    # Closing a doorway rebuilds its strips and can change the face count.
+    # Inspect an unsaved play copy rather than using a pre-edit face index.
+    # Export leaves the document and its undo/save baseline untouched.
+    folder = client.out / 'connect-assets'
+    state = settled(client, state, play=f'export:{folder}')
+    assert state['message'].startswith('Wrote levels/'), state
+    name = state['message'].split('/')[1]
+    closed = json.loads((folder / 'levels' / name / 'editor-play.json').read_bytes())
+    wall = len(closed['rooms'][a]['quads']) - 1
     state = command(client, mode='mesh', mesh_room=a)
     state = command(client, mesh_select=f'q{wall}', frame=True)
     state = settled(client, state, mesh_connect=True)

@@ -7,6 +7,7 @@ import math
 import shutil
 from port_smoke import Client,ROOT,align_reference,convert
 from record_swimming import CASES
+from record_drowning import CASES as DROWNING_CASES
 
 
 def binary(v):return (round(v*65536/math.tau)+32768)%65536-32768
@@ -17,16 +18,23 @@ def multiply(a,b):
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--case',choices=CASES)
-    args=p.parse_args();out=ROOT/'validation/swim/smoke'
+    p=argparse.ArgumentParser(description=__doc__)
+    p.add_argument('--suite', choices=['swimming', 'drowning'], default='swimming')
+    p.add_argument('--case', choices=sorted(set(CASES) | set(DROWNING_CASES)))
+    args=p.parse_args()
+    cases = CASES if args.suite == 'swimming' else DROWNING_CASES
+    if args.case and args.case not in cases:
+        p.error('--case must belong to the selected suite')
+    folder = 'swim' if args.suite == 'swimming' else 'drowning'
+    out=ROOT/f'validation/{folder}/smoke'
     out.mkdir(parents=True,exist_ok=True)
     report={'status':'running','cases':{}}
     report_file=out/(f'report-{args.case}.json' if args.case else 'report.json')
     level=json.loads((ROOT/'game/assets/levels/assault/level.json').read_text())
     try:
-        for name in [args.case] if args.case else CASES:
-            rows=list(csv.DictReader((ROOT/f'game/tests/data/original/swimming_{name}.csv').open()))
-            meta=json.loads((ROOT/f'game/tests/data/original/swimming_{name}.json').read_text())
+        for name in [args.case] if args.case else cases:
+            rows=list(csv.DictReader((ROOT/f'game/tests/data/original/{args.suite}_{name}.csv').open()))
+            meta=json.loads((ROOT/f'game/tests/data/original/{args.suite}_{name}.json').read_text())
             first=rows[0]
             client=Client(ROOT/'target/debug/tomb-raider-ii',out/name,'assault')
             poses=report['cases'][name]=[]
@@ -44,6 +52,20 @@ def main():
                     'bank':int(first['roll'])*math.tau/65536,'air_ticks':int(first['air'])})
                 client.edit('Player','Traversal',{'goal':int(first['goal'])})
                 fields=sorted(set([f for f in [2,4,14,26,40,44,46,52,62,70,72,74,86,88,92,94,110,112,140,180] if f<len(rows)-4]+[len(rows)-5]))
+                if args.suite == 'drowning':
+                    # Include counter/death/mode boundaries and late terminal
+                    # poses. Round to actual native snapshots at the retained
+                    # four-field display offset, including the long countdown.
+                    cadence = int(meta['command'][meta['command'].index('--snapshot-every') + 1])
+                    candidates = [2,4,6,8,10,12,14,22,24,32,34,54,80,100,160,320,420,len(rows)-5]
+                    for key in ['air', 'health', 'state', 'water_mode']:
+                        for field in range(2, len(rows), 2):
+                            if (key in ['state', 'water_mode'] and rows[field][key] != rows[field-2][key]
+                                or key == 'air' and rows[field][key] in ['0', '-1'] and rows[field][key] != rows[field-2][key]
+                                or key == 'health' and int(rows[field][key]) <= 0 < int(rows[field-2][key])):
+                                candidates.extend([field-2,field,field+2])
+                    fields = sorted({(f+4)//cadence*cadence-4 for f in candidates if 0<f<=len(rows)-5})
+                    fields = [f for f in fields if f>0]
                 tick=0
                 for field in fields:
                     while 2*tick<field:
@@ -57,7 +79,9 @@ def main():
                     actual=dict(x=round(actor['position'][0]*1024),y=round(-actor['position'][1]*1024),z=round(actor['position'][2]*1024),
                         yaw=binary(actor['yaw']),pitch=binary(motion['pitch']),roll=binary(water['bank']),turn_rate=motion['turn_rate'],
                         swim_speed=round(water['speed']*4096/30),animation=a['animation'],animation_frame=level['animations'][a['animation']]['frame_start']+a['frame'],
-                        state=level['animations'][a['animation']]['state'],goal=c['Traversal']['goal'],room=actor['room'],air=water['air_ticks'],health=actor['health'])
+                        state=level['animations'][a['animation']]['state'],goal=c['Traversal']['goal'],room=actor['room'],air=water['air_ticks'],health=actor['health'],
+                        water_mode=2 if actor['mode']=='Surface' else 1)
+                    assert actor['mode'] in ['Swimming', 'Surface'], (name, field, actor['mode'])
                     for key,value in actual.items():assert value==int(row[key]),(name,field,key,value,row[key])
                     yaw,pitch,bank=[int(row[k])*math.tau/65536 for k in ['yaw','pitch','roll']]
                     expected=multiply(multiply([0,math.sin(yaw/2),0,math.cos(yaw/2)],[-math.sin(pitch/2),0,0,math.cos(pitch/2)]),[0,0,-math.sin(bank/2),math.cos(bank/2)])
@@ -66,7 +90,7 @@ def main():
                     client.edit('ChaseCamera','CameraRig',{'manual':True,'position':convert([int(row['camera_'+k]) for k in 'xyz']),
                         'target':convert([int(row['target_'+k]) for k in 'xyz'])})
                     capture=client.capture(f'f{field:04}',min_colors=16)
-                    original=ROOT/f'validation/swim/{name}/screens/f{field+4:06}.png'
+                    original=ROOT/f'validation/{folder}/{name}/screens/f{field+4:06}.png'
                     target=client.out/f'f{field:04}-original.png';shutil.copyfile(original,target)
                     poses.append(dict(field=field,state=state,image=capture,original=str(target.relative_to(ROOT))))
             finally:client.close()

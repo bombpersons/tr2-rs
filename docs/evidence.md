@@ -78,9 +78,11 @@ Corner/side and forward-top contacts remain unverified.
 
 - [Frontal oblique running wall contacts](oblique-wall-evidence.md): complete native collision/shift trace and2745 exact full-controller ticks across six ordinary routes, with two fresh combined-rule validations. Tangent restoration and quantized ground/braking motion close the navigation replay diagnostic; side/corner/static contacts remain unverified.
 
-- [Submerged stroke/glide/tread and steering](swimming-evidence.md):700 exact ticks,16 compared columns, three fresh independent replays and126 full-game pose checks. Authored dispatch, pitch/bank/turn inertia, quantized movement and ordinary air consumption verified; transitions/collisions/drowning/appearance remain pending.
+- [Submerged stroke/glide/tread and steering](swimming-evidence.md):700 exact ticks,16 compared columns, three fresh independent replays and126 full-game pose checks. Authored dispatch, pitch/bank/turn inertia, quantized movement and ordinary air consumption verified; subsequent collision and water milestones are linked from that report.
 - [Water surface, entry and climb-out](surface-evidence.md): eleven complete routes (five independent), every column exact, and121 full-game pose checks. Surfacing, surface strokes/turns/collision, tread dive, climb-out and deep-water entry verified; submerged wall collision and wading remain pending.
 
 - [Underwater palette](underwater-palette-evidence.md): 16384 observed palette pairs, all 32 red levels, room/camera selection code and a fresh full-game visual comparison. Caustics remain pending.
 
 - [Wet-room vertex lighting](caustics-evidence.md): 1256 native corner updates, all 64 wave entries, fresh odd-phase observations, 140 exact clock ticks and full-game animation/restoration checks.
+
+- [Oxygen exhaustion and water death](drowning-evidence.md):3710 exact logic ticks across ten complete PSX replays, six independent; signed damage, authored dispatch, braking, angular recovery, buoyancy and surface death. A full remaining-air countdown has no counter pokes. The longer post-death pad-hold UI/timing diagnostic remains separate.

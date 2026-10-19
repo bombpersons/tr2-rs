@@ -19,6 +19,9 @@
     "bank_limit": 4004,
     "max_air_ticks": 1800,
     "drowning_damage": 5,
+    "death_drag": 2.0,
+    "death_rise": 5.0,
+    "death_surface_margin": 100.0,
     "surface": {
      "max_speed": 60,
      "acceleration": 8,

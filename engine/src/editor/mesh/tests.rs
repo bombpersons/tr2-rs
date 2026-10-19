@@ -641,3 +641,47 @@ fn closing_part_of_a_hole_brings_back_both_faces_and_shrinks_the_portals() {
     joins_cleanly(&level);
     assert!(disconnect(&mut level, 0, 1).is_err(), "nothing joins them any more");
 }
+
+#[test]
+fn closing_a_link_with_visible_surface_faces_preserves_them_without_duplicates() {
+    // A renderable surface can cover a sector that still links through to
+    // another room. Closing that link must not add an overlapping second face.
+    for disconnect_pair in [false, true] {
+        let mut level = box_level(3, 3);
+        let mut below = level.rooms[0].clone();
+        for v in &mut below.vertices {
+            v[1] += 2048;
+        }
+        for s in below.sectors.iter_mut().filter(|s| s.floor != SOLID) {
+            (s.floor, s.ceiling) = (s.floor + 2048, s.ceiling + 2048);
+        }
+        (below.top, below.bottom) = (0, 2048);
+        level.rooms.push(below);
+        let geometry = level.rooms.clone();
+        let floor = face_at(&level, 1, 1, Surface::Floor);
+        open_hole(&mut level, 0, floor).unwrap();
+        for (room, original) in level.rooms.iter_mut().zip(&geometry) {
+            room.vertices.clone_from(&original.vertices);
+            room.quads.clone_from(&original.quads);
+            room.triangles.clone_from(&original.triangles);
+        }
+        if disconnect_pair {
+            disconnect(&mut level, 0, 1).unwrap();
+        } else {
+            let lower = &level.rooms[1];
+            let floor = lower
+                .quads
+                .iter()
+                .position(|q| sector_face(lower, q).is_some_and(|f| (f.x, f.z, f.surface) == (1, 1, Surface::Floor)))
+                .unwrap();
+            assert_eq!(close_holes(&mut level, 1, &[floor]), Ok(BTreeSet::from([0])));
+        }
+        assert_eq!((sector(&level, 1, 1).below, level.rooms[1].sectors[4].above), (None, None));
+        for (room, original) in level.rooms.iter().zip(&geometry) {
+            assert_eq!(room.vertices, original.vertices, "preserve vertex shades and UV references");
+            assert_eq!(room.quads, original.quads, "reuse the authored floor and ceiling faces");
+            assert!(room.portals.is_empty());
+        }
+        joins_cleanly(&level);
+    }
+}

@@ -336,6 +336,10 @@ problems afterwards.
   no new diagnostics problems (the smoke test does this for rooms 0 and 3,
   and for the 90-sector hole between rooms 6 and 13).
 
+Closing a hole or disconnecting rooms preserves any floor or ceiling face
+already covering the linked sector, including its texture and vertex shades.
+Missing faces are restored without adding overlapping duplicates.
+
 ### Navigation boxes
 
 Creatures path and the chase camera keeps its eye inside navigation boxes:

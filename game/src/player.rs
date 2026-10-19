@@ -21,9 +21,9 @@ use engine::world::{FloorHit, WorldGeometry};
 mod traversal;
 pub use traversal::Traversal;
 mod backward;
+mod collision;
 mod forward;
 mod rolling;
-mod collision;
 mod surface;
 mod swimming;
 pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
@@ -664,7 +664,10 @@ fn control(
         );
         weapon.cooldown_seconds = (weapon.cooldown_seconds - dt).max(0.0);
         weapon.firing = false;
-        if player.health <= 0 {
+        if player.health <= 0 && matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
+            player.health = -1;
+        }
+        if player.health <= 0 && !matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
             if player.mode == PlayerMode::FatalLanding {
                 // LaraControl clamps a dead actor to-1 on its next tick
                 // (0x80042B10), including impact154's initial health0.
@@ -676,10 +679,10 @@ fn control(
             motion.velocity.z = 0.0;
             continue;
         }
-        if pad.pressed(Button::Triangle) {
+        if player.health > 0 && pad.pressed(Button::Triangle) {
             weapon.drawn = !weapon.drawn;
         }
-        if weapon.drawn && pad.held(Button::Cross) && weapon.cooldown_seconds == 0.0 {
+        if player.health > 0 && weapon.drawn && pad.held(Button::Cross) && weapon.cooldown_seconds == 0.0 {
             weapon.firing = true;
             weapon.shot_serial += 1;
             // Provisional pistol cadence; not yet measured from the PS1 weapon controller.
@@ -964,6 +967,7 @@ fn integrate(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
+    tuning: Res<SwimmingTuning>,
     mut players: Query<(
         &mut Player,
         &mut Motion,
@@ -986,6 +990,7 @@ fn integrate(
                 geometry,
                 clips.as_deref(),
                 !weapon.drawn && pad.held(Button::Cross),
+                &tuning,
                 dt,
             );
             continue;
@@ -999,6 +1004,7 @@ fn integrate(
                 &mut traversal,
                 geometry,
                 clips.as_deref(),
+                &tuning,
                 dt,
             );
             continue;

@@ -17,6 +17,10 @@ pub struct SwimmingTuning {
     pub max_speed: f32,
     pub max_air_ticks: i32,
     pub drowning_damage: i32,
+    /// Underwater death0x8004570C /0x80045810: source units per tick.
+    pub death_drag: f32,
+    pub death_rise: f32,
+    pub death_surface_margin: f32,
     pub acceleration: f32,
     pub drag: f32,
     pub tread_threshold: f32,
@@ -71,6 +75,7 @@ enum Phase {
     Treading,
     Stroking,
     Gliding,
+    Dying,
 }
 impl Phase {
     fn from_clip(state: usize) -> Option<Self> {
@@ -79,6 +84,7 @@ impl Phase {
             17 => Some(Self::Stroking),
             18 => Some(Self::Gliding),
             35 => Some(Self::Diving),
+            44 => Some(Self::Dying),
             _ => None,
         }
     }
@@ -91,6 +97,22 @@ pub(super) fn radians(angle: i32) -> f32 {
 }
 pub(super) fn decay(value: i32, amount: i32) -> i32 {
     value - value.signum() * value.abs().min(amount)
+}
+
+/// The underwater wrapper applies angular recovery even when a state rejects
+/// input (0x800450E4..0x800451CC). Death and entry skip active steering.
+fn recover_angles(player: &mut Player, motion: &mut Motion, water: &mut SubmergedMotion, tuning: &SwimmingTuning) {
+    motion.pitch = radians(angle(motion.pitch).clamp(-tuning.pitch_limit, tuning.pitch_limit));
+    motion.turn_rate = decay(motion.turn_rate, tuning.turn_drag);
+    water.bank = radians(decay(angle(water.bank), tuning.bank_drag));
+    player.yaw = radians((angle(player.yaw) + motion.turn_rate) as i16 as i32);
+}
+
+/// State44's controller is shared by submerged and surface wrappers
+/// (0x80045728..0x8004577C); each wrapper owns its own angular recovery.
+pub(super) fn death_control(motion: &mut Motion, water: &mut SubmergedMotion, tuning: &SwimmingTuning) {
+    water.speed = (water.speed - units(tuning.death_drag * ORIGINAL_FPS)).max(0.0);
+    motion.pitch = radians(decay(angle(motion.pitch), tuning.pitch_step));
 }
 
 // Keep the independently owned ECS components explicit at the controller boundary.
@@ -106,15 +128,30 @@ pub(super) fn control(
     tuning: &SwimmingTuning,
 ) {
     let Some(phase) = clips.and_then(|c| c.state(animation.animation)).and_then(Phase::from_clip) else { return };
-    // LaraControl0x80042C1C decrements before underwater control; an exhausted
-    // counter remains -1 and costs5 health per tick. Entry/surface refill is separate.
-    water.air_ticks = (water.air_ticks - 1).max(-1);
-    motion.oxygen_seconds = water.air_ticks.max(0) as f32 / ORIGINAL_FPS;
-    if water.air_ticks < 0 {
-        player.damage(tuning.drowning_damage);
-    }
+    // LaraControl0x80042B10 normalizes a dead actor before oxygen accounting.
+    //0x80042BF8 skips oxygen/damage for negative health; the lethal tick
+    // itself may still reach zero or a negative value before state collision.
     if player.health <= 0 {
+        player.health = -1;
+    } else {
+        water.air_ticks = (water.air_ticks - 1).max(-1);
+        if water.air_ticks < 0 {
+            // Do not switch to grounded death: authored water dispatch still
+            // owns the animation, speed and collision on this tick.
+            player.health -= tuning.drowning_damage;
+        }
+    }
+    motion.oxygen_seconds = water.air_ticks.max(0) as f32 / ORIGINAL_FPS;
+    if let Phase::Dying = phase {
+        //0x80045728..0x8004577C brakes by8 quarter-units and levels pitch
+        // by364 binary units; neither steering nor Jump changes the goal.
+        death_control(motion, water, tuning);
+        recover_angles(player, motion, water, tuning);
+        return;
+    }
+    if player.health <= 0 && !matches!(phase, Phase::Diving) {
         traversal.goal = 44;
+        recover_angles(player, motion, water, tuning);
         return;
     }
     if let Phase::Diving = phase {
@@ -123,11 +160,7 @@ pub(super) fn control(
         if pad.held(Button::Up) {
             motion.pitch = radians(angle(motion.pitch) - tuning.pitch_step / 2);
         }
-        // The wrapper's pitch limit (0x80045134) applies to the dive too.
-        motion.pitch = radians(angle(motion.pitch).clamp(-tuning.pitch_limit, tuning.pitch_limit));
-        motion.turn_rate = decay(motion.turn_rate, tuning.turn_drag);
-        water.bank = radians(decay(angle(water.bank), tuning.bank_drag));
-        player.yaw = radians((angle(player.yaw) + motion.turn_rate) as i16 as i32);
+        recover_angles(player, motion, water, tuning);
         return;
     }
     let pitch = angle(motion.pitch)
@@ -170,7 +203,7 @@ pub(super) fn control(
                 traversal.goal = 13;
             }
         }
-        Phase::Diving => {}
+        Phase::Diving | Phase::Dying => {}
         Phase::Treading => {
             if pad.held(Button::Square) {
                 traversal.goal = 17;
@@ -189,6 +222,7 @@ pub(super) fn step(
     traversal: &mut Traversal,
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
+    tuning: &SwimmingTuning,
     dt: f32,
 ) {
     let Some(clips) = clips else { return };
@@ -214,13 +248,40 @@ pub(super) fn step(
     let old = player.position;
     player.position += delta;
     motion.grounded = false;
-    if let Some(world) = world {
+    if clips.state(animation.animation) == Some(44) {
+        death_collision(player, motion, water, world, old, tuning, dt);
+    } else if let Some(world) = world {
         collide(player, motion, water, world, old);
+    }
+    if let Some(world) = world {
         // UpdateLaraRoom at the feet; a dry room hands over to LaraControl's
         // surfacing test next tick.
         player.room = super::body_room(world, player.position, player.room, 0.0);
     }
     motion.velocity = (player.position - old) / dt;
+}
+
+/// State44's shared collision0x80045810, selected by the surface wrapper at
+///0x80044478 as well as the submerged wrapper. Float first, then body collision.
+pub(super) fn death_collision(
+    player: &mut Player,
+    motion: &mut Motion,
+    water: &mut SubmergedMotion,
+    world: Option<&WorldGeometry>,
+    old: Vec3,
+    tuning: &SwimmingTuning,
+    dt: f32,
+) {
+    player.health = -1;
+    water.air_ticks = -1;
+    motion.oxygen_seconds = 0.0;
+    let Some(world) = world else { return };
+    if world.water_surface(player.position, player.room).is_some_and(|surface| {
+        (surface * 1024.0).round() > (player.position.y * 1024.0).round() + tuning.death_surface_margin
+    }) {
+        player.position.y += units(tuning.death_rise) * original_frames(dt);
+    }
+    collide(player, motion, water, world, old);
 }
 
 /// Submerged state collision 0x80045CB8 (states 13/17/18/35): a body whose

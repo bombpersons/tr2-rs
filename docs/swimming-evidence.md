@@ -92,8 +92,9 @@ green palette was subsequently ported in [a separate verified change](underwater
 aligned to recorded PSX samples for this pose check; default underwater camera
 behavior is not claimed by this comparison.
 
-Current volumes, underwater roll, weapons and fatal drowning remain
-unverified. Surfacing, surface swimming, the dive and deep-water entry were
+Current volumes, underwater roll and weapons remain unverified. Oxygen
+exhaustion and fatal drowning were later verified in
+[a separate milestone](drowning-evidence.md). Surfacing, surface swimming, the dive and deep-water entry were
 later ported in [a separate verified change](surface-evidence.md); submerged
 collision in the section below.
 

@@ -129,9 +129,15 @@ it off. Record partial progress below without checking the parent item.
   dispatch and oxygen consumption now match700 ticks across six complete
   replays, including three independent validations. Wall, floor and ceiling
   collision (0x80045CB8) matches four further independent routes and both
-  back-hop entries to their end. Current/roll/death and wading branches
+  back-hop entries to their end. Current/roll and wading branches
   remain. [Evidence](docs/swimming-evidence.md),
   [tests](game/tests/swimming.rs).
+- [x] Oxygen exhaustion and authored submerged/surface death: signed damage,
+  delayed animation dispatch, braking, angular recovery, buoyancy and terminal
+  poses. Ten complete PSX routes compare3710 ticks across17 gameplay columns,
+  six independent, including a full remaining-air countdown without counter
+  pokes. The later native death-flow return is a separate diagnostic.
+  [Evidence](docs/drowning-evidence.md), [tests](game/tests/swimming.rs).
 - [ ] Water transitions: entry, surface, submerge and climb out; oxygen behavior.
   Surfacing, surface strokes/turns/wall contact, the tread dive, climb-out,
   deep-water entry and surface air refill now match eleven complete PSX routes,
@@ -311,6 +317,17 @@ it off. Record partial progress below without checking the parent item.
   flight goal52 and walk/run recovery match. Workspace tests (261 passed),
   all-target builds and Clippy pass. No runtime or format change was needed.
   [Evidence](docs/rolling-evidence.md#first-half-departure-verification).
+- 2026-10-19: Oxygen exhaustion and water death: ten complete PSX routes,
+  3710 exact logic ticks, six independent and182 full-game MCP poses. Authored
+  submerged and surface death now retain water motion and collision. A focused
+  native trace identifies the later held-input death-flow return separately.
+  Workspace tests (374 passed), all-target builds, Clippy, sandbox movement
+  and rendering, editor sandbox/Home save/reopen and Lara clip124 preview pass.
+  Editor verification also fixed duplicate surface faces when closing room
+  links, with an engine-only regression covering hole closure and disconnection;
+  the smoke now selects the post-edit doorway face. No format or template
+  changes. Existing unrelated format/lint warnings remain.
+  [Evidence](docs/drowning-evidence.md).
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

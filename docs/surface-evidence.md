@@ -84,8 +84,9 @@ rest of the workspace tests still pass.
   both hop entries now run to their end.
 - Wading (water mode 4) and the shallow-water stand-up branch are not ported;
   shallow water is now walked on as ground. Swan-dive entries (states 52/53),
-  water currents, splash/sound effects, Look at the surface and drowning
-  death remain separate work.
+  water currents, splash/sound effects and Look at the surface remain separate
+  work. Drowning and the authored surface death were later verified in
+  [a separate milestone](drowning-evidence.md).
 - The standing back jump (ground) does not match its PSX launch, so it is not
   used as entry evidence.
 - The PSX shows the air bar at the surface; the port's HUD shows health.
