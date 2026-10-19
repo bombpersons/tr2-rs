@@ -237,3 +237,8 @@ Home attendant motion uses the existing authored clips280–283 and type260
 registry metadata. Preview placement9 in the Home level to inspect its starts,
 stops and state goals; local follow thresholds remain in the existing per-type
 JSON table. The preview continues to suppress game controllers.
+
+Animated contact reuses the existing clip bounds, joint trees and mesh sphere
+fields; no level format changes are needed. Model posing remains shared by
+the full-resolution preview and game. The preview does not simulate sphere
+contacts or game-specific push decisions.

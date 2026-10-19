@@ -11,6 +11,7 @@ import json
 import math
 import shutil
 from port_smoke import Client, ROOT, REFERENCES, align_reference, convert
+from record_winston import CASES
 
 
 def main():
@@ -19,8 +20,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     level = json.loads((ROOT / 'game/assets/levels/assault/level.json').read_text())
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--case', choices=['local_run', 'heldout_short', 'heldout_turn', 'heldout_walk'])
+    parser.add_argument('--case', choices=CASES)
     args = parser.parse_args()
+    report_file = out / (f"report-{args.case}.json" if args.case else "report.json")
     for name in ([args.case] if args.case else ['local_run', 'heldout_short', 'heldout_turn', 'heldout_walk']):
         rows = list(csv.DictReader((ROOT / f'game/tests/data/original/winston_{name}.csv').open()))
         meta = json.loads((ROOT / f'game/tests/data/original/winston_{name}.json').read_text())
@@ -34,6 +36,10 @@ def main():
                        position=[int(start[f'lara_{c}']) for c in 'xyz'], yaw=int(start['lara_yaw']),
                        animation=int(start['lara_animation']), absolute_animation_frame=int(start['lara_animation_frame']))
             align_reference(client, ref)
+            if 'lara_movement_heading' in start:
+                # The bootstrap tick used the level spawn's old heading; seed
+                # the checkpoint's preceding collision pass before replaying.
+                client.edit('Player','Motion',{'movement_heading':int(start['lara_movement_heading'])*math.tau/65536})
             yaw = int(start['actor_yaw']) * math.tau / 65536
             client.edit('Object260_9', 'Transform', {'translation': convert([int(start[f'actor_{c}']) for c in 'xyz']),
                         'rotation': [0, math.sin(yaw / 2), 0, math.cos(yaw / 2)]})
@@ -41,7 +47,8 @@ def main():
             client.edit('Object260_9', 'ObjectAnimation', {'animation': clip, 'frame': int(start['actor_animation_frame']) - level['animations'][clip]['frame_start']})
             client.edit('Object260_9', 'AnimationGoal', {'state': int(start['actor_goal'])})
             client.edit('Object260_9', 'Winston', {'speed': int(start['actor_speed'])})
-            fields = sorted(set([2, 58, 64, 102, 160, 240, 360, len(rows)-1]))
+            samples = [2,8,16,36,38,40,42,78,88,90,94,96,98] if name.startswith('contact') else [2,58,64,102,160,240,360]
+            fields = sorted(set([f for f in samples if f < len(rows)] + [len(rows)-1]))
             tick = 0
             for field in fields:
                 while 2*tick < field:
@@ -61,6 +68,19 @@ def main():
                 assert level['animations'][a['animation']]['frame_start'] + a['frame'] == int(row['actor_animation_frame'])
                 assert c['Winston']['speed'] == int(row['actor_speed'])
                 assert c['AnimationGoal']['state'] == int(row['actor_goal'])
+                qx,qy,qz,qw=t['rotation']
+                yaw=round(math.atan2(2*(qw*qy+qx*qz),1-2*(qy*qy+qz*qz))*65536/math.tau)
+                assert (yaw-int(row['actor_yaw']))%65536==0,(name,field,yaw,row)
+                if 'actor_contact_mask' in row:
+                    assert c['Winston']['contact_mask']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
+                if name.startswith('contact'):
+                    player=client.query(components=['Player','AnimationState'])['entities'][0]['components']
+                    pos=player['Player']['position']
+                    got_lara=[round(pos[0]*1024),round(-pos[1]*1024),round(pos[2]*1024)]
+                    assert got_lara==[int(row[f'lara_{k}']) for k in 'xyz'],(name,field,got_lara,row)
+                    la=player['AnimationState']
+                    assert la['animation']==int(row['lara_animation'])
+                    assert level['animations'][la['animation']]['frame_start']+la['frame']==int(row['lara_animation_frame'])
                 if 'camera_x' in row:
                     client.edit('ChaseCamera', 'CameraRig', {'manual': True,
                                 'position': convert([int(row[f'camera_{k}']) for k in 'xyz']),
@@ -79,9 +99,9 @@ def main():
                 checks.append(entry)
         finally:
             client.close()
-            (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+            report_file.write_text(json.dumps(report,indent=2)+'\n')
     report['status']='complete'
-    (out/'report.json').write_text(json.dumps(report,indent=2)+'\n')
+    report_file.write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(dict(status=report['status'], checks=sum(map(len,report['cases'].values())))))
 
 

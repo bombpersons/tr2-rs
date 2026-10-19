@@ -355,12 +355,19 @@ fn animate_objects(
 /// end frame, so it only shortens the interval for clips starting at frame 0.
 /// The weighted difference is truncated before adding the first bound.
 pub fn vertical_bounds(data: &Level, animation: &AnimationState) -> Option<(i32, i32)> {
-    let clip = data.animations.get(animation.animation)?;
-    let frame = animation.frame.max(0.0).floor() as usize;
+    let bounds = frame_bounds(data, animation.animation, animation.frame)?;
+    Some((bounds[2], bounds[3]))
+}
+
+/// Interpolated authored bounds at a clip-relative frame, in source model
+/// units (`x_min,x_max,y_min,y_max,z_min,z_max`, y down). Avatar clearance
+/// uses these; object contact instead uses [`collision_bounds`].
+pub fn frame_bounds(data: &Level, animation: usize, frame: f32) -> Option<[i32; 6]> {
+    let clip = data.animations.get(animation)?;
+    let frame = frame.max(0.0).floor() as usize;
     let mut rate = clip.frame_rate.max(1);
     let (key, interp) = (frame / rate, frame % rate);
-    let pose = |k: usize, i: usize| clip.bounds.get(k).map(|b| b[i]);
-    let first = (pose(key, 2)?, pose(key, 3)?);
+    let first = *clip.bounds.get(key)?;
     if interp == 0 {
         return Some(first);
     }
@@ -368,9 +375,28 @@ pub fn vertical_bounds(data: &Level, animation: &AnimationState) -> Option<(i32,
     if clip.frame_end < second_frame {
         rate = clip.frame_end - key * rate;
     }
-    let second = (pose(key + 1, 2)?, pose(key + 1, 3)?);
-    let lerp = |a: i32, b: i32| a + ((b - a) as i64 * interp as i64 / rate.max(1) as i64) as i32;
-    Some((lerp(first.0, second.0), lerp(first.1, second.1)))
+    let second = *clip.bounds.get(key + 1)?;
+    Some(std::array::from_fn(|i| {
+        first[i] + ((second[i] - first[i]) as i64 * interp as i64 / rate.max(1) as i64) as i32
+    }))
+}
+
+/// Nearest authored collision key, with exact halfway choosing the earlier
+/// key. The final shortened interval follows the stored absolute end-frame
+/// comparison (PSX key selection0x80028824 and bounds0x800289D4).
+fn collision_key(data: &Level, animation: usize, frame: f32) -> Option<usize> {
+    let clip = data.animations.get(animation)?;
+    let frame = frame.max(0.0).floor() as usize;
+    let rate = clip.frame_rate.max(1);
+    let (key, remainder) = (frame / rate, frame % rate);
+    let interval = if (key + 1) * rate > clip.frame_end { clip.frame_end.saturating_sub(key * rate) } else { rate };
+    Some(key + usize::from(remainder > interval / 2))
+}
+
+/// The authored box used by animated object contact, rather than the
+/// interpolated box used by avatar vertical clearance.
+pub fn collision_bounds(data: &Level, animation: usize, frame: f32) -> Option<[i32; 6]> {
+    data.animations.get(animation)?.bounds.get(collision_key(data, animation, frame)?).copied()
 }
 
 fn rotation(a: [u16; 3]) -> Quat {
@@ -416,6 +442,38 @@ pub fn model_pose(data: &Level, model: &Model, anim: usize, frame: f32) -> Vec<T
     } else {
         vec![]
     }
+}
+
+/// A mesh's authored bounding sphere after the current skeletal pose.
+#[derive(Debug, Clone, Copy)]
+pub struct PosedSphere {
+    /// Joint index, retained when a mesh has no positive-radius sphere.
+    pub joint: usize,
+    pub center: Vec3,
+    pub radius: f32,
+}
+
+/// Mesh collision spheres in world space. The actor supplies its root
+/// transform; model data supplies joint offsets, pose keys and sphere geometry.
+/// Uses the engine's ordinary posed bones; it does not emulate a fixed-point
+/// geometry processor or apply game-specific aiming/head rotations.
+pub fn model_spheres(data: &Level, model: &Model, animation: usize, frame: f32, root: &Transform) -> Vec<PosedSphere> {
+    let frame = collision_key(data, animation, frame)
+        .and_then(|key| data.animations.get(animation).map(|clip| (key * clip.frame_rate.max(1)) as f32))
+        .unwrap_or(frame);
+    model_pose(data, model, animation, frame)
+        .into_iter()
+        .zip(&model.meshes)
+        .enumerate()
+        .filter_map(|(joint, (bone, &index))| {
+            let mesh = data.meshes.get(index)?;
+            (mesh.radius > 0).then(|| PosedSphere {
+                joint,
+                center: root.transform_point(bone.transform_point(position(mesh.center))),
+                radius: units(mesh.radius as f32) * root.scale.abs().max_element(),
+            })
+        })
+        .collect()
 }
 
 pub struct AnimationPlugin;

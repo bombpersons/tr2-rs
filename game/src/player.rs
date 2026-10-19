@@ -42,10 +42,11 @@ pub const RUN_JUMP_SPEED: f32 = units(75.0 * ORIGINAL_FPS);
 /// AnimateLara0x80043210..0x80043230 adds6 units/tick below128 fall speed,
 /// otherwise1. Fresh airborne recordings independently verify the6 branch.
 pub const GRAVITY: f32 = units(6.0 * ORIGINAL_FPS * ORIGINAL_FPS);
-/// OpenLara src/lara.h LARA_HEIGHT/RADIUS and Character's stepHeight.
-/// https://github.com/XProger/OpenLara/blob/master/src/lara.h
+/// PSX object-push world validation0x8001CC00 passes a762-unit body height.
 pub const PLAYER_HEIGHT: f32 = units(762.0);
+/// PSX Lara collision context0x800381E8..0x800381EC starts with radius100.
 pub const PLAYER_RADIUS: f32 = units(100.0);
+/// Inherited Character::stepHeight value; unchanged by contact verification.
 pub const STEP_HEIGHT: f32 = units(256.0);
 pub const MAX_HEALTH: i32 = 1000;
 /// OpenLara LARA_SWIM_SPEED = 50 units/frame.

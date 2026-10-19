@@ -14,6 +14,8 @@ use engine::{
 
 use crate::player::Player;
 
+mod contact;
+
 pub const KIND: u16 = 260;
 
 /// Moddable local follow thresholds. The authored clip table supplies speeds.
@@ -30,6 +32,8 @@ pub struct WinstonTuning {
 pub struct Winston {
     /// Previous authored movement speed, in source units per 30Hz tick.
     pub speed: i32,
+    /// Mesh contacts from the avatar collision pass; read by the next item tick.
+    pub contact_mask: u32,
 }
 
 pub struct WinstonRulesPlugin;
@@ -37,6 +41,7 @@ pub struct WinstonRulesPlugin;
 impl Plugin for WinstonRulesPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, engine::EngineRulesPlugin);
+        contact::install(app);
         app.insert_resource(crate::interactions::winston_tuning());
         app.register_type::<Winston>().add_systems(
             FixedUpdate,
@@ -106,6 +111,8 @@ fn move_authored(
             continue;
         }
         let Some(clip) = world.data.animations.get(animation.animation) else { continue };
+        // AnimateItem0x8001DDC8 clears last tick's mesh contacts.
+        actor.contact_mask = 0;
         actor.speed = ((i64::from(clip.speed) + i64::from(clip.accel) * animation.frame.floor() as i64) >> 16) as i32;
         let yaw = yaw(&transform);
         let delta = Vec3::new(((sin(yaw) * actor.speed) >> 14) as f32, 0.0, ((cos(yaw) * actor.speed) >> 14) as f32);

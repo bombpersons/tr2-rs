@@ -71,3 +71,5 @@ Corner/side and forward-top contacts remain unverified.
 - [First-half roll departures](rolling-evidence.md#first-half-departure-verification): three post-implementation no-poke routes verify forward flight, unchanged yaw and landing/recovery;413 additional sampled ticks and44 full-game poses.
 
 - [Home attendant local follow](winston-evidence.md): four ordinary PSX routes,1260 exact item ticks and three post-implementation validation routes; authored start/stop and local turning verified, navigation/contact remain pending.
+
+- [Home attendant animated contact](winston-evidence.md#animated-contact-and-avatar-pushing):285 exact full-controller ticks across four ordinary routes, three independent;82 native sphere centers within1.022 source units, exact recorded contact masks, nearest-key bounds and expanded-edge pushing. Blocked-world/special-mode/ordering branches remain pending.
