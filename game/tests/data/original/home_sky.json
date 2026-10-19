@@ -1,0 +1,890 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
+  "build": {
+    "id": "src-6406590b7cd127b1-release",
+    "profile": "release",
+    "source_sha256": "6406590b7cd127b1dfc1222afa4a416e0653cac479c3af1ced1c87ea0947bd38",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.1.0"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.1.0",
+    "bios": "/home/maisy/.local/share/psx/bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": ".psx/home_start/state.bin",
+    "media": "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 8,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/home_start/state.bin",
+    "--frames",
+    "4",
+    "--gpu-frame",
+    "3",
+    "--save-state",
+    "--out",
+    ".psx/home_sky_gpu",
+    "--summary"
+  ],
+  "camera": {
+    "eye": [
+      20817,
+      1967,
+      97024
+    ],
+    "target": [
+      19968,
+      1976,
+      95744
+    ]
+  },
+  "model": 254,
+  "mesh": 100,
+  "animation": 278,
+  "rotation": [
+    16320,
+    32704,
+    32704
+  ],
+  "source_mesh_address": "0x001260F4",
+  "source_pose_address": "0x0016E8CC",
+  "textured_commands": [
+    {
+      "clut": [
+        992,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 8,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 512,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            192,
+            64
+          ],
+          "view": [
+            -1519,
+            -672,
+            1525
+          ],
+          "x": -36,
+          "y": 275
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            255,
+            64
+          ],
+          "view": [
+            -820,
+            -675,
+            1988
+          ],
+          "x": 97,
+          "y": 298
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            192,
+            127
+          ],
+          "view": [
+            -1517,
+            6,
+            1526
+          ],
+          "x": -35,
+          "y": 376
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            255,
+            127
+          ],
+          "view": [
+            -818,
+            4,
+            1991
+          ],
+          "x": 98,
+          "y": 376
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        1008,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 9,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 448,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            200
+          ],
+          "view": [
+            -1519,
+            -1352,
+            1523
+          ],
+          "x": -36,
+          "y": 173
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            200
+          ],
+          "view": [
+            -821,
+            -1354,
+            1987
+          ],
+          "x": 97,
+          "y": 220
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            255
+          ],
+          "view": [
+            -1519,
+            -672,
+            1525
+          ],
+          "x": -36,
+          "y": 275
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            255
+          ],
+          "view": [
+            -820,
+            -675,
+            1988
+          ],
+          "x": 97,
+          "y": 298
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        976,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 10,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 512,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            64
+          ],
+          "view": [
+            -820,
+            -675,
+            1988
+          ],
+          "x": 97,
+          "y": 298
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            64
+          ],
+          "view": [
+            3,
+            -677,
+            2150
+          ],
+          "x": 192,
+          "y": 304
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            127
+          ],
+          "view": [
+            -818,
+            4,
+            1991
+          ],
+          "x": 98,
+          "y": 376
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            127
+          ],
+          "view": [
+            6,
+            1,
+            2152
+          ],
+          "x": 192,
+          "y": 376
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        960,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 11,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 448,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            64,
+            200
+          ],
+          "view": [
+            -821,
+            -1354,
+            1987
+          ],
+          "x": 97,
+          "y": 220
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            127,
+            200
+          ],
+          "view": [
+            1,
+            -1356,
+            2148
+          ],
+          "x": 192,
+          "y": 232
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            64,
+            255
+          ],
+          "view": [
+            -820,
+            -675,
+            1988
+          ],
+          "x": 97,
+          "y": 298
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            127,
+            255
+          ],
+          "view": [
+            3,
+            -677,
+            2150
+          ],
+          "x": 192,
+          "y": 304
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        992,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 12,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 512,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            192,
+            64
+          ],
+          "view": [
+            3,
+            -677,
+            2150
+          ],
+          "x": 192,
+          "y": 304
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            255,
+            64
+          ],
+          "view": [
+            826,
+            -680,
+            1984
+          ],
+          "x": 286,
+          "y": 297
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            192,
+            127
+          ],
+          "view": [
+            6,
+            1,
+            2152
+          ],
+          "x": 192,
+          "y": 376
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            255,
+            127
+          ],
+          "view": [
+            829,
+            -2,
+            1985
+          ],
+          "x": 287,
+          "y": 375
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        1008,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 13,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 448,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            200
+          ],
+          "view": [
+            1,
+            -1356,
+            2148
+          ],
+          "x": 192,
+          "y": 232
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            200
+          ],
+          "view": [
+            823,
+            -1359,
+            1983
+          ],
+          "x": 286,
+          "y": 219
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            255
+          ],
+          "view": [
+            3,
+            -677,
+            2150
+          ],
+          "x": 192,
+          "y": 304
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            255
+          ],
+          "view": [
+            826,
+            -680,
+            1984
+          ],
+          "x": 286,
+          "y": 297
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        976,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 14,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 512,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            64
+          ],
+          "view": [
+            826,
+            -680,
+            1984
+          ],
+          "x": 286,
+          "y": 297
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            64
+          ],
+          "view": [
+            1522,
+            -683,
+            1516
+          ],
+          "x": 420,
+          "y": 273
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            128,
+            127
+          ],
+          "view": [
+            829,
+            -2,
+            1985
+          ],
+          "x": 287,
+          "y": 375
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            191,
+            127
+          ],
+          "view": [
+            1526,
+            -5,
+            1517
+          ],
+          "x": 421,
+          "y": 375
+        }
+      ],
+      "words": 12
+    },
+    {
+      "clut": [
+        960,
+        434
+      ],
+      "dither": true,
+      "gouraud": true,
+      "index": 15,
+      "kind": "poly4",
+      "offset": [
+        0,
+        256
+      ],
+      "op": 60,
+      "texpage": {
+        "blend": 0,
+        "depth": 4,
+        "x": 448,
+        "y": 256
+      },
+      "textured": true,
+      "vertices": [
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            64,
+            200
+          ],
+          "view": [
+            823,
+            -1359,
+            1983
+          ],
+          "x": 286,
+          "y": 219
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            127,
+            200
+          ],
+          "view": [
+            1518,
+            -1362,
+            1514
+          ],
+          "x": 420,
+          "y": 170
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            64,
+            255
+          ],
+          "view": [
+            826,
+            -680,
+            1984
+          ],
+          "x": 286,
+          "y": 297
+        },
+        {
+          "color": [
+            134,
+            134,
+            134
+          ],
+          "uv": [
+            127,
+            255
+          ],
+          "view": [
+            1522,
+            -683,
+            1516
+          ],
+          "x": 420,
+          "y": 273
+        }
+      ],
+      "words": 12
+    }
+  ],
+  "cap_command": {
+    "dither": false,
+    "index": 7,
+    "kind": "poly4",
+    "offset": [
+      0,
+      256
+    ],
+    "op": 40,
+    "vertices": [
+      {
+        "color": [
+          168,
+          196,
+          208
+        ],
+        "x": 0,
+        "y": 256
+      },
+      {
+        "color": [
+          168,
+          196,
+          208
+        ],
+        "x": 383,
+        "y": 256
+      },
+      {
+        "color": [
+          168,
+          196,
+          208
+        ],
+        "x": 0,
+        "y": 305
+      },
+      {
+        "color": [
+          168,
+          196,
+          208
+        ],
+        "x": 383,
+        "y": 305
+      }
+    ],
+    "words": 5
+  },
+  "source_checkpoint_sha256": "107cbc05042a79927bb322bb82773eb2e3db6f28a95304d1cd90c11b0e18cd01",
+  "gpu_frame_sha256": "9ab21e8d4faaa6b25384d17e08bd020cf7b4b813451d99420c1e189fc3d7d977",
+  "mesh_vertices_verified_against_ram": 50
+}

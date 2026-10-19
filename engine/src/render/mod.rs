@@ -2,6 +2,7 @@
 //! models, hiding rooms out of view, lighting items, and the 3D camera.
 //!
 //! All geometry comes from the level asset; no captured frame is used.
+pub mod backdrop;
 pub mod rooms;
 pub mod view;
 
@@ -167,7 +168,8 @@ pub struct RenderPlugin;
 
 impl Plugin for RenderPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<Level>()
+        app.add_plugins(backdrop::BackdropPlugin)
+            .init_asset::<Level>()
             .init_asset_loader::<LevelLoader>()
             .init_resource::<LevelRequest>()
             .init_resource::<ViewSettings>()
@@ -276,6 +278,36 @@ impl MeshBuilder {
     }
 }
 
+/// Build an authored object mesh with its atlas UVs and vertex lighting.
+/// Model placement, posing and material choice belong to the caller.
+pub fn object_mesh(m: &crate::world::ObjectMesh, textures: &[Texture]) -> Mesh {
+    let vs: Vec<_> = m.vertices.iter().map(|v| position([v[0], v[1], v[2]]).to_array()).collect();
+    let mut b = MeshBuilder::new();
+    if m.normals.is_empty() {
+        let light: Vec<_> = m.vertices.iter().map(|v| (1.0 - v[3] as f32 / 8192.0).clamp(0.05, 1.0)).collect();
+        for f in &m.quads {
+            b.face(&f[..4], &textures[f[4]], &vs, &light);
+        }
+        for f in &m.triangles {
+            b.face(&f[..3], &textures[f[3]], &vs, &light);
+        }
+    } else {
+        // Normal-lit meshes: ItemLighting supplies the shade per object.
+        let ns: Vec<_> = m
+            .normals
+            .iter()
+            .map(|n| Vec3::new(n[0] as f32, -n[1] as f32, n[2] as f32).normalize_or_zero().to_array())
+            .collect();
+        for f in &m.quads {
+            b.face_lit(&f[..4], &textures[f[4]], &vs, &ns);
+        }
+        for f in &m.triangles {
+            b.face_lit(&f[..3], &textures[f[3]], &vs, &ns);
+        }
+    }
+    b.finish()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn finish_level(
     mut commands: Commands,
@@ -368,31 +400,7 @@ fn finish_level(
         .meshes
         .iter()
         .map(|m| {
-            let vs: Vec<_> = m.vertices.iter().map(|v| position([v[0], v[1], v[2]]).to_array()).collect();
-            let mut b = MeshBuilder::new();
-            if m.normals.is_empty() {
-                let light: Vec<_> = m.vertices.iter().map(|v| (1.0 - v[3] as f32 / 8192.0).clamp(0.05, 1.0)).collect();
-                for f in &m.quads {
-                    b.face(&f[..4], &data.textures[f[4]], &vs, &light);
-                }
-                for f in &m.triangles {
-                    b.face(&f[..3], &data.textures[f[3]], &vs, &light);
-                }
-            } else {
-                // Normal-lit meshes: ItemLighting supplies the shade per object.
-                let ns: Vec<_> = m
-                    .normals
-                    .iter()
-                    .map(|n| Vec3::new(n[0] as f32, -n[1] as f32, n[2] as f32).normalize_or_zero().to_array())
-                    .collect();
-                for f in &m.quads {
-                    b.face_lit(&f[..4], &data.textures[f[4]], &vs, &ns);
-                }
-                for f in &m.triangles {
-                    b.face_lit(&f[..3], &data.textures[f[3]], &vs, &ns);
-                }
-            }
-            meshes.add(b.finish())
+            meshes.add(object_mesh(m, &data.textures))
         })
         .collect();
     for (room_index, room) in data.rooms.iter().enumerate() {
