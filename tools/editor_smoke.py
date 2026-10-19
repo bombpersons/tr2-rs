@@ -512,6 +512,27 @@ def rooms_smoke(client, level, captures):
     return result
 
 
+def flip_smoke(client, level, captures):
+    """Choose an alternate room: the view flips to show it in its room's
+    place, and turning Flipped off brings the original back."""
+    pair = next(((b, r['alternate']) for b, r in enumerate(level['rooms']) if r.get('alternate') is not None), None)
+    if pair is None:
+        return None
+    base, alternate = pair
+    state = command(client, mode='object', select='none')
+    problems = state['problems_new']
+    state = command(client, show_rooms=True, room=alternate, frame_room=True)
+    assert state['flipped'] and state['mesh_room'] == alternate, state
+    time.sleep(1.5)
+    captures.append(client.capture('flipped'))
+    state = command(client, flip='off')
+    assert not state['flipped'] and state['mesh_room'] == base, state
+    time.sleep(1.5)
+    captures.append(client.capture('unflipped'))
+    assert not state['dirty'] and state['problems_new'] == problems, state
+    return {'room': base, 'alternate': alternate}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', type=Path, default=ROOT / 'engine/assets/levels/sandbox/level.json')
@@ -603,6 +624,7 @@ def main():
         state = command(client, select='1', frame=True)
         captures.append(client.capture('edited'))
         rooms = rooms_smoke(client, saved, captures)
+        flip = flip_smoke(client, saved, captures)
         diagnostics = diagnostics_smoke(client, saved, captures)
         connected = connect_smoke(client, saved, captures)
         holes = hole_smoke(client, saved, captures)
@@ -628,7 +650,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'close_hole': closed, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'flip': flip, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'close_hole': closed, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

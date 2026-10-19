@@ -5,6 +5,7 @@
 //! save rewrites only what changed, in the file's own formatting. Changes use
 //! the same typed format and reference validation as the preview.
 mod diagnostics;
+mod flip;
 mod mesh;
 mod navigation;
 mod rooms;
@@ -13,6 +14,7 @@ mod validate;
 
 use crate::world::Level;
 pub use diagnostics::*;
+pub use flip::*;
 pub use mesh::*;
 pub use navigation::*;
 pub use rooms::*;

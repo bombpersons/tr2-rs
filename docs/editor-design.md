@@ -49,7 +49,9 @@ height. One room cannot express:
 - Rooms may overlap in space when no portal joins them (ASSAULT has 13 such
   pairs). Impossible geometry is a feature to keep.
 - `alternate` pairs a room with its flipped version (CATACOMB has 10). The
-  engine does not flip rooms yet.
+  engine does not flip rooms yet. Every shipped alternate pairs with one
+  room on the same grid, and links never name it: when the level flips, the
+  original's room number holds the alternate's data.
 - `placement.room` is stored, not derived from position.
 - Shipped rooms are at most 20 sectors on a side. The PS1 vertex packing
   limits a room to 32 sectors per axis and its height to 31 * 256 units
@@ -181,7 +183,10 @@ window, the map and clicking faces in mesh mode all choose the same room.
 
 - Rebuild navigation boxes for edited areas. (Built: Diagnostics' Rebuild
   navigation.)
-- Flip-room view and editing of `alternate`.
+- Flip-room view (built: Flipped shows one state at a time, and
+  Diagnostics checks both). Editing `alternate` ("Make alternate" copying a
+  room in place; split and merge applied to both versions) waits for the
+  game to flip rooms, so authored flips can be seen working.
 - Possibly a managed-region mode for new levels: paint columns with several
   floor/ceiling spans and let the editor partition them into rooms. Most
   ergonomic, most complex, and incompatible with byte-exact preservation, so
@@ -222,6 +227,6 @@ nothing in the game.
 2. Rooms window, map view, automatic object room. (Done.)
 3. Diagnostics. (Done.)
 4. Connect / open hole (done, with Disconnect), new room, split and merge
-   (done), close hole (done). Next: flip rooms.
+   (done), close hole (done), flip-room view and checks (done).
 5. Navigation box rebuild. (Done: incremental, for missing and stale boxes.)
 6. Lights and baking.

@@ -89,6 +89,20 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   edge, and the two grids overlap by two sectors as imported neighbours do,
   so Connect can join them (see "Joining rooms"). New rooms have no
   navigation boxes yet, which Diagnostics reports.
+- **Flipped** (in the toolbar and on the map, on levels with flip rooms)
+  shows the level as it is once it flips. A room's `alternate` is a second
+  version of it, such as a flooded or drained pool, that the game swaps in
+  for it. Shipped alternates sit on the same grid as their room, and
+  nothing links to them by number: their doorways and portals name the
+  rooms their originals do, and once the level flips the original's number
+  holds the alternate. So the editor shows one version at a time. Without
+  Flipped, alternates are hidden from the 3D view and the map (and dimmed
+  in the Rooms list); with it, the rooms they replace are. Objects stay
+  shown when their room flips. Choosing an alternate anywhere (the Rooms
+  list, its "Alternate of" and "Flips to" links, the toolbar's room, a
+  Diagnostics row) switches to the state it is in, and turning Flipped on
+  or off moves the current room to the version shown. Showing a state
+  never changes the file.
 - **Diagnostics** (View > Diagnostics, or the status bar's "N new problems")
   checks how rooms join, where objects stand and the navigation boxes:
   one-sided portals; doorway, floor and ceiling links with no render portal,
@@ -108,6 +122,14 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   **Fix all new** applies every fix offered for new problems as one undo
   step. There is no fix for heights. **Rebuild navigation** (see below)
   resolves every navigation-box problem, new or inherited, in one step.
+  Flip rooms are checked in both states. Problems found only once the level
+  flips (in an alternate, or in a room next to one) read "When flipped:" and
+  are listed against the alternate when they are in its data; they offer no
+  fix, since a fix would change the level before it flips too. A separate
+  check reports alternates that do not pair up: on another grid, shared by
+  two rooms, with an alternate of their own, or named by a link. No shipped
+  level has any of these, and a navigation rebuild still changes nothing in
+  any of them.
 
 The **toolbar** has four groups. Each button runs the same function as its
 key and menu item, and a button that does not apply is greyed out with the
@@ -122,7 +144,8 @@ grows into.
 - **Actions:** in object mode Frame and Select all; in mesh mode Raise,
   Lower, Push wall, Fill (paint the selected faces) and Turn texture.
 - **Settings:** in object mode Snap; in mesh mode the edited room (with
-  Frame room) and the brush swatch, which opens the Textures window.
+  Frame room) and the brush swatch, which opens the Textures window. Levels
+  with flip rooms also get Flipped, in both modes.
 
 In the 3D view, click an object to select it. Shift- or Ctrl-click adds it
 to the selection, or removes it. Clicking a room or empty space clears the
@@ -465,7 +488,9 @@ checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
 references, the unsaved-changes question, clicking a framed object in the 3D
 view and Shift-clicking it off with the Select tool (automation's `click`
 goes through the same systems as the mouse, so this runs headless), the
-Rooms and Map windows with the current room's outline, carrying an object
+Rooms and Map windows with the current room's outline, choosing an alternate
+room (which shows the level flipped) and turning Flipped off again (on
+levels with flip rooms), carrying an object
 through a doorway into the next room (on levels with several rooms) and
 undoing it, Diagnostics reporting a deleted return portal as new and Fix all
 new restoring it, disconnecting a doorway and a hole and opening them again

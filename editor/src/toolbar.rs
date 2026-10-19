@@ -156,6 +156,7 @@ pub fn toolbar(
                             ui.checkbox(&mut editor.snap, "Snap").on_hover_text(
                                 "Moves snap to 256 units and turns to 15 degrees; Ctrl inverts while dragging",
                             );
+                            flip_toggle(ui, editor, level);
                         }
                     });
                 })
@@ -251,6 +252,18 @@ fn mesh_actions(ui: &mut egui::Ui, editor: &mut Editor) {
     }
 }
 
+/// Flipped: show the level as it is once flipped. Only levels with
+/// alternate rooms have it.
+fn flip_toggle(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>) {
+    if !level.is_some_and(|l| l.rooms.iter().any(|r| r.alternate.is_some())) {
+        return;
+    }
+    let hint = "Show the level as it is once flipped: each room with an alternate is replaced by it (a flooded room, a fallen ceiling)";
+    if ui.selectable_label(editor.flipped, "Flipped").on_hover_text(hint).clicked() {
+        editor.set_flipped(!editor.flipped);
+    }
+}
+
 fn mesh_settings(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, atlas: Option<egui::TextureId>) {
     let rooms = editor.doc.value()["rooms"].as_array().map_or(0, Vec::len);
     let mut room = editor.mesh.room;
@@ -265,11 +278,12 @@ fn mesh_settings(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, 
         .response
         .on_hover_text("The room being edited; clicking another room's face also switches");
     if room != editor.mesh.room {
-        editor.mesh_room(room);
+        editor.select_room(room);
     }
     if ui.button("Frame room").on_hover_text("Frame the room being edited").clicked() {
         editor.frame_room();
     }
+    flip_toggle(ui, editor, level);
     ui.separator();
     ui.label("Brush");
     let brush = editor.mesh.brush.and_then(|b| Some((b, level?.textures.get(b)?)));

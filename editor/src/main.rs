@@ -60,6 +60,8 @@ struct Editor {
     diagnostics: diagnostics::Diagnostics,
     /// The Rooms window's split and merge choices.
     room_tools: rooms::RoomTools,
+    /// Show the level as it is once flipped: alternate rooms replace theirs.
+    flipped: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,6 +96,7 @@ impl Editor {
             frame_room: false,
             diagnostics: diagnostics::Diagnostics::opened(opened),
             room_tools: default(),
+            flipped: false,
         }
     }
 }
@@ -175,6 +178,8 @@ struct EditorCommand {
     rebuild_nav: bool,
     /// "select", "move", "rotate" or "paint".
     tool: String,
+    /// "on" shows the level flipped, "off" as it starts.
+    flip: String,
 }
 
 #[derive(Component, Reflect, Default)]
@@ -197,6 +202,8 @@ struct EditorStatus {
     /// Problems an edit introduced, and every problem found.
     problems_new: usize,
     problems: usize,
+    /// The level is shown flipped.
+    flipped: bool,
 }
 
 fn main() -> AppExit {
@@ -493,6 +500,13 @@ fn automation(
         let room = std::mem::replace(&mut c.room, -1);
         editor.select_room(room as usize);
     }
+    if !c.flip.is_empty() {
+        match std::mem::take(&mut c.flip).as_str() {
+            "on" => editor.set_flipped(true),
+            "off" => editor.set_flipped(false),
+            text => editor.status = format!("flip is \"on\" or \"off\", not {text}"),
+        }
+    }
     if c.frame_room {
         c.frame_room = false;
         editor.frame_room();
@@ -768,6 +782,7 @@ fn status(editor: Res<Editor>, mut status: Query<&mut EditorStatus>) {
         status.brush = editor.mesh.brush.map_or(-1, |b| b as i64);
         status.problems_new = editor.diagnostics.new_count();
         status.problems = editor.diagnostics.problems.len();
+        status.flipped = editor.flipped;
     }
 }
 

@@ -115,8 +115,13 @@ pub fn moved_room(level: &Level, room: usize, from: [i32; 3], to: [i32; 3]) -> R
         // Dropped where the walk from its room can't reach (typed far away,
         // say): any room that holds the position, preferring its own.
         None => {
-            let found: Vec<_> =
-                rooms_containing(level, to).into_iter().filter_map(|r| locate_room(level, r, to)).collect();
+            // Not an alternate: objects are authored in the room it replaces.
+            let bases = super::flip::flip_bases(level);
+            let found: Vec<_> = rooms_containing(level, to)
+                .into_iter()
+                .filter_map(|r| locate_room(level, r, to))
+                .filter(|&r| bases[r].is_none())
+                .collect();
             match found.as_slice() {
                 found if found.contains(&room) => RoomChange::Keep,
                 [first, ..] => RoomChange::Into(*first),

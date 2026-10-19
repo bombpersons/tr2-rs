@@ -12,8 +12,9 @@ use crate::{
 use bevy::prelude::*;
 use bevy_egui::egui::{self, Color32, Pos2, Rect, RichText, Sense, Stroke, Vec2 as EVec2};
 use engine::{
-    editor::{Link, STEP, neighbours},
-    render::GameCamera,
+    editor::{Link, STEP, flip_bases, live_rooms, neighbours},
+    objects::WorldObject,
+    render::{GameCamera, InRoom, LevelEntity},
     world::{Level, Room, WorldGeometry, format::SOLID},
 };
 use serde_json::Value;
@@ -132,18 +133,56 @@ fn draft_notes(level: &Level, d: &Draft) -> Vec<String> {
 pub struct RoomsPlugin;
 impl Plugin for RoomsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostUpdate, outline.after(bevy::transform::TransformSystems::Propagate));
+        app.add_systems(PostUpdate, outline.after(bevy::transform::TransformSystems::Propagate))
+            .add_systems(Update, flip_visibility.after(crate::animation::preview));
     }
 }
 
 impl Editor {
-    /// Make `room` the current room, as mesh mode edits it.
+    /// Make `room` the current room, as mesh mode edits it. Choosing a room
+    /// or its alternate shows the level in the state that room is in.
     pub fn select_room(&mut self, room: usize) {
         if room != self.mesh.room {
             self.room_tools.merge_with = None;
         }
         self.mesh_room(room);
         self.status = format!("Room {room}");
+        if let Some((_, alternate)) = self.flip_pair(room)
+            && alternate != self.flipped
+        {
+            self.flipped = alternate;
+            self.status = format!(
+                "Room {room} - showing the level {}",
+                if alternate { "flipped (it is an alternate)" } else { "as it starts" }
+            );
+        }
+    }
+
+    /// The room a flip swaps with `room`, and whether `room` is the alternate.
+    fn flip_pair(&self, room: usize) -> Option<(usize, bool)> {
+        let rooms = self.doc.value()["rooms"].as_array()?;
+        let alternate = |r: &Value| r.get("alternate").and_then(Value::as_u64).map(|a| a as usize);
+        if let Some(a) = rooms.get(room).and_then(alternate) {
+            return Some((a, false));
+        }
+        rooms.iter().position(|r| alternate(r) == Some(room)).map(|b| (b, true))
+    }
+
+    /// Show the level flipped or as it starts. The current room follows to
+    /// the version shown.
+    pub fn set_flipped(&mut self, flipped: bool) {
+        self.flipped = flipped;
+        if let Some((partner, alternate)) = self.flip_pair(self.mesh.room)
+            && alternate != flipped
+        {
+            self.room_tools.merge_with = None;
+            self.mesh_room(partner);
+        }
+        self.status = if flipped {
+            "Showing the level flipped: rooms with an alternate are replaced by it".into()
+        } else {
+            "Showing the level as it starts".into()
+        };
     }
 
     /// Split `room` as the Rooms window's tools say.
@@ -233,6 +272,7 @@ pub fn window(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, sho
         }
         c
     });
+    let (bases, live) = (flip_bases(level), live_rooms(level, editor.flipped));
     ui.label(egui::RichText::new("Click to choose; double-click to frame.").weak());
     egui::ScrollArea::vertical().id_salt("room list").max_height(220.0).auto_shrink([false, true]).show_rows(
         ui,
@@ -249,13 +289,21 @@ pub fn window(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, sho
                 if r.wind {
                     flags.push_str(" wind");
                 }
-                if r.alternate.is_some() {
-                    flags.push_str(" flip");
+                if let Some(a) = r.alternate {
+                    flags.push_str(&format!(" flips to {a}"));
+                }
+                if let Some(b) = bases[index] {
+                    flags.push_str(&format!(" alternate of {b}"));
                 }
                 let size = format!("{}x{}", r.x_sectors, r.z_sectors);
                 let text =
                     format!("{index:>3} {size:>5}  y {:>6}..{:<6} {:>2} obj{flags}", r.top, r.bottom, counts[index]);
-                let response = ui.selectable_label(index == current, egui::RichText::new(text).monospace());
+                let mut text = egui::RichText::new(text).monospace();
+                if !live[index] {
+                    // Not in the level as shown: the other flip state's.
+                    text = text.weak();
+                }
+                let response = ui.selectable_label(index == current, text);
                 if response.clicked() {
                     editor.select_room(index);
                 }
@@ -325,8 +373,23 @@ fn details(ui: &mut egui::Ui, editor: &mut Editor, level: &Level, index: usize, 
         ui.end_row();
         if let Some(alternate) = r.alternate {
             ui.label("Flips to");
-            if ui.link(format!("Room {alternate}")).clicked() {
+            if ui
+                .link(format!("Room {alternate}"))
+                .on_hover_text("Its alternate, shown when the level is flipped")
+                .clicked()
+            {
                 editor.select_room(alternate);
+            }
+            ui.end_row();
+        }
+        if let Some(base) = flip_bases(level)[index] {
+            ui.label("Alternate of");
+            if ui
+                .link(format!("Room {base}"))
+                .on_hover_text("The room this one replaces when the level flips")
+                .clicked()
+            {
+                editor.select_room(base);
             }
             ui.end_row();
         }
@@ -505,6 +568,12 @@ pub fn map(
         if ui.button("Fit").on_hover_text("Show every room in the slice").clicked() {
             view.fit = true;
         }
+        if level.rooms.iter().any(|r| r.alternate.is_some()) {
+            let hint = "Show the level as it is once flipped: each room with an alternate is replaced by it";
+            if ui.selectable_label(editor.flipped, "Flipped").on_hover_text(hint).clicked() {
+                editor.set_flipped(!editor.flipped);
+            }
+        }
         let hint =
             "Drag a rectangle of open floor. Draw it beside another room's floor, sharing an edge, to connect them";
         if ui.selectable_label(view.drawing, "New room").on_hover_text(hint).clicked() {
@@ -561,7 +630,9 @@ pub fn map(
         ui.allocate_painter(ui.available_size().max(EVec2::splat(120.0)), Sense::click_and_drag());
     let rect = response.rect;
     painter.rect_filled(rect, 0.0, Color32::from_rgb(18, 20, 26));
-    let shown: Vec<usize> = (0..level.rooms.len()).filter(|&i| in_slice(&level.rooms[i], view.slice)).collect();
+    let live = live_rooms(level, editor.flipped);
+    let shown: Vec<usize> =
+        (0..level.rooms.len()).filter(|&i| live[i] && in_slice(&level.rooms[i], view.slice)).collect();
     if view.fit && !shown.is_empty() {
         let (mut lo, mut hi) = ([f32::MAX; 2], [f32::MIN; 2]);
         for &i in &shown {
@@ -662,8 +733,12 @@ pub fn map(
             );
         }
     }
+    let bases = flip_bases(level);
     for (i, p) in level.placements.iter().enumerate() {
-        if !level.rooms.get(p.room).is_some_and(|r| in_slice(r, view.slice)) {
+        // Objects stay when their room flips; those in an alternate appear with it.
+        if !level.rooms.get(p.room).is_some_and(|r| in_slice(r, view.slice))
+            || (!editor.flipped && bases[p.room].is_some())
+        {
             continue;
         }
         let selected = editor.selection.contains(&i);
@@ -720,7 +795,7 @@ pub fn map(
         }
     } else if let Some(cursor) = response.hover_pos() {
         let [x, z] = t.level(cursor);
-        let found = rooms_at(level, view.slice, x, z);
+        let found: Vec<_> = rooms_at(level, view.slice, x, z).into_iter().filter(|&r| live[r]).collect();
         if !found.is_empty() {
             let list = found.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(", ");
             response.clone().on_hover_text_at_pointer(format!("Room {list}  (x {x:.0}, z {z:.0})"));
@@ -808,9 +883,74 @@ fn outline(
     }
 }
 
+/// Hide the rooms the level does not have in the state shown, and objects
+/// authored in an alternate until the level flips. Runs after the animation
+/// preview, which shows everything it does not isolate.
+#[allow(clippy::type_complexity)]
+fn flip_visibility(
+    editor: Res<Editor>,
+    world: Option<Res<WorldGeometry>>,
+    mut entities: Query<(&InRoom, &mut Visibility, Option<&WorldObject>), With<LevelEntity>>,
+) {
+    let Some(world) = world else { return };
+    let level = &world.data;
+    if level.rooms.iter().all(|r| r.alternate.is_none()) {
+        return;
+    }
+    let (live, bases) = (live_rooms(level, editor.flipped), flip_bases(level));
+    for (room, mut visibility, object) in &mut entities {
+        let shown = match object {
+            Some(o) => editor.flipped || bases.get(o.room).is_none_or(Option::is_none),
+            None => live.get(room.0).copied().unwrap_or(true),
+        };
+        if !shown {
+            visibility.set_if_neq(Visibility::Hidden);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn choosing_an_alternate_flips_the_view_and_hides_the_rooms_it_replaces() {
+        let mut editor = crate::sandbox();
+        let mut rooms = editor.doc.value()["rooms"].clone();
+        let copy = rooms[0].clone();
+        rooms.as_array_mut().unwrap().push(copy);
+        rooms[0]["alternate"] = Value::from(1);
+        editor.edit(vec![("/rooms".into(), rooms)], false);
+        editor.select_room(1);
+        assert!(editor.flipped, "room 1 is an alternate");
+        editor.set_flipped(false);
+        assert_eq!(editor.mesh.room, 0, "the current room follows to the version shown");
+        editor.set_flipped(true);
+        assert_eq!(editor.mesh.room, 1);
+        editor.select_room(0);
+        assert!(!editor.flipped);
+
+        let level = editor.doc.level().unwrap();
+        let mut app = App::new();
+        app.insert_resource(WorldGeometry::new(level)).add_systems(Update, flip_visibility);
+        let spawn =
+            |app: &mut App, room| app.world_mut().spawn((LevelEntity, InRoom(room), Visibility::Inherited)).id();
+        let (original, alternate) = (spawn(&mut app, 0), spawn(&mut app, 1));
+        let object =
+            app.world_mut().spawn((LevelEntity, InRoom(1), Visibility::Inherited, WorldObject::new(0, 1, 1, 0))).id();
+        let shown = |app: &App| {
+            [original, alternate, object].map(|e| app.world().get::<Visibility>(e) != Some(&Visibility::Hidden))
+        };
+        app.insert_resource(editor);
+        app.update();
+        assert_eq!(shown(&app), [true, false, false]);
+        app.world_mut().resource_mut::<Editor>().set_flipped(true);
+        for e in [original, alternate, object] {
+            *app.world_mut().get_mut::<Visibility>(e).unwrap() = Visibility::Inherited;
+        }
+        app.update();
+        assert_eq!(shown(&app), [false, true, true]);
+    }
 
     #[test]
     fn clicking_a_stack_steps_down_it_and_the_map_round_trips() {

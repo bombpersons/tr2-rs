@@ -123,7 +123,7 @@ fn select(editor: &mut Editor, preview: &mut AnimationPreview) -> Result<(), Str
 }
 
 #[allow(clippy::type_complexity)]
-fn preview(
+pub(crate) fn preview(
     time: Res<Time>,
     world: Option<Res<WorldGeometry>>,
     mut preview: Query<&mut AnimationPreview>,

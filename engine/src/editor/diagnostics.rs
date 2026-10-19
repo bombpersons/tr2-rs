@@ -12,6 +12,11 @@
 //! is not a doorway or a hole has one. Box floors follow no per-sector rule
 //! that the imported data confirms, so a box is reported stale only when
 //! its sector's floor changed since the level was opened.
+//!
+//! Flip rooms are checked in the state they are seen in: the level as it
+//! starts, then flipped (see [`super::flip`]), where problems in an
+//! alternate's data, or caused by the alternate beside a room, are added.
+use super::flip::{flip_bases, flipped};
 use super::rooms::locate_room;
 use crate::world::{Level, Room, Sector, format::Portal, format::SOLID};
 
@@ -40,10 +45,15 @@ pub enum Check {
     /// A sector whose floor changed since the level was opened while its
     /// navigation box did not.
     NavBoxStale,
+    /// An alternate that is not on its room's grid, that two rooms share or
+    /// that has an alternate itself, or a link that names an alternate room
+    /// rather than the room it replaces.
+    FlipPair,
 }
 
 impl Check {
-    pub const ALL: [Check; 9] = [
+    pub const ALL: [Check; 10] = [
+        Check::FlipPair,
         Check::LinkIntoSolid,
         Check::ObjectOutside,
         Check::NavBoxOutside,
@@ -66,6 +76,7 @@ impl Check {
             Check::NavBoxOutside => "Sectors outside their navigation box",
             Check::NavBoxMissing => "Open sectors without a navigation box",
             Check::NavBoxStale => "Navigation boxes older than their floor",
+            Check::FlipPair => "Flip rooms that do not pair up",
         }
     }
 }
@@ -95,6 +106,8 @@ pub struct Problem {
     /// object's index. Splitting or merging rooms renumbers them, and must
     /// not make the problems a file already had look new.
     pub place: [i32; 6],
+    /// Found in the level as it is once flipped.
+    pub flipped: bool,
 }
 
 /// A problem's identity across edits: see [`Problem::place`].
@@ -141,6 +154,111 @@ pub fn mirror_portal(level: &Level, from: usize, portal: &Portal) -> Option<Port
 /// Every problem in `level`. `opened` is the level as it was opened, for
 /// finding navigation boxes an edit left behind.
 pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
+    let bases = flip_bases(level);
+    // Before the level flips, alternates are not there.
+    let mut out: Vec<Problem> =
+        check(level, opened).into_iter().filter(|p| is_object(p.check) || bases[p.room].is_none()).collect();
+    out.extend(flip_pairs(level, &bases));
+    // Swapped: base numbers whose data is their alternate's once flipped.
+    let swapped: Vec<Option<usize>> =
+        (0..level.rooms.len()).map(|b| level.rooms[b].alternate.filter(|&a| bases.get(a) == Some(&Some(b)))).collect();
+    if swapped.iter().all(Option::is_none) {
+        return out;
+    }
+    let seen: std::collections::BTreeSet<ProblemKey> = out.iter().map(Problem::key).collect();
+    let opened = opened.map(flipped);
+    for mut p in check(&flipped(level), opened.as_ref()) {
+        if is_object(p.check) {
+            if seen.contains(&p.key()) {
+                continue;
+            }
+        } else if bases[p.room].is_some() {
+            // An original's data, not there once flipped.
+            continue;
+        } else if let Some(alternate) = swapped[p.room] {
+            // The alternate's own data: report it where it is stored.
+            p.detail = p.detail.replacen(&format!("Room {} ", p.room), &format!("Room {alternate} "), 1);
+            p.room = alternate;
+            p.place[5] = 1;
+        } else if seen.contains(&p.key()) {
+            continue;
+        }
+        p.detail = format!("When flipped: {}", p.detail);
+        // Fixes would change the level before it flips as well.
+        p.fix = None;
+        p.flipped = true;
+        out.push(p);
+    }
+    out
+}
+
+fn is_object(check: Check) -> bool {
+    matches!(check, Check::ObjectInOtherRoom | Check::ObjectOutside)
+}
+
+/// Alternates that do not pair up with their room, and links naming them.
+fn flip_pairs(level: &Level, bases: &[Option<usize>]) -> Vec<Problem> {
+    let mut out = vec![];
+    let rooms = &level.rooms;
+    let mut problem = |room: usize, other: Option<usize>, kind: i32, detail: String| {
+        let r = &rooms[room];
+        let place = [r.origin[0], r.origin[2], r.top, r.bottom, kind, 2];
+        out.push(Problem {
+            check: Check::FlipPair,
+            room,
+            sector: None,
+            other,
+            detail,
+            fix: None,
+            place,
+            flipped: false,
+        });
+    };
+    for (i, r) in rooms.iter().enumerate() {
+        let Some(a) = r.alternate.filter(|&a| a < rooms.len()) else { continue };
+        let alt = &rooms[a];
+        if a == i {
+            problem(i, Some(a), 1, format!("Room {i} is its own alternate"));
+        } else if bases[a] != Some(i) {
+            problem(
+                i,
+                Some(a),
+                2,
+                format!("Room {i} flips to room {a}, which room {} flips to too", bases[a].unwrap_or(a)),
+            );
+        } else if alt.alternate.is_some() {
+            problem(i, Some(a), 3, format!("Room {i} flips to room {a}, which has an alternate of its own"));
+        } else if (alt.origin[0], alt.origin[2], alt.x_sectors, alt.z_sectors)
+            != (r.origin[0], r.origin[2], r.x_sectors, r.z_sectors)
+        {
+            problem(i, Some(a), 4, format!("Room {i} and its alternate {a} are on different grids"));
+        }
+    }
+    // Links name the room an alternate replaces; once flipped they lead into it.
+    for (i, r) in rooms.iter().enumerate() {
+        let mut named: Vec<usize> = r.portals.iter().map(|p| p.room).collect();
+        for s in &r.sectors {
+            named.extend(level.floor_info(s).portal.into_iter().chain(s.below).chain(s.above));
+        }
+        named.sort_unstable();
+        named.dedup();
+        for to in named.into_iter().filter(|&to| to != i && bases.get(to).is_some_and(Option::is_some)) {
+            problem(
+                i,
+                Some(to),
+                10,
+                format!(
+                    "Room {i} links to room {to}, an alternate; links name room {}, which it replaces",
+                    bases[to].unwrap()
+                ),
+            );
+        }
+    }
+    out
+}
+
+/// The checks over one state of the level.
+fn check(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
     let mut out = vec![];
     let rooms = &level.rooms;
     for (i, r) in rooms.iter().enumerate() {
@@ -161,6 +279,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                     other: Some(p.room),
                     detail: format!("Room {i} sees into room {} but not back", p.room),
                     fix: Some(Fix::ReturnPortal { room: i, portal: k }),
+                    flipped: false,
                     // The plane, not the extent: splitting a room clips portals into it.
                     place: {
                         let axis = (0..3).find(|&a| p.normal[a] != 0).unwrap_or(1);
@@ -180,7 +299,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 let (gx, gz) = (r.origin[0].div_euclid(1024) + sx as i32, r.origin[2].div_euclid(1024) + sz as i32);
                 let mut problem = |check, other, kind: i32, detail: String| {
                     let place = [gx, gz, s.floor, s.ceiling, kind, 0];
-                    out.push(Problem { check, room: i, sector: at, other, detail, fix: None, place });
+                    out.push(Problem { check, room: i, sector: at, other, detail, fix: None, place, flipped: false });
                 };
                 let doorway = level.floor_info(s).portal;
                 // Doorways, holes and openings: (target, kind, render portal facing).
@@ -276,6 +395,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 detail: format!("Object {index} is authored in room {} but stands in room {room}", p.room),
                 fix: Some(Fix::ObjectRoom { placement: index, room }),
                 place: [index as i32, 0, 0, 0, 0, 0],
+                flipped: false,
             }),
             None => out.push(Problem {
                 check: Check::ObjectOutside,
@@ -285,6 +405,7 @@ pub fn diagnose(level: &Level, opened: Option<&Level>) -> Vec<Problem> {
                 detail: format!("Object {index} is in solid ground or outside room {}", p.room),
                 fix: None,
                 place: [index as i32, 0, 0, 0, 0, 0],
+                flipped: false,
             }),
         }
     }
@@ -419,5 +540,40 @@ mod tests {
         );
         let key = diagnose(&level, None)[0].key();
         assert_eq!(key, (Check::NavBoxMissing, [1, 1, 0, -2048, 0, 0]), "keyed by world place, not room number");
+    }
+
+    #[test]
+    fn flip_rooms_are_checked_in_the_state_they_are_seen_in() {
+        // Room 2 is room 1's alternate: the same room, at first.
+        let mut level = level();
+        let mut alternate = level.rooms[1].clone();
+        level.rooms[1].alternate = Some(2);
+        level.rooms.push(alternate.clone());
+        assert_eq!(diagnose(&level, Some(&level)), []);
+        // Once flipped, A's doorway steps up onto the alternate's raised floor.
+        level.rooms[2].sectors[4].floor = -256;
+        let problems = diagnose(&level, None);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        let p = &problems[0];
+        assert_eq!((p.check, p.room, p.other, p.flipped, &p.fix), (Check::HeightMismatch, 0, Some(1), true, &None));
+        assert!(p.detail.starts_with("When flipped: Room 0 "), "{}", p.detail);
+        // A problem in the alternate's own data is reported in the alternate.
+        level.rooms[2].sectors[4].floor = 0;
+        level.rooms[2].sectors[4].nav_box = None;
+        let problems = diagnose(&level, None);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert_eq!((problems[0].check, problems[0].room, problems[0].sector), (Check::NavBoxMissing, 2, Some((1, 1))));
+        assert!(problems[0].detail.starts_with("When flipped: Room 2 "), "{}", problems[0].detail);
+        assert_eq!(problems[0].place[5], 1, "distinct from the same problem in room 1");
+        // Pairs on different grids, and links naming the alternate.
+        alternate.origin[0] += 1024;
+        level.rooms[2] = alternate;
+        level.rooms[0].portals[0].room = 2;
+        let pairs: Vec<_> = diagnose(&level, None)
+            .into_iter()
+            .filter(|p| p.check == Check::FlipPair)
+            .map(|p| (p.room, p.other))
+            .collect();
+        assert_eq!(pairs, [(1, Some(2)), (0, Some(2))]);
     }
 }
