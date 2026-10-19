@@ -1,90 +1,94 @@
-//! File selection is browse-first; typing a location is an optional shortcut.
-use std::path::{Path, PathBuf};
+//! Native open/save dialogs. They run on their own thread so the editor keeps
+//! drawing; the chosen path comes back on the next frame.
+use crate::Editor;
+use bevy::prelude::*;
+use std::{
+    path::PathBuf,
+    sync::{Mutex, mpsc},
+};
 
-pub const PAGE_SIZE: usize = 8;
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Focus {
-    Search,
-    Location,
-    Filename,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ask {
+    Open,
+    SaveAs,
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct Picker {
-    pub directory: PathBuf,
-    pub page: usize,
-    pub selected: usize,
-    pub save: bool,
-    pub focus: Focus,
+/// What the user chose in a dialog; `None` when it was canceled.
+type Chosen = (Ask, Option<PathBuf>);
+
+#[derive(Resource, Default)]
+pub struct FileDialogs {
+    pending: Option<Mutex<mpsc::Receiver<Chosen>>>,
 }
 
-impl Picker {
-    pub fn new(path: &Path, save: bool) -> (Self, String) {
-        let mut text = if save {
-            format!("{}-copy.json", path.file_stem().unwrap_or_default().to_string_lossy())
-        } else {
-            String::new()
-        };
-        if save {
-            let mut number = 2;
-            while path.parent().unwrap_or(Path::new(".")).join(&text).exists() {
-                text = format!("{}-copy-{number}.json", path.file_stem().unwrap_or_default().to_string_lossy());
-                number += 1;
-            }
-        }
-        (
-            Self {
-                directory: path.parent().unwrap_or(Path::new(".")).to_path_buf(),
-                page: 0,
-                selected: 0,
-                save,
-                focus: if save { Focus::Filename } else { Focus::Search },
-            },
-            text,
-        )
+pub fn show(mut editor: ResMut<Editor>, mut dialogs: ResMut<FileDialogs>) {
+    if dialogs.pending.is_some() {
+        editor.bypass_change_detection().ask = None;
+        return;
     }
+    let Some(ask) = editor.ask.take() else { return };
+    let path = editor.doc.path();
+    let folder = path.parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+    let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let dialog = rfd::FileDialog::new().add_filter("Level", &["json"]).set_directory(folder);
+    let (send, receive) = mpsc::channel();
+    std::thread::spawn(move || {
+        let path = match ask {
+            Ask::Open => dialog.set_title("Open level").pick_file(),
+            Ask::SaveAs => dialog.set_title("Save level as").set_file_name(name).save_file(),
+        };
+        let _ = send.send((ask, path));
+    });
+    dialogs.pending = Some(Mutex::new(receive));
+}
 
-    pub fn entries(&self, text: &str) -> Result<Vec<PathBuf>, String> {
-        let filter = if self.focus == Focus::Search { text.to_lowercase() } else { String::new() };
-        let mut entries = std::fs::read_dir(&self.directory)
-            .map_err(|e| format!("Cannot read this folder: {e}"))?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.is_dir() || path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")))
-            .filter(|path| path.file_name().unwrap_or_default().to_string_lossy().to_lowercase().contains(&filter))
-            .collect::<Vec<_>>();
-        entries.sort_by_key(|path| (!path.is_dir(), path.file_name().unwrap_or_default().to_ascii_lowercase()));
-        Ok(entries)
+pub fn receive(mut editor: ResMut<Editor>, mut dialogs: ResMut<FileDialogs>) {
+    let Some(pending) = &dialogs.pending else { return };
+    let result = pending.lock().unwrap().try_recv();
+    let (ask, path) = match result {
+        Ok(result) => result,
+        Err(mpsc::TryRecvError::Empty) => return,
+        Err(mpsc::TryRecvError::Disconnected) => (Ask::Open, None),
+    };
+    dialogs.pending = None;
+    match (ask, path) {
+        (Ask::Open, Some(path)) => editor.open(&path),
+        (Ask::SaveAs, Some(path)) => editor.save_as(path),
+        (_, None) => (),
     }
 }
 
 /// Find nearby level libraries by directory layout, without knowing any game.
-pub fn locations(current: &Path) -> Vec<(String, PathBuf)> {
-    let mut locations = vec![("Current level folder".into(), current.to_path_buf())];
-    let workspace = |path: &Path| {
+pub fn libraries(current: &std::path::Path) -> Vec<(String, PathBuf)> {
+    let workspace = |path: &std::path::Path| {
         path.ancestors()
             .find(|path| {
                 std::fs::read_to_string(path.join("Cargo.toml")).is_ok_and(|text| text.contains("[workspace]"))
             })
-            .map(Path::to_path_buf)
+            .map(std::path::Path::to_path_buf)
     };
-    if let Some(root) = workspace(current).or_else(|| std::env::current_dir().ok().and_then(|path| workspace(&path))) {
-        locations.push(("Project folder".into(), root.clone()));
-        if let Ok(entries) = std::fs::read_dir(root) {
-            let mut libraries: Vec<_> = entries
-                .filter_map(Result::ok)
-                .map(|entry| (entry.file_name(), entry.path().join("assets/levels")))
-                .filter(|(_, path)| path.is_dir())
-                .collect();
-            libraries.sort_by(|a, b| a.0.cmp(&b.0));
-            for (name, path) in libraries {
-                locations.push((format!("{} levels", name.to_string_lossy()), path));
-            }
+    let mut levels = vec![];
+    let Some(root) = workspace(current).or_else(|| std::env::current_dir().ok().and_then(|path| workspace(&path)))
+    else {
+        return levels;
+    };
+    let Ok(crates) = std::fs::read_dir(root) else { return levels };
+    let mut crates: Vec<_> = crates.filter_map(Result::ok).map(|entry| entry.path().join("assets/levels")).collect();
+    crates.sort();
+    for library in crates {
+        let Ok(entries) = std::fs::read_dir(&library) else { continue };
+        let mut found: Vec<_> = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path().join("level.json"))
+            .filter(|path| path.is_file())
+            .collect();
+        found.sort();
+        let owner = library.parent().and_then(|p| p.parent()).and_then(|p| p.file_name());
+        let owner = owner.unwrap_or_default().to_string_lossy().into_owned();
+        for path in found {
+            let name = path.parent().and_then(|p| p.file_name()).unwrap_or_default().to_string_lossy().into_owned();
+            levels.push((format!("{owner}/{name}"), path));
         }
     }
-    if let Some(home) = std::env::var_os("HOME") {
-        locations.push(("Home folder".into(), home.into()));
-    }
-    locations
+    levels
 }

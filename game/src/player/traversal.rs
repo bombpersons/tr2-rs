@@ -582,15 +582,8 @@ fn jump_motion(
         motion.velocity = (player.forward() * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     }
     if let Some(hit) = world.floor_at(player.position, player.room) {
-        player.room = hit.room;
-        if hit.water {
-            // Keep the existing provisional water controller reachable;
-            // entry rules and water animation are a separate investigation.
-            player.mode = PlayerMode::Swimming;
-            motion.grounded = false;
-            motion.air_animation = 0;
-            return true;
-        }
+        // Water entry is LaraControl's depth test at the start of a tick.
+        player.room = super::body_room(world, player.position, hit.room, 381.0);
         if !motion.grounded && motion.velocity.y <= 0.0 && player.position.y <= hit.height {
             landing_damage(player, motion.velocity);
             player.position.y = hit.height;

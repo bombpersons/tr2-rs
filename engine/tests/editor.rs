@@ -92,3 +92,100 @@ fn animation_links_are_validated_and_authored_edits_survive_save_reopen() {
     let reopened = LevelDocument::open(&path).unwrap();
     assert_eq!(reopened.level().unwrap().animations[1].poses[1].root[1], -384);
 }
+
+#[test]
+fn multi_field_edits_are_one_validated_undo_step_and_can_add_optional_fields() {
+    let path = fixture("multi");
+    let bytes = fs::read(&path).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let edits = |x: i64, room: i64| {
+        vec![
+            ("/placements/0/position/0".to_string(), serde_json::json!(x)),
+            ("/placements/1/invisible".to_string(), serde_json::json!(true)),
+            ("/placements/1/room".to_string(), serde_json::json!(room)),
+        ]
+    };
+    // One invalid field rejects every change.
+    assert!(doc.apply(edits(4096, 99999)).is_err());
+    assert!(!doc.is_dirty());
+    assert!(doc.value()["placements"][1].get("invisible").is_none());
+    doc.apply(edits(4096, 0)).unwrap();
+    assert_eq!(doc.value()["placements"][0]["position"][0], 4096);
+    assert_eq!(doc.value()["placements"][1]["invisible"], true);
+    assert!(doc.undo());
+    assert!(!doc.can_undo());
+    assert!(doc.value()["placements"][1].get("invisible").is_none(), "undo removes an added field");
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert!(doc.redo());
+    assert_eq!(doc.value()["placements"][1]["invisible"], true);
+    assert!(doc.apply([("/no/such/table".to_string(), serde_json::json!(1))]).is_err());
+}
+
+#[test]
+fn steps_applied_piece_by_piece_merge_into_one_undo_step() {
+    let path = fixture("merge");
+    let bytes = fs::read(&path).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    doc.replace("/name", "\"first\"").unwrap();
+    let steps = doc.undo_steps();
+    // A stroke can set the same field twice; undo still restores what was before it.
+    doc.replace("/placements/0/position/0", "4096").unwrap();
+    doc.replace("/placements/0/position/0", "5120").unwrap();
+    doc.replace("/placements/1/position/0", "4096").unwrap();
+    doc.merge_since(steps);
+    assert_eq!(doc.undo_steps(), steps + 1);
+    assert!(doc.undo());
+    assert_eq!(doc.level().unwrap().name, "first");
+    assert_eq!(doc.undo_steps(), steps);
+    assert!(doc.redo());
+    assert_eq!(doc.value()["placements"][0]["position"][0], 5120);
+    assert_eq!(doc.value()["placements"][1]["position"][0], 4096);
+    assert!(doc.undo() && doc.undo());
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+#[test]
+fn save_replacing_overwrites_a_confirmed_destination_atomically() {
+    let path = fixture("replace");
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let target = path.with_file_name("existing.json");
+    fs::write(&target, "old contents").unwrap();
+    assert!(doc.save_to(&target).is_err(), "plain Save As never replaces");
+    assert_eq!(fs::read(&target).unwrap(), b"old contents");
+    doc.replace("/name", "\"replaced\"").unwrap();
+    doc.save_replacing(&target).unwrap();
+    assert_eq!(doc.path(), fs::canonicalize(&target).unwrap());
+    assert_eq!(LevelDocument::open(&target).unwrap().level().unwrap().name, "replaced");
+    assert!(!doc.is_dirty());
+}
+
+#[test]
+fn typed_level_edits_keep_unknown_fields_and_the_bytes_of_untouched_rooms() {
+    let path = fixture("typed");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    // Two rooms in a compact file; the first carries a property the format does not know.
+    let room = value["rooms"][0].clone();
+    value["rooms"].as_array_mut().unwrap().push(room);
+    value["rooms"][0]["sectors"][7]["note"] = serde_json::json!("keep me");
+    let bytes = serde_json::to_vec(&value).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    let mut level = doc.level().unwrap();
+    level.rooms[0].sectors[7].floor = -256;
+    level.rooms[0].sectors[7].ceiling = -3072;
+    level.rooms[0].vertices.push([0, 0, 0, 128]);
+    doc.apply_level(&level).unwrap();
+    assert_eq!(doc.value()["rooms"][0]["sectors"][7]["note"], "keep me");
+    assert_eq!(doc.value()["rooms"][0]["sectors"][7]["floor"], -256);
+    doc.save().unwrap();
+    let saved = fs::read_to_string(&path).unwrap();
+    let untouched = serde_json::to_string(&value["rooms"][1]).unwrap();
+    assert!(saved.contains(&untouched), "the untouched room keeps its exact text");
+    assert!(!saved.contains('\n'), "a compact file stays compact");
+    let reopened = LevelDocument::open(&path).unwrap();
+    assert_eq!(reopened.level().unwrap().rooms[0].vertices.len(), level.rooms[0].vertices.len());
+    assert!(doc.undo());
+    assert!(doc.is_dirty(), "undoing past a save differs from the file");
+}

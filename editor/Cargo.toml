@@ -15,3 +15,7 @@ engine.workspace = true
 # Pointer observers also need the UI hit-testing backend.
 bevy = { workspace = true, features = ["ui_picking", "mesh_picking", "bevy_gizmos_render"] }
 serde_json.workspace = true
+# Immediate-mode editor UI: windows, menus and drag values over the 3D view.
+bevy_egui = { version = "0.43.1", default-features = false, features = ["render", "default_fonts", "manage_clipboard"] }
+# Native open/save dialogs.
+rfd = "0.17.2"

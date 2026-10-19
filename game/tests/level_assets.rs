@@ -13,6 +13,17 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
     assert_eq!(dirs.len(), 25, "the supplied game contains 25 level/cutscene files");
     let mut floors_tested = 0;
     for dir in dirs {
+        // The editor's mesh mode derives sectors from their floor and ceiling
+        // faces. Imported rooms agree with that rule except for a few authored
+        // faces that do not draw their sector (one is not even flat).
+        let mut disagreements = 0;
+        let quirks = match dir.file_name().unwrap().to_str().unwrap() {
+            "cut4" => 10,
+            "living" => 30,
+            "opera" => 1,
+            "rig" => 11,
+            _ => 0,
+        };
         let path = dir.join("level.json");
         let data: Level =
             serde_json::from_slice(&fs::read(&path).unwrap()).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
@@ -36,8 +47,9 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
         for texture in &data.textures {
             assert!(texture.uv.iter().flatten().all(|uv| uv.is_finite()), "{label}: finite UV");
         }
-        for room in &data.rooms {
+        for (index, room) in data.rooms.iter().enumerate() {
             assert_eq!(room.sectors.len(), room.x_sectors * room.z_sectors, "{label}: sector grid");
+            disagreements += engine::editor::sector_mismatches(&data, index).len();
             for face in &room.quads {
                 check_face(&face[..4], face[4], room.vertices.len());
             }
@@ -56,6 +68,7 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
                 assert!(sector.nav_box.is_none_or(|b| b < data.boxes.len()), "{label}: navigation box");
             }
         }
+        assert_eq!(disagreements, quirks, "{label}: floor and ceiling faces that disagree with their sectors");
         for info in &data.floor_infos {
             for trigger in &info.triggers {
                 for action in &trigger.actions {

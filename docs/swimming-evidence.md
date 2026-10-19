@@ -92,12 +92,71 @@ green palette was subsequently ported in [a separate verified change](underwater
 aligned to recorded PSX samples for this pose check; default underwater camera
 behavior is not claimed by this comparison.
 
-Wall/ceiling/floor deflection, current volumes, water entry, surface movement,
-climbing out, underwater roll, weapons and fatal drowning remain unverified.
-The controller retains a bounded floor/body-clearance fallback; it does not
-claim that fallback reproduces the original `0x80045CB8` collision routine.
-The existing water-entry/surface/save reconstruction also remains provisional.
+Current volumes, underwater roll, weapons and fatal drowning remain
+unverified. Surfacing, surface swimming, the dive and deep-water entry were
+later ported in [a separate verified change](surface-evidence.md); submerged
+collision in the section below.
 
 All-features workspace tests and Clippy completed; existing unrelated warnings
 remain. The engine sandbox ran offscreen. The editor Home Lara stroke preview
 and untouched save passed. No engine format or template changes were needed.
+
+## Submerged collision (0x80045CB8)
+
+The provisional floor/body-clearance clamp is replaced by the original
+collision routine shared by states 13, 17, 18 and 35 (table `0x80082DE0`
+entries `0x800457D0`, `0x80045790`, `0x800457B0`, `0x800457F0` each only call
+`0x80045CB8`). Code: `swimming::collide` and the general GetCollisionInfo
+port `game/src/player/collision.rs`. Static reading with `psx disasm --ram
+.psx/home_start/ram.bin`, then checked against runtime routes:
+
+- Wrapper `0x80044FC4`: radius 300, bad_pos 32512, bad_ceiling 400, old
+  position saved, slope/lava flags cleared; after control it clamps pitch to
+  ±15470 and roll to ±4004 for every submerged state (the port now also
+  clamps the dive), moves, runs state collision, then updates the room at the
+  feet (`0x8001C0E8` with offset 0).
+- `0x80045CB8`: facing is yaw, or yaw+180° beyond vertical pitch, and is also
+  written as the move angle a surfacing tick uses. The body height is
+  `|762·sin(pitch) >> 14|`, at least 200; bad_neg is minus that height and
+  the probe line is half of it below the origin. ShiftItem applies the shift.
+  Front: pitch beyond ±6370 deflects a further 364 away from level, otherwise
+  speed stops. Top: pitch at or above −8190 drops 364. Top-front: speed stops.
+  Left/right: yaw ±910. Clamp: back to the old position, speed 0, nothing else.
+  A floor above the probe line (`mid.floor < 0`) lifts the body by it and adds
+  364 pitch. Finally `0x80045BA4` undoes the move when GetWaterDepth
+  `0x800458CC` finds no water below.
+- GetCollisionInfo `0x8001B018`: mid/front/left/right probes by cardinal
+  quadrant (front's transverse offset from the sine table), rooms resolved
+  160 above the body and chained from probe to probe; floors relative to the
+  probe line, ceilings to the body top. No mid floor → front and undo;
+  floor ≤ ceiling → clamp and undo; mid ceiling ≥ 0 → top with a downward
+  shift; a bad front floor or ceiling → front, undoing the move along the
+  facing axis and grid-shifting across it (`0x8001B9EC`); front ceiling exactly
+  at the limit → top-front; a bad left/right floor → side, grid-shifted
+  relative to the front probe. This is why a 20° stroke into the north wall
+  stops dead on both axes instead of sliding.
+
+### Evidence and validation
+
+`tools/record_swim_collision.py` records four routes, all first recorded after
+these rules were written. Three start from the submerged pool checkpoint above:
+a head-on stroke into the north wall, an angled stroke to the east wall that
+turns back along it (right-side contacts deflect yaw by 910 per tick to level)
+and stops in the north-east corner, and a downward stroke pushed off the pool
+floor (the floor lifts pitch 364 per tick to level) into the wall. `--setup`
+builds a second checkpoint in Home's water tunnel: its only pokes place Lara
+in room 42 facing west (`swim_collision_fixture.json`); the original enters
+the water and settles itself. The fourth route rises into the tunnel (room 46)
+and slides under its solid ceiling, with Top contacts fighting held Down,
+into room 41. Replays make no pokes.
+
+`game/tests/swimming.rs` compares every column of the four routes, and the two
+held-out back-hop entries in `game/tests/surface.rs` now run to their end:
+both meet the pool's east wall in the entry dive, are grid-shifted back to
+x 30419 and keep pitching down 364 per tick past the ±15470 limit while they
+sink, through stroke, glide and tread.
+
+Not ported: static-mesh collision (`0x8001BA24`, no statics in these water
+rooms), the slope/lava pit flags (cleared underwater), wading from water 512
+or less deep (`0x80045BA4`'s other branch; wading is not ported at all),
+water currents (`0x80045EE0`) and the fly cheat's skip.

@@ -18,7 +18,16 @@
     "bank_drag": 364,
     "bank_limit": 4004,
     "max_air_ticks": 1800,
-    "drowning_damage": 5
+    "drowning_damage": 5,
+    "surface": {
+     "max_speed": 60,
+     "acceleration": 8,
+     "drag": 4,
+     "turn": 728,
+     "side_turn": 364,
+     "dive_hold_ticks": 10,
+     "air_refill": 10
+    }
    }
   },
   {

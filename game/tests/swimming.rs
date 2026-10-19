@@ -47,6 +47,7 @@ fn compare_case(csv: &str, metadata: &str) {
                 speed: at(start, "swim_speed") as f32 * 30.0 / 4096.0,
                 bank: angle(at(start, "roll")),
                 air_ticks: at(start, "air"),
+                dive_hold: 0,
             },
         ))
         .id();
@@ -127,5 +128,35 @@ fn heldout_treading_direction_reversal_recovers_bank_and_turn_inertia() {
     compare_case(
         include_str!("data/original/swimming_idle_reverse_heldout.csv"),
         include_str!("data/original/swimming_idle_reverse_heldout.json"),
+    );
+}
+
+// Collision 0x80045CB8, all recorded after the collision rules were written.
+#[test]
+fn heldout_head_on_stroke_stops_at_the_pool_wall() {
+    compare_case(
+        include_str!("data/original/swim_collision_wall_head_on.csv"),
+        include_str!("data/original/swim_collision_wall_head_on.json"),
+    );
+}
+#[test]
+fn heldout_angled_stroke_along_the_wall_deflects_then_stops_in_the_corner() {
+    compare_case(
+        include_str!("data/original/swim_collision_wall_angled.csv"),
+        include_str!("data/original/swim_collision_wall_angled.json"),
+    );
+}
+#[test]
+fn heldout_downward_stroke_is_pushed_off_the_pool_floor() {
+    compare_case(
+        include_str!("data/original/swim_collision_floor_dive.csv"),
+        include_str!("data/original/swim_collision_floor_dive.json"),
+    );
+}
+#[test]
+fn heldout_rising_stroke_slides_under_the_tunnel_ceiling() {
+    compare_case(
+        include_str!("data/original/swim_collision_tunnel_ceiling.csv"),
+        include_str!("data/original/swim_collision_tunnel_ceiling.json"),
     );
 }

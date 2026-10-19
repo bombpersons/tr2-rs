@@ -127,10 +127,17 @@ it off. Record partial progress below without checking the parent item.
 - [ ] Swimming: acceleration, braking, turning, pitch, collision and animation.
   Ordinary submerged stroke/glide/tread, exact turning/pitch/bank, authored
   dispatch and oxygen consumption now match700 ticks across six complete
-  replays, including three independent validations. Collision/current/roll/
-  death branches remain. [Evidence](docs/swimming-evidence.md),
+  replays, including three independent validations. Wall, floor and ceiling
+  collision (0x80045CB8) matches four further independent routes and both
+  back-hop entries to their end. Current/roll/death and wading branches
+  remain. [Evidence](docs/swimming-evidence.md),
   [tests](game/tests/swimming.rs).
 - [ ] Water transitions: entry, surface, submerge and climb out; oxygen behavior.
+  Surfacing, surface strokes/turns/wall contact, the tread dive, climb-out,
+  deep-water entry and surface air refill now match eleven complete PSX routes,
+  five independent. [Evidence](docs/surface-evidence.md),
+  [tests](game/tests/surface.rs). Wading, swan-dive entry and the surface
+  air bar remain.
 
 ## Combat and interactions
 
