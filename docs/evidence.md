@@ -69,3 +69,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Fast-fall damage and fatal pose](fall-damage-evidence.md): controlled-motion thresholds, lethal sentinel and authored death goal/terminal pose;513 sampled ticks, five independent fixtures, with native first-death wait retained separately as a timing diagnostic.
 
 - [First-half roll departures](rolling-evidence.md#first-half-departure-verification): three post-implementation no-poke routes verify forward flight, unchanged yaw and landing/recovery;413 additional sampled ticks and44 full-game poses.
+
+- [Home attendant local follow](winston-evidence.md): four ordinary PSX routes,1260 exact item ticks and three post-implementation validation routes; authored start/stop and local turning verified, navigation/contact remain pending.

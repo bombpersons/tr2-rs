@@ -232,3 +232,8 @@ controller rules over the same sector and authored animation data. This
 milestone adds no editor format or dependency; the existing preview can
 inspect clips61/62/93/82 without simulating Lara's collision or input goals.
 The no-op save/edit/undo/reopen and animation smoke still passes unchanged.
+
+Home attendant motion uses the existing authored clips280–283 and type260
+registry metadata. Preview placement9 in the Home level to inspect its starts,
+stops and state goals; local follow thresholds remain in the existing per-type
+JSON table. The preview continues to suppress game controllers.

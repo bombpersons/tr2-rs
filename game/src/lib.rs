@@ -17,6 +17,7 @@ pub mod presentation;
 pub mod save;
 pub mod sky;
 pub mod subdivision;
+pub mod winston;
 
 use bevy::prelude::*;
 use engine::psx::Region;

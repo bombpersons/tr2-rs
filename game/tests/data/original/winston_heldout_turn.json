@@ -1,0 +1,92 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc, psx native runtime",
+  "checkpoint": ".psx/home_runway_start/state.bin",
+  "checkpoint_sha256": "8f452c632c140047141e9dbf539f042cdb70f4e4e9e7d560ebda6466f57e41de",
+  "fields": 700,
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "UP"
+      ],
+      "until": 84
+    },
+    {
+      "frame": 84,
+      "buttons": [
+        "RIGHT"
+      ],
+      "until": 106
+    },
+    {
+      "frame": 106,
+      "buttons": [
+        "UP"
+      ],
+      "until": 130
+    }
+  ],
+  "independent": true,
+  "pokes": [],
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/.psx/home_runway_start/state.bin",
+    "--frames",
+    "700",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"UP\"], \"until\": 84}, {\"frame\": 84, \"buttons\": [\"RIGHT\"], \"until\": 106}, {\"frame\": 106, \"buttons\": [\"UP\"], \"until\": 130}]",
+    "--out",
+    "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/validation/winston/heldout_turn",
+    "--save-state",
+    "--summary",
+    "--sample",
+    "8017c8d6:i16:actor_state",
+    "--sample",
+    "8017c8d8:i16:actor_goal",
+    "--sample",
+    "8017c8dc:i16:actor_animation",
+    "--sample",
+    "8017c8de:i16:actor_animation_frame",
+    "--sample",
+    "8017c8e0:i16:actor_room",
+    "--sample",
+    "8017c8e6:i16:actor_speed",
+    "--sample",
+    "8017c8fc:i32:actor_x",
+    "--sample",
+    "8017c900:i32:actor_y",
+    "--sample",
+    "8017c904:i32:actor_z",
+    "--sample",
+    "8017c90a:i16:actor_yaw",
+    "--sample",
+    "8017c88a:i16:lara_state",
+    "--sample",
+    "8017c88c:i16:lara_goal",
+    "--sample",
+    "8017c890:i16:lara_animation",
+    "--sample",
+    "8017c892:i16:lara_animation_frame",
+    "--sample",
+    "8017c894:i16:lara_room",
+    "--sample",
+    "8017c89a:i16:lara_speed",
+    "--sample",
+    "8017c8b0:i32:lara_x",
+    "--sample",
+    "8017c8b4:i32:lara_y",
+    "--sample",
+    "8017c8b8:i32:lara_z",
+    "--sample",
+    "8017c8be:i16:lara_yaw",
+    "--sample",
+    "801826f8:i16:max_turn",
+    "--sample",
+    "80182728:i32:target_x",
+    "--sample",
+    "80182730:i32:target_z"
+  ],
+  "scope": "Local same-floor follow, authored start/stop and turning; no contact or cross-box navigation"
+}

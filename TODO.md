@@ -122,6 +122,13 @@ it off. Record partial progress below without checking the parent item.
 
 ## Combat and interactions
 
+- [ ] Home attendant navigation and contact. Local flat-floor follow, authored
+  start/stop and turning now match1260 PSX ticks across four ordinary routes,
+  including three independent recordings. [Evidence](docs/winston-evidence.md),
+  [tests](game/tests/winston.rs). Cross-box navigation, room obstacles and
+  Lara contact/pushing remain.
+
+
 - [ ] Pistols: draw/holster, firing cadence, targeting and shot/damage timing.
 - [ ] Tiger and spider behavior: attack selection, contact and damage windows.
 - [ ] Pickups: alignment, animation and collection timing.

@@ -51,6 +51,29 @@ pub fn cos(angle: i32) -> i32 {
     sin(angle + 16384)
 }
 
+/// Horizontal heading in binary turn units: zero faces +Z, positive toward
+/// +X. Ratio quantization and asymmetric octant offsets follow0x80063EC4;
+/// atan(i/2048) rounded to binary angles matches all2049 entries at0x80082FF4.
+pub fn heading(x: i32, z: i32) -> i32 {
+    if x == 0 && z == 0 {
+        return 0;
+    }
+    let mut octant = usize::from(z < 0) * 4 + usize::from(x < 0) * 2;
+    let (mut major, mut minor) = (i64::from(z).abs(), i64::from(x).abs());
+    if major < minor {
+        std::mem::swap(&mut major, &mut minor);
+        octant += 1;
+    }
+    while minor > i64::from(i16::MAX) {
+        minor >>= 1;
+        major >>= 1;
+    }
+    let ratio = (minor * 2048 / major) as f64 / 2048.0;
+    let angle = (ratio.atan() * 65536.0 / std::f64::consts::TAU).round() as i32;
+    const OCTANTS: [i32; 8] = [0, -16384, -65535, 49152, -32768, 16384, 32768, -49152];
+    (angle + OCTANTS[octant]).abs() as i16 as i32
+}
+
 fn isqrt(value: i32) -> i32 {
     (value.max(0) as f64).sqrt() as i32
 }
@@ -219,14 +242,18 @@ fn edge_candidate(
 /// space around the target, sliding it along walls rather than through them.
 pub fn shift_ideal(world: Space, target: Point, eye: Point, ideal: &mut Point, distance2: i32) {
     line_of_sight(world, target, ideal);
-    let Some(target_box) = world.world.navigation_box(target.room, target.x, target.z).and_then(|b| world.world.data.boxes.get(b))
+    let Some(target_box) =
+        world.world.navigation_box(target.room, target.x, target.z).and_then(|b| world.world.data.boxes.get(b))
     else {
         return;
     };
     let bounds = |b: &NavBox| [b.z_min << 10, (b.z_max << 10) - 1, b.x_min << 10, (b.x_max << 10) - 1];
     let [mut zmin, mut zmax, mut xmin, mut xmax] = bounds(target_box);
     let outside = ideal.z < zmin || ideal.z > zmax || ideal.x < xmin || ideal.x > xmax;
-    if outside && let Some(own) = world.world.navigation_box(ideal.room, ideal.x, ideal.z).and_then(|b| world.world.data.boxes.get(b)) {
+    if outside
+        && let Some(own) =
+            world.world.navigation_box(ideal.room, ideal.x, ideal.z).and_then(|b| world.world.data.boxes.get(b))
+    {
         [zmin, zmax, xmin, xmax] = bounds(own);
     }
     // Extend through open neighbours; a solid neighbour fixes the edge.

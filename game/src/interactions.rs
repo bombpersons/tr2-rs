@@ -44,6 +44,8 @@ struct ObjectTypeData {
     spikes: Option<Spikes>,
     #[serde(default)]
     creature: Option<CreatureData>,
+    #[serde(default)]
+    attendant: Option<crate::winston::WinstonTuning>,
 }
 
 #[derive(serde::Deserialize)]
@@ -132,6 +134,11 @@ fn object_types() -> Vec<ObjectTypeData> {
     table.types
 }
 
+/// The local attendant thresholds live with the existing per-type tuning data.
+pub(crate) fn winston_tuning() -> crate::winston::WinstonTuning {
+    object_types().into_iter().find_map(|entry| entry.attendant).expect("attendant tuning is registered")
+}
+
 /// Register every object type of `data/object_types.json` with the engine.
 fn register_object_types(app: &mut App) {
     for data in object_types() {
@@ -141,6 +148,9 @@ fn register_object_types(app: &mut App) {
         }
         let hook = data.clone();
         object_type = object_type.on_init(move |entity, _, world| {
+            if hook.id == crate::winston::KIND {
+                entity.insert((crate::winston::Winston::default(), AnimationGoal { state: 2 }));
+            }
             if let Some(pickup) = &hook.pickup {
                 entity.insert(pickup.clone());
             }
@@ -243,6 +253,7 @@ impl Plugin for InteractionsPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, engine::EngineRulesPlugin);
         engine::add_once(app, crate::player::AvatarPlugin);
+        engine::add_once(app, crate::winston::WinstonRulesPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
         app.init_resource::<Inventory>()
