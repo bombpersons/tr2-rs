@@ -225,6 +225,12 @@ recorded_case!(original_walk_ledge_uses_the_foot_stop_with_standing_control, "wa
 recorded_case!(original_walk_steps_up_through_authored_foot_clips, "walk_step_up");
 recorded_case!(original_walk_steps_down_through_authored_foot_clips, "walk_step_down");
 recorded_case!(original_roll_on_an_oblique_runway_uses_authored_motion_and_turn, "roll_runway");
+recorded_case!(original_first_half_roll_departure_uses_forward_fall_and_landing, "roll_first_half_fall");
+recorded_case!(heldout_first_half_roll_departure_recovers_before_walking, "roll_first_half_walk_heldout");
+recorded_case!(
+    heldout_first_half_roll_departure_ignores_jump_then_recovers_into_running,
+    "roll_first_half_run_heldout"
+);
 recorded_case!(original_roll_steps_up_without_cancelling_the_authored_second_half, "roll_step_up");
 recorded_case!(original_roll_steps_down_then_completes_authored_recovery, "roll_step_down");
 recorded_case!(original_roll_wall_keeps_its_speed_and_pose_while_position_is_blocked, "roll_wall");
