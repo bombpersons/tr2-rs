@@ -61,3 +61,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Vertical jump steering](vertical-steering-evidence.md): signed directional acceleration and ascent cutoff,625 sampled ticks and two independent complete routes; separate item-push diagnostic retained.
 
 - [Home sky](sky-evidence.md): model/pose independently verified against runtime RAM, rotation-only draw and shade134 from PSX code,72 projected corners including a fresh independent camera view; standalone rendering and translation invariance.
+
+- [Forward walking room collision](forward-walk-evidence.md): blocked starts, ledge refusal, both ascending/descending feet and collision standing override;1309 sampled ticks including five independent complete routes.

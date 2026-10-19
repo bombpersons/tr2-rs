@@ -21,6 +21,7 @@ use engine::world::{FloorHit, WorldGeometry};
 mod traversal;
 pub use traversal::Traversal;
 mod backward;
+mod forward;
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -146,6 +147,8 @@ pub enum PlayerMode {
     PullingUp,
     /// A landing whose authored ranges determine when control can resume.
     Recovering,
+    /// A front-wall/ledge stop retains standing control through walking stop2/3.
+    WalkStopping,
     /// Position is frozen while the clip plays; `offset` (world units) is
     /// applied when it ends, as the clip's end-of-animation command.
     Climbing {
@@ -702,7 +705,8 @@ fn control(
             | PlayerMode::JumpImpact
             | PlayerMode::Hanging { .. }
             | PlayerMode::PullingUp
-            | PlayerMode::Recovering => continue,
+            | PlayerMode::Recovering
+            | PlayerMode::WalkStopping => continue,
             PlayerMode::FallingBack => continue,
             PlayerMode::Landing { seconds_left, animation, start_frame } if seconds_left > dt => {
                 player.mode = PlayerMode::Landing { seconds_left: seconds_left - dt, animation, start_frame };
@@ -892,6 +896,10 @@ fn integrate(
             &pad,
             dt,
         ) {
+            continue;
+        }
+        if forward::step(&mut player, &mut motion, &mut animation, &mut traversal, geometry, clips.as_deref(), &pad, dt)
+        {
             continue;
         }
         if matches!(player.mode, PlayerMode::Jump | PlayerMode::Fall)
@@ -1326,6 +1334,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::JumpImpact => 31,
         PlayerMode::PullingUp => 97,
         PlayerMode::Recovering => 31,
+        PlayerMode::WalkStopping => STANDING_CLIP,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
         PlayerMode::Rolling { .. } => 146,
         PlayerMode::Swimming => {

@@ -12,6 +12,17 @@ import subprocess
 from record_backward_collision import ROOT, SAMPLES, event
 
 CASES = {
+    'walk_wall': ('vertical_wall_start', 180, [event(['UP', 'R1'], 100)]),
+    'walk_ledge': ('forward_ledge_start', 280, [event(['UP', 'R1'], 220)]),
+    'walk_step_up': ('home_start', 420, [event(['UP', 'R1'], 360)]),
+    'walk_step_down': ('backward_rolled_start', 380, [event(['UP', 'R1'], 320)]),
+    'walk_step_up_other_heldout': ('backward_step_down_start', 260, [event(['UP', 'R1'], 190, 10)]),
+    'walk_step_down_release_heldout': ('backward_rolled_start', 240, [event(['UP', 'R1'], 112, 16)]),
+    'walk_step_down_mid_release_heldout': ('backward_rolled_start', 240, [event(['UP', 'R1'], 98, 16)]),
+    'walk_step_down_other_heldout': ('walk_step_down_other_start', 300, [event(['UP', 'R1'], 240)]),
+    'walk_ledge_jump_request_heldout': ('forward_ledge_start', 300, [event(['UP', 'R1'], 170, 18),
+                                                                event(['SQUARE'], 186, 176),
+                                                                event(['UP', 'R1'], 254, 224)]),
     'vertical_steer_forward': ('home_runway_start', 240, [event(['SQUARE'], 8), event(['UP'], 50, 28)]),
     'vertical_steer_backward': ('home_runway_start', 240, [event(['SQUARE'], 8), event(['DOWN'], 50, 28)]),
     'vertical_steer_wall': ('vertical_wall_start', 240, [event(['SQUARE'], 8), event(['UP'], 50, 28)]),
@@ -92,8 +103,16 @@ def main():
     parser.add_argument('--prepare-checkpoints', action='store_true')
     parser.add_argument('--prepare-vertical-wall', action='store_true')
     parser.add_argument('--prepare-vertical-open', action='store_true')
+    parser.add_argument('--prepare-walk-step', action='store_true')
     parser.add_argument('--summarize-only', action='store_true')
     args = parser.parse_args()
+    if args.prepare_walk_step:
+        subprocess.run(['psx', 'run', '--from-state', '.psx/backward_step_down_start/state.bin',
+                        '--frames', '90', '--input', json.dumps([event(['CIRCLE'], 2)]),
+                        '--save-state', '--out', '.psx/walk_step_down_other_start', '--summary'],
+                       cwd=ROOT, check=True)
+        if args.case is None:
+            return
     if args.prepare_vertical_open:
         subprocess.run(['psx', 'run', '--from-state', '.psx/vertical_wall_start/state.bin',
                         '--frames', '140', '--input', json.dumps([event(['DOWN', 'R1'], 60)]),
@@ -149,7 +168,8 @@ def main():
         'heldout_after_implementation': args.case.endswith('_heldout'),
         'used_to_refine_rules': args.case in ('low_cancel_heldout', 'run_start_retry_probe', 'run_stop_rehold_heldout',
                                             'forward_ledge_release_heldout', 'forward_ledge_walk_heldout',
-                                            'braking_wall_validation_heldout'),
+                                            'braking_wall_validation_heldout', 'walk_wall', 'walk_ledge',
+                                            'walk_step_up', 'walk_step_down'),
         'diagnostic_only': args.case == 'vertical_steer_backward',
         'level': 'assault', 'command': command, 'input': inputs, 'samples': SAMPLES,
         'build': report['build'], 'identity': report['identity'], 'frames': report['frames'],
@@ -185,6 +205,13 @@ def main():
             'source': source,
             'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
             'frames': 140, 'input': [event(['DOWN', 'R1'], 60)], 'output': checkpoint, 'pokes': [],
+        }
+    if start == 'walk_step_down_other_start':
+        source = '.psx/backward_step_down_start/state.bin'
+        metadata['checkpoint_preparation'] = {
+            'source': source,
+            'source_sha256': hashlib.sha256((ROOT / source).read_bytes()).hexdigest(),
+            'frames': 90, 'input': [event(['CIRCLE'], 2)], 'output': checkpoint, 'pokes': [],
         }
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(target.relative_to(ROOT))
