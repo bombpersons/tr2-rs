@@ -55,6 +55,17 @@ private material-sync system would be fragile and would mutate every affected
 material twice each frame. On template updates, retain the option, default,
 conditional sync and test unless upstream provides equivalent support.
 
+- `psx-bevy/src/psx/mod.rs`: `resize_screen` marks the `Projection` of every
+  camera it retargets as changed (asserted in `screen_targets_follow_set_size`).
+  Bevy recomputes a camera's target size only on a projection change, a new
+  camera or an image asset event, not on a `RenderTarget` change. A camera
+  whose projection also changed that frame (the engine fits the level view
+  to the new screen) took the new size a frame before the HUD and menu
+  cameras on the same canvas. Bevy shares one depth texture per target, so
+  the frame failed wgpu validation ("Attachments have differing sizes") and
+  the game exited when Aspect was switched to match window. Upstream
+  candidate: any game that changes a projection on resize hits it.
+
 ## Update 2026-10-18
 
 - Added upstream `PsxDepthBias` and `PsxMaterial::depth_bias`, including the
