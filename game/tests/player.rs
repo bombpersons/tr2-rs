@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use engine::controller::Button;
+use engine::testing::{TickApp, headless_app};
 use engine::world::{Level, Room, Sector, WorldGeometry};
 use game::player::{
     AnimationState, Motion, Player, PlayerMode, PlayerRulesPlugin, RUN_SPEED, SimulationEnabled, WALK_SPEED,
     WeaponState,
 };
-use engine::testing::{TickApp, headless_app};
 
 fn app() -> (App, Entity) {
     let mut app = headless_app(game::tick_rate(game::REGION));
@@ -157,7 +157,9 @@ fn lethal_falls_disable_movement_and_firing() {
     app.world_mut().get_mut::<Player>(entity).unwrap().position.y = 12.0;
     app.world_mut().get_mut::<Motion>(entity).unwrap().grounded = false;
     app.run_ticks(180, &[]);
-    assert_eq!(player(&app, entity).health, 0);
+    // A lethal impact above154 writes-1 (PSX0x8003E0D4), retained in
+    // airborne_fall_damage_155_impact rather than clamped to zero.
+    assert_eq!(player(&app, entity).health, -1);
     assert_eq!(player(&app, entity).mode, PlayerMode::Dead);
     let position = player(&app, entity).position;
     app.run_ticks(20, &[Button::Up, Button::Triangle, Button::Cross]);
@@ -297,8 +299,15 @@ fn original_wall_entry_falls_slides_and_turns_across_every_recorded_tick() {
             f64::from(-m.velocity.y * 1024.0 / 30.0),
         ]
     });
-    let tolerances = [("x", 0.0), ("y", 0.02), ("z", 0.0), ("yaw", 0.0), ("animation", 0.0),
-        ("animation_frame", 0.0), ("fall_speed", 0.001)];
+    let tolerances = [
+        ("x", 0.0),
+        ("y", 0.02),
+        ("z", 0.0),
+        ("yaw", 0.0),
+        ("animation", 0.0),
+        ("animation_frame", 0.0),
+        ("fall_speed", 0.001),
+    ];
     engine::testing::compare(&original, &rebuild, &tolerances).unwrap().assert_passed();
 }
 
@@ -342,7 +351,9 @@ fn compare_wall_climb(csv: &str, forward_windows: &[(usize, usize)]) {
     let inputs: Vec<Vec<Button>> = (0..original.ticks() - 1)
         .map(|t| match 2 * t {
             f if f < 56 => vec![Button::Right],
-            f if forward_windows.iter().any(|&(start, end)| (start..end).contains(&f)) => vec![Button::Up, Button::Cross],
+            f if forward_windows.iter().any(|&(start, end)| (start..end).contains(&f)) => {
+                vec![Button::Up, Button::Cross]
+            }
             _ => vec![],
         })
         .collect();
@@ -361,7 +372,7 @@ fn compare_wall_climb(csv: &str, forward_windows: &[(usize, usize)]) {
             f64::from((m.velocity.with_y(0.0).length() * 1024.0 / 30.0).round()),
         ]
     });
-    let tolerances = [("x", 0.02), ("y", 0.02), ("z", 0.02), ("yaw", 0.0), ("animation", 0.0),
-        ("animation_frame", 0.0)];
+    let tolerances =
+        [("x", 0.02), ("y", 0.02), ("z", 0.02), ("yaw", 0.0), ("animation", 0.0), ("animation_frame", 0.0)];
     engine::testing::compare(&original, &rebuild, &tolerances).unwrap().assert_passed();
 }

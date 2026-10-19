@@ -72,6 +72,12 @@ it off. Record partial progress below without checking the parent item.
 
 ## Completed traversal milestones
 
+- [x] Fast-fall impact damage boundary and authored fatal ground pose:
+  controlled initial-motion fixtures verify140/141/142/147/153/154/155,
+  retained lethal contact and terminal pose. Native first-death wait timing
+  is a separate diagnostic, not a fixed-rate parity claim.
+  [Evidence](docs/fall-damage-evidence.md), [tests](game/tests/airborne.rs).
+
 - [x] Ordinary authored rolling: entry offset, turn effect, deceleration,
   wall/step correction, held repetition, recovery walk and a second-half
   backward departure/landing. Ten complete PSX routes include six independent
@@ -252,6 +258,14 @@ it off. Record partial progress below without checking the parent item.
   Clippy, builds,119 full-game MCP poses, sandbox movement/rendering and editor
   saves/146-to147 preview pass. No engine format or template change.
   [Evidence](docs/rolling-evidence.md).
+- 2026-10-19: Fast-fall damage and fatal landing: ten passing controlled-motion
+  fixtures compare513 sampled ticks across thirteen columns, including five
+  fresh independent fixtures. Fixed the death goal/pose and retained the native
+  negative-health sentinel. Workspace tests (258 passed), Clippy, builds,65
+  full-game MCP poses, sandbox movement/rendering and editor saves/clip25 preview
+  pass. The original first-death wait is retained as a timing diagnostic; its
+  exact cause and display-field transition parity remain unverified.
+  [Evidence](docs/fall-damage-evidence.md).
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.

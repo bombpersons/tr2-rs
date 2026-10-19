@@ -9,6 +9,7 @@ the exact MCP transcript; no disc is opened by the port.
 import argparse
 import csv
 import json
+import math
 import shutil
 from pathlib import Path
 
@@ -64,6 +65,20 @@ def main(captures=CAPTURES, prefix='backward_collision', min_colors=16):
                     'turn_rate': 0, 'turning': 0, 'air_animation': 0,
                     'locomotion_frame': 0.0, 'movement_heading': None,
                 })
+                if metadata.get('initial_mode') in ('fast_falling', 'fatal_landing'):
+                    falling = metadata['initial_mode'] == 'fast_falling'
+                    yaw = int(first['yaw']) * math.tau / 65536
+                    speed = int(first['speed']) * 30 / 1024
+                    fall = int(first['fall_speed']) * 30 / 1024
+                    client.edit('Player', 'Player', {
+                        'mode': 'FastFalling' if falling else 'FatalLanding', 'health': int(first['health']),
+                    })
+                    client.edit('Player', 'Motion', {
+                        'grounded': not falling,
+                        'velocity': [math.sin(yaw) * speed, -fall, math.cos(yaw) * speed],
+                        'movement_heading': yaw,
+                    })
+                    client.edit('Player', 'Traversal', {'goal': int(first['goal'])})
                 tick = 0
                 level = json.loads((ROOT / f'game/assets/levels/{level_name}/level.json').read_text())
                 for field in fields:
@@ -83,11 +98,13 @@ def main(captures=CAPTURES, prefix='backward_collision', min_colors=16):
                     p, a = components['Player'], components['AnimationState']
                     position = [round(p['position'][0] * 1024), round(-p['position'][1] * 1024), round(p['position'][2] * 1024)]
                     assert position == [int(row[c]) for c in ['x', 'y', 'z']], (field, position, row)
+                    assert p['health'] == int(row['health']), (field, p, row)
                     assert a['animation'] == int(row['animation']), (field, a, row)
                     absolute = level['animations'][a['animation']]['frame_start'] + a['frame']
                     assert absolute == int(row['animation_frame']), (field, a, row)
                     image = client.capture(f'f{field:03}', min_colors=min_colors)
-                    original = ROOT / f'.psx/{prefix}_{case}/screens/f{field+4:06}.png'
+                    original_folder = metadata.get('display_capture', {}).get('out', f'.psx/{prefix}_{case}')
+                    original = ROOT / f'{original_folder}/screens/f{field+4:06}.png'
                     target = client.out / f'f{field:03}-original.png'
                     shutil.copyfile(original, target)
                     poses.append({'field': field, 'state': state, 'image': image,

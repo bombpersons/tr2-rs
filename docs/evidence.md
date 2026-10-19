@@ -65,3 +65,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Forward walking room collision](forward-walk-evidence.md): blocked starts, ledge refusal, both ascending/descending feet and collision standing override;1309 sampled ticks including five independent complete routes.
 
 - [Authored rolling](rolling-evidence.md): entry offset, turn effect, authored speed and recovery, wall/step correction, held repetition and second-half backward departure;1220 sampled ticks including six independent routes.
+
+- [Fast-fall damage and fatal pose](fall-damage-evidence.md): controlled-motion thresholds, lethal sentinel and authored death goal/terminal pose;513 sampled ticks, five independent fixtures, with native first-death wait retained separately as a timing diagnostic.

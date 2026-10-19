@@ -142,6 +142,8 @@ pub enum PlayerMode {
     JumpingForward,
     /// State9: retain the collision heading, brake in air and use the heavy landing.
     FastFalling,
+    /// A fatal fast-fall contact dispatches into the authored ground death pose.
+    FatalLanding,
     /// State14: a low airborne impact locks clip31 through its authored end.
     JumpImpact,
     /// Authored pull-up clips apply their own end offsets, then settle.
@@ -212,12 +214,17 @@ impl Default for Motion {
 }
 
 /// Landing damage0x8003E044: no damage through140 units/tick, quadratic
-/// through154 and lethal above154. Threshold runtime sweeps remain pending.
+/// through154 and lethal above154. PSX controlled impacts are retained in
+/// docs/fall-damage-evidence.md; >154 writes the original negative sentinel.
 fn landing_damage(player: &mut Player, velocity: Vec3) {
     let impact = (-velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
     if impact > 140 {
-        let damage = if impact > 154 { MAX_HEALTH } else { (impact - 140).pow(2) * MAX_HEALTH / 196 };
-        player.damage(damage);
+        if impact > 154 {
+            player.health = -1; // Lethal sentinel at0x8003E0CC..0x8003E0D4.
+            player.mode = PlayerMode::Dead;
+        } else {
+            player.damage((impact - 140).pow(2) * MAX_HEALTH / 196);
+        }
     }
 }
 
@@ -611,6 +618,12 @@ fn control(
         weapon.cooldown_seconds = (weapon.cooldown_seconds - dt).max(0.0);
         weapon.firing = false;
         if player.health <= 0 {
+            if player.mode == PlayerMode::FatalLanding {
+                // LaraControl clamps a dead actor to-1 on its next tick
+                // (0x80042B10), including impact154's initial health0.
+                player.health = -1;
+                continue;
+            }
             player.mode = PlayerMode::Dead;
             motion.velocity.x = 0.0;
             motion.velocity.z = 0.0;
@@ -1199,15 +1212,8 @@ fn integrate(
         if swimming {
             player.position.y = player.position.y.clamp(hit.height, (hit.ceiling - units(400.0)).max(hit.height));
         } else if player.position.y <= hit.height && motion.velocity.y <= 0.0 {
-            let impact = -motion.velocity.y * 1024.0 / ORIGINAL_FPS;
-            if !motion.grounded && impact > 140.0 {
-                // OpenLara getStand: quadratic damage from fall speed 140..154.
-                let damage = if impact > 154.0 {
-                    MAX_HEALTH
-                } else {
-                    ((impact - 140.0).powi(2) * MAX_HEALTH as f32 / 196.0) as i32
-                };
-                player.damage(damage);
+            if !motion.grounded {
+                landing_damage(&mut player, motion.velocity);
             }
             if !motion.grounded && player.health > 0 {
                 // Landing lock is a provisional readable substitute for animation dispatch windows.
@@ -1342,6 +1348,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::JumpingUp { .. } => 26,
         PlayerMode::JumpingForward => 76,
         PlayerMode::FastFalling => 23,
+        PlayerMode::FatalLanding => 25,
         PlayerMode::JumpImpact => 31,
         PlayerMode::PullingUp => 97,
         PlayerMode::Recovering => 31,
