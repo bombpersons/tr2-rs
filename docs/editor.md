@@ -136,7 +136,9 @@ key and menu item, and a button that does not apply is greyed out with the
 reason in its tooltip. [editor-design.md](editor-design.md) has the plan it
 grows into.
 
-- **Mode:** Objects or Mesh (Tab switches). Rooms is shown but not yet built.
+- **Mode:** Objects or Mesh (Tab switches), then **Play** (F5, see "Play
+  from view"). The room tools that a Rooms mode was planned for live in the
+  Rooms and Map windows instead.
 - **Tool:** Select (1) only selects; Move (2) shows the arrows; Rotate (3)
   shows the ring (objects only); Paint (4) paints faces (mesh only).
   Leaving a mode drops a tool that does nothing in the other one, back to
@@ -189,6 +191,7 @@ the level format's units, with Y increasing downward.
 | File > Open recent | Levels opened earlier in this session |
 | Ctrl+S / File > Save | Save |
 | Ctrl+Shift+S / File > Save As... | Native save dialog; continue editing the new file |
+| F5 / File > Play from view / toolbar Play | Run the game on the level as it is now, with Lara where the view looks (see "Play from view") |
 | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z | Undo / redo (also under Edit) |
 | Ctrl+A / Edit > Select all objects | Select every placement |
 | Tab / Edit > Mesh mode | Switch between object and mesh mode (after clicking the view) |
@@ -220,6 +223,22 @@ editable, but audio playback and atlas/image editing belong to future tools.
 There are no authored tuning RON assets in the current port; add an authoring
 surface when those formats become used, rather than inventing a controller
 schema for the editor.
+
+## Play from view
+
+**Play** (the toolbar's ▶, F5 or File > Play from view) runs the game on the
+level as it is in the editor, unsaved edits included. Lara starts on the
+floor where the centre of the 3D view first meets a room (looking from
+inside a room, the floor under the camera), facing the way the view looks.
+The level as it starts is used, not the flipped one. The editor writes
+`levels/<name>/editor-play.json` under `game/assets` (`<name>` is the
+level's folder, so a copy of WALL plays as WALL with its atlas, sky, audio
+and place in the level order), never touching the level's own files, and
+runs `cargo run -p tomb-raider-ii -- --level <name> --level-file
+levels/<name>/editor-play.json` from the workspace, building the game first
+if it needs to. Playing again closes the previous game. A level without a
+Lara model (the sandbox) cannot be played. Lara's placement moves to the
+spot, or one is added if the level has none.
 
 ## Mesh editing
 
@@ -497,7 +516,9 @@ new restoring it, disconnecting a doorway and a hole and opening them again
 with Connect and Open hole (on levels that have them), drawing a room beside
 the sandbox room on the map, connecting it and rebuilding navigation,
 splitting room 0 across x and at a height and merging it back each time,
-closing four sectors of a hole from below and rebuilding navigation (on
+Play from view writing its play copy (only Lara's placement differs, and
+she stands on an open sector), closing four sectors of a hole from below
+and rebuilding navigation (on
 levels with holes), mesh mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and

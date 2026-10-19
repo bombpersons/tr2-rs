@@ -5,6 +5,7 @@ mod edit;
 mod files;
 mod gizmo;
 mod mesh;
+mod play;
 mod rooms;
 mod toolbar;
 mod ui;
@@ -62,6 +63,8 @@ struct Editor {
     room_tools: rooms::RoomTools,
     /// Show the level as it is once flipped: alternate rooms replace theirs.
     flipped: bool,
+    /// Play from view, on the next update.
+    play: Option<play::Play>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -97,6 +100,7 @@ impl Editor {
             diagnostics: diagnostics::Diagnostics::opened(opened),
             room_tools: default(),
             flipped: false,
+            play: None,
         }
     }
 }
@@ -180,6 +184,9 @@ struct EditorCommand {
     tool: String,
     /// "on" shows the level flipped, "off" as it starts.
     flip: String,
+    /// "run" plays from the view as F5 does; "export:FOLDER" only writes the
+    /// play copy under that asset folder.
+    play: String,
 }
 
 #[derive(Component, Reflect, Default)]
@@ -279,6 +286,7 @@ fn main() -> AppExit {
             toolbar::ToolbarPlugin,
             rooms::RoomsPlugin,
             animation::AnimationPreviewPlugin,
+            play::PlayPlugin,
         ))
         .init_resource::<files::FileDialogs>();
     // The MCP's `screen` is an ordinary full-resolution render target here;
@@ -510,6 +518,17 @@ fn automation(
     if c.frame_room {
         c.frame_room = false;
         editor.frame_room();
+    }
+    if !c.play.is_empty() {
+        let text = std::mem::take(&mut c.play);
+        editor.play = match text.split_once(':') {
+            None if text == "run" => Some(play::Play::Run),
+            Some(("export", folder)) => Some(play::Play::Export(folder.into())),
+            _ => {
+                editor.status = format!("play is \"run\" or \"export:FOLDER\", not {text}");
+                None
+            }
+        };
     }
     if c.show_diagnostics {
         c.show_diagnostics = false;

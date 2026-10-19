@@ -72,7 +72,12 @@ functions over the typed `Level` with unit tests. UI lives in `editor/`.
 Every operation validates the whole document and refuses with a reason in
 the status bar rather than leaving a half-edited level.
 
-## Toolbar (built; Rooms mode pending)
+## Toolbar (built; Rooms mode dropped)
+
+Rooms mode was to make clicks pick whole rooms, with the room tools as its
+actions. Those tools ended up in the Rooms and Map windows (Split and Merge
+work on the current room, New room is drawn on the map), so the greyed-out
+button was removed and Play took its place.
 
 One strip under the menu bar, in four groups:
 

@@ -533,6 +533,30 @@ def flip_smoke(client, level, captures):
     return {'room': base, 'alternate': alternate}
 
 
+def play_smoke(client, level, out):
+    """Play from view, writing only the play copy: Lara's placement moves to
+    the floor at the centre of the view and nothing else changes."""
+    folder = out / 'play-assets'
+    shutil.rmtree(folder, ignore_errors=True)
+    before = status(client)
+    state = settled(client, before, play=f'export:{folder}')
+    if not any(m['id'] == 0 for m in level['models']):
+        assert 'no Lara model' in state['message'], state
+        return None
+    assert state['message'].startswith('Wrote levels/'), state
+    name = state['message'].split('/')[1]
+    written = json.loads((folder / 'levels' / name / 'editor-play.json').read_bytes())
+    lara = next(i for i, p in enumerate(level['placements']) if p['kind'] == 0)
+    spot = written['placements'][lara]
+    room = written['rooms'][spot['room']]
+    x, z = (spot['position'][0] - room['origin'][0]) // 1024, (spot['position'][2] - room['origin'][2]) // 1024
+    assert room['sectors'][x * room['z_sectors'] + z]['floor'] != SOLID, spot
+    written['placements'][lara] = level['placements'][lara]
+    assert written == level, 'play copy changed more than Lara'
+    assert not status(client)['dirty']
+    return {'level': name, 'lara': spot}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--level', type=Path, default=ROOT / 'engine/assets/levels/sandbox/level.json')
@@ -625,6 +649,7 @@ def main():
         captures.append(client.capture('edited'))
         rooms = rooms_smoke(client, saved, captures)
         flip = flip_smoke(client, saved, captures)
+        played = play_smoke(client, saved, out)
         diagnostics = diagnostics_smoke(client, saved, captures)
         connected = connect_smoke(client, saved, captures)
         holes = hole_smoke(client, saved, captures)
@@ -650,7 +675,7 @@ def main():
             assert image.size == (1280, 800), 'editor must render at full resolution'
             preview = image.convert('RGB').crop((500, 80, 1280, 800))
             assert len(preview.getcolors(preview.width * preview.height)) > 32, '3D preview is blank or a fallback material'
-    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'flip': flip, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'close_hole': closed, 'mesh': mesh}
+    report = {'level': str(source.relative_to(ROOT)), 'captures': captures, 'save_roundtrip': True, 'clicked': clicked, 'rooms': rooms, 'flip': flip, 'play': played, 'diagnostics': diagnostics, 'connected': connected, 'holes': holes, 'new_room': built, 'split': split, 'close_hole': closed, 'mesh': mesh}
     (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
 

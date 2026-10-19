@@ -175,8 +175,11 @@ fn modes(ui: &mut egui::Ui, editor: &mut Editor) {
     if ui.selectable_label(mesh, "Mesh").on_hover_text("Edit room faces and the sector grid (Tab)").clicked() && !mesh {
         editor.set_mesh_mode(true);
     }
-    ui.add_enabled(false, egui::Button::selectable(false, "Rooms"))
-        .on_disabled_hover_text("Planned: create, connect and split rooms (docs/editor-design.md)");
+    ui.separator();
+    let hint = "Play from view: run the game on the level as it is now, unsaved edits included, with Lara on the floor at the centre of the view, facing the way it looks (F5)";
+    if ui.button("▶ Play").on_hover_text(hint).clicked() {
+        editor.play = Some(crate::play::Play::Run);
+    }
 }
 
 fn tools(ui: &mut egui::Ui, editor: &mut Editor) {

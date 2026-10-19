@@ -61,7 +61,7 @@ impl Plugin for UiPlugin {
         app.add_plugins(EguiPlugin::default())
             .add_systems(Startup, setup)
             .add_systems(Update, quit)
-            .add_systems(EguiPrimaryContextPass, ui);
+            .add_systems(EguiPrimaryContextPass, (style, ui).chain());
         app.world_mut().resource_mut::<EguiGlobalSettings>().auto_create_primary_context = false;
     }
 }
@@ -81,6 +81,49 @@ fn setup(mut commands: Commands, target: Res<EditorTarget>) {
     if target.headless {
         commands.entity(camera).insert(RenderTarget::Image(target.image.clone().into()));
     }
+}
+
+fn style(mut contexts: EguiContexts, mut done: Local<bool>) -> Result {
+    if !*done {
+        compact(contexts.ctx_mut()?);
+        *done = true;
+    }
+    Ok(())
+}
+
+/// A denser theme than egui's default: smaller text, tighter spacing and
+/// margins, so more of the 3D view stays visible around the windows.
+fn compact(ctx: &egui::Context) {
+    use egui::{FontFamily, FontId, TextStyle};
+    ctx.all_styles_mut(|style| {
+        style.text_styles = [
+            (TextStyle::Heading, FontId::new(14.0, FontFamily::Proportional)),
+            (TextStyle::Body, FontId::new(11.5, FontFamily::Proportional)),
+            (TextStyle::Button, FontId::new(11.5, FontFamily::Proportional)),
+            (TextStyle::Monospace, FontId::new(10.5, FontFamily::Monospace)),
+            (TextStyle::Small, FontId::new(9.0, FontFamily::Proportional)),
+        ]
+        .into();
+        let s = &mut style.spacing;
+        s.item_spacing = egui::vec2(5.0, 2.0);
+        s.button_padding = egui::vec2(3.0, 0.0);
+        s.interact_size = egui::vec2(32.0, 15.0);
+        s.window_margin = egui::Margin::same(5);
+        s.menu_margin = egui::Margin::same(3);
+        s.indent = 12.0;
+        s.icon_width = 11.0;
+        s.icon_width_inner = 6.0;
+        s.icon_spacing = 3.0;
+        s.slider_width = 90.0;
+        s.combo_width = 80.0;
+        s.text_edit_width = 160.0;
+        s.combo_height = 300.0;
+        s.scroll = egui::style::ScrollStyle::thin();
+        style.visuals.window_corner_radius = egui::CornerRadius::same(3);
+        style.visuals.menu_corner_radius = egui::CornerRadius::same(3);
+        style.visuals.window_shadow = egui::Shadow::NONE;
+        style.visuals.popup_shadow = egui::Shadow::NONE;
+    });
 }
 
 fn quit(mut editor: ResMut<Editor>, mut close: MessageReader<WindowCloseRequested>, mut exit: MessageWriter<AppExit>) {
@@ -178,6 +221,7 @@ fn ui(
 const OPEN: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::O);
 const SAVE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::S);
 const SAVE_AS: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::S);
+const PLAY: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, Key::F5);
 const UNDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Z);
 const REDO: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
 const REDO_SHIFT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND.plus(Modifiers::SHIFT), Key::Z);
@@ -203,6 +247,8 @@ fn shortcuts(ctx: &egui::Context, editor: &mut Editor) {
             editor.save();
         } else if input.consume_shortcut(&OPEN) {
             editor.request_leave(Leave::Open(None));
+        } else if input.consume_shortcut(&PLAY) {
+            editor.play = Some(crate::play::Play::Run);
         } else if typing {
         } else if input.consume_shortcut(&REDO_SHIFT) || input.consume_shortcut(&REDO) {
             editor.redo();
@@ -318,6 +364,10 @@ fn file_menu(ui: &mut egui::Ui, editor: &mut Editor) {
             }
         });
     });
+    ui.separator();
+    if shortcut(ui, "Play from view", &PLAY, true) {
+        editor.play = Some(crate::play::Play::Run);
+    }
     ui.separator();
     if shortcut(ui, "Save", &SAVE, true) {
         editor.save();

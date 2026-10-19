@@ -34,6 +34,15 @@ pub struct LevelRequest {
     pub name: String,
 }
 
+/// Load the level named `name` from `path` (relative to the asset root)
+/// rather than its `level.json`: an editor's play-test copy. Everything else
+/// keyed by the name (atlas, sky, audio, the level order) stays the level's.
+#[derive(Resource, Clone, Debug)]
+pub struct LevelFile {
+    pub name: String,
+    pub path: String,
+}
+
 /// A level finished loading and its entities were spawned this frame.
 #[derive(Message, Clone)]
 pub struct LevelLoaded {
@@ -237,6 +246,7 @@ fn request_level(
     active: Option<Res<ActiveLevel>>,
     pending: Option<Res<Pending>>,
     server: Res<AssetServer>,
+    file: Option<Res<LevelFile>>,
 ) {
     if request.name.is_empty()
         || active.as_ref().is_some_and(|a| a.name == request.name)
@@ -244,7 +254,11 @@ fn request_level(
     {
         return;
     }
-    let handle = server.load(format!("levels/{}/level.json", request.name));
+    let path = match file {
+        Some(file) if file.name == request.name => file.path.clone(),
+        _ => format!("levels/{}/level.json", request.name),
+    };
+    let handle = server.load(path);
     commands.insert_resource(Pending { handle, name: request.name.clone() });
 }
 
