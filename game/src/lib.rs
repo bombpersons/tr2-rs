@@ -17,6 +17,7 @@ pub mod presentation;
 pub mod save;
 pub mod sky;
 pub mod subdivision;
+pub mod water_palette;
 pub mod winston;
 
 use bevy::prelude::*;
@@ -57,6 +58,7 @@ impl Plugin for GamePlugin {
             audio::GameAudioPlugin,
             subdivision::SubdivisionPlugin,
             sky::SkyPlugin,
+            water_palette::WaterPalettePlugin,
         ));
     }
 }
