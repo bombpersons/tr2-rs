@@ -9,6 +9,7 @@
 use crate::{
     Editor,
     gizmo::{self, OnTop},
+    toolbar::Tool,
     viewport::{ViewportFocus, file_offset, world},
 };
 use bevy::prelude::*;
@@ -31,11 +32,19 @@ pub struct MeshEdit {
     pub active: Option<Element>,
     /// The texture-table entry that painting applies.
     pub brush: Option<usize>,
-    /// Clicking a face paints it instead of selecting it.
-    pub paint: bool,
+    /// The Paint tool's stroke in progress.
+    pub stroke: Option<Stroke>,
     /// The snapped offset of a gizmo move in progress, applied on release.
     pub dragging: Option<[i32; 3]>,
     pub hover: Option<(usize, Element)>,
+}
+
+/// Faces painted since the mouse went down, applied as they are crossed and
+/// joined into one undo step when it comes up.
+pub struct Stroke {
+    /// Undo steps before the stroke began.
+    steps: usize,
+    painted: BTreeSet<(usize, Face)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,8 +89,12 @@ impl Editor {
     /// the room open in the Data window.
     pub fn set_mesh_mode(&mut self, on: bool) {
         self.commit();
+        self.end_stroke();
         self.mesh.on = on;
         self.mesh.dragging = None;
+        if self.tool.unavailable(on).is_some() {
+            self.tool = Tool::Move;
+        }
         if on {
             let pointer_room = self.pointer.strip_prefix("/rooms/").and_then(|p| p.split('/').next()?.parse().ok());
             let object_room =
@@ -220,6 +233,68 @@ impl Editor {
         self.mesh_edit(&format!("Painted texture {texture}"), |level, room| {
             authoring::paint(level, room, &faces, texture)
         });
+    }
+
+    /// Paint one face as part of a stroke. Each face crossed is applied at
+    /// once so the view shows it; [`Editor::end_stroke`] makes the stroke one
+    /// undo step. A face is painted once per stroke.
+    pub fn paint_stroke(&mut self, room: usize, face: Face) {
+        let Some(texture) = self.mesh.brush else {
+            self.status = "Choose a brush in the Textures window (or Alt-click a face) first".into();
+            return;
+        };
+        if self.mesh.stroke.is_none() {
+            self.commit();
+            self.mesh.stroke = Some(Stroke { steps: self.doc.undo_steps(), painted: BTreeSet::new() });
+        }
+        let Some(stroke) = self.mesh.stroke.as_mut() else { return };
+        if !stroke.painted.insert((room, face)) {
+            return;
+        }
+        let pointer = match face {
+            Face::Quad(i) => format!("/rooms/{room}/quads/{i}/4"),
+            Face::Triangle(i) => format!("/rooms/{room}/triangles/{i}/3"),
+        };
+        let steps = self.doc.undo_steps();
+        match self.doc.apply([(pointer, serde_json::Value::from(texture))]) {
+            Ok(()) if self.doc.undo_steps() == steps => (),
+            Ok(()) => {
+                let count = self.mesh.stroke.as_ref().map_or(0, |s| s.painted.len());
+                self.status = format!("Painted texture {texture} on {count} faces - Ctrl+Z to undo");
+                self.revision += 1;
+                self.preview = true;
+            }
+            Err(error) => self.status = error,
+        }
+    }
+
+    /// Finish a paint stroke as one undo step.
+    pub fn end_stroke(&mut self) {
+        if let Some(stroke) = self.mesh.stroke.take() {
+            self.doc.merge_since(stroke.steps);
+        }
+    }
+
+    /// Make a face's texture the brush.
+    pub fn pick_texture(&mut self, level: &Level, room: usize, face: Face) {
+        let texture = level.rooms.get(room).and_then(|r| match face {
+            Face::Quad(i) => r.quads.get(i).map(|q| q[4]),
+            Face::Triangle(i) => r.triangles.get(i).map(|t| t[3]),
+        });
+        if let Some(texture) = texture {
+            self.mesh.brush = Some(texture);
+            self.status = format!("Brush: texture {texture}");
+        }
+    }
+
+    /// Turn the selected faces' textures a quarter turn.
+    pub fn mesh_rotate_texture(&mut self) {
+        let faces: Vec<_> = self.mesh.faces.iter().copied().collect();
+        if faces.is_empty() {
+            self.status = "Select faces to turn their textures".into();
+            return;
+        }
+        self.mesh_edit("Turned texture", |level, room| authoring::rotate_texture(level, room, &faces));
     }
 
     /// Drop selected elements that no longer exist (after undo, for example).
@@ -388,6 +463,9 @@ fn keys(
     if keys.just_pressed(KeyCode::KeyP) {
         editor.mesh_push();
     }
+    if keys.just_pressed(KeyCode::KeyR) {
+        editor.mesh_rotate_texture();
+    }
     if keys.just_pressed(KeyCode::Escape) {
         editor.mesh_clear();
     }
@@ -416,24 +494,43 @@ fn pick(
     {
         editor.mesh_retain(room);
     }
+    if editor.mesh.stroke.is_some() && !mouse.pressed(MouseButton::Left) {
+        editor.end_stroke();
+    }
     let cursor = windows.single().ok().and_then(Window::cursor_position);
     let (Ok((camera, eye)), Some(cursor)) = (cameras.single(), cursor) else { return };
     let blocked = egui.wants_any_pointer_input() || handles.busy() || editor.leaving.is_some();
-    let hover = if blocked { None } else { hit(&editor, &level, camera, eye, cursor, false) };
+    let painting = editor.tool == Tool::Paint;
+    // The brush reaches every room; selection hovers only the edited one.
+    let hover = if blocked { None } else { hit(&editor, &level, camera, eye, cursor, painting) };
     if editor.mesh.hover != hover {
         editor.mesh.hover = hover;
     }
-    if blocked || !focus.active || !mouse.just_pressed(MouseButton::Left) {
+    if blocked || !focus.active {
+        return;
+    }
+    if keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]) {
+        if mouse.just_pressed(MouseButton::Left)
+            && let Some((room, Element::Face(face))) = hit(&editor, &level, camera, eye, cursor, true)
+        {
+            editor.pick_texture(&level, room, face);
+        }
+        return;
+    }
+    if painting {
+        let stroking = mouse.just_pressed(MouseButton::Left) || editor.mesh.stroke.is_some();
+        if stroking
+            && mouse.pressed(MouseButton::Left)
+            && let Some((room, Element::Face(face))) = hover
+        {
+            editor.paint_stroke(room, face);
+        }
+        return;
+    }
+    if !mouse.just_pressed(MouseButton::Left) {
         return;
     }
     let found = hit(&editor, &level, camera, eye, cursor, true);
-    if editor.mesh.paint
-        && let Some((room, Element::Face(face))) = found
-    {
-        editor.mesh_room(room);
-        editor.mesh_paint(Some(vec![face]));
-        return;
-    }
     let extend =
         keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight, KeyCode::ControlLeft, KeyCode::ControlRight]);
     let room = found.map_or(editor.mesh.room, |(r, _)| r);
@@ -501,13 +598,13 @@ fn draw(
         mark(&mut gizmos, p, scale(p) * 2.0, yellow);
     }
     if let Some((r, element)) = editor.mesh.hover
-        && r == editor.mesh.room
+        && let Some(hovered) = w.data.rooms.get(r)
     {
-        let color = if editor.mesh.paint { Color::srgb(0.2, 0.9, 1.0) } else { Color::WHITE };
+        let color = if editor.tool == Tool::Paint { Color::srgb(0.2, 0.9, 1.0) } else { Color::WHITE };
         match element {
-            Element::Face(face) => outline(&mut gizmos, room, face, [0.0; 3], color),
+            Element::Face(face) => outline(&mut gizmos, hovered, face, [0.0; 3], color),
             Element::Vertex(v) => {
-                let p = world(vertex_position(room, v));
+                let p = world(vertex_position(hovered, v));
                 mark(&mut gizmos, p, scale(p) * 2.5, color);
             }
         }
@@ -557,7 +654,7 @@ pub fn panel(ui: &mut egui::Ui, editor: &mut Editor, world_geometry: Option<&Wor
     });
     ui.label(
         egui::RichText::new(
-            "Click vertices or faces; Shift-click adds. Arrows move on the grid. Tab returns to objects.",
+            "Click vertices or faces; Shift-click adds; Esc clears. Arrows move on the grid. Tab returns to objects.",
         )
         .weak(),
     );
@@ -575,49 +672,27 @@ pub fn panel(ui: &mut egui::Ui, editor: &mut Editor, world_geometry: Option<&Wor
         ui.label(format!("Texture {texture}"));
     }
     ui.separator();
-    let faces = !editor.mesh.faces.is_empty();
-    ui.horizontal_wrapped(|ui| {
-        if ui
-            .add_enabled(faces, egui::Button::new("Raise").shortcut_text("+"))
-            .on_hover_text("Raise floor or ceiling faces 256 units")
-            .clicked()
-        {
-            editor.mesh_extrude(-STEP);
-        }
-        if ui
-            .add_enabled(faces, egui::Button::new("Lower").shortcut_text("-"))
-            .on_hover_text("Lower floor or ceiling faces 256 units")
-            .clicked()
-        {
-            editor.mesh_extrude(STEP);
-        }
-        if ui
-            .add_enabled(faces, egui::Button::new("Push wall out").shortcut_text("P"))
-            .on_hover_text("Open the sector behind a wall face")
-            .clicked()
-        {
-            editor.mesh_push();
-        }
-        if ui
-            .add_enabled(faces || !editor.mesh.vertices.is_empty(), egui::Button::new("Clear").shortcut_text("Esc"))
-            .clicked()
-        {
-            editor.mesh_clear();
-        }
-    });
+    ui.label(egui::RichText::new("Raise, lower, push walls, fill and turn textures from the toolbar.").weak());
 }
 
 /// The Textures window: the texture table drawn from the atlas. Click one to
-/// choose it, then paint the selection or click faces with Paint on click.
+/// make it the brush, then paint with the Paint tool or fill the selection.
 pub fn textures(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, atlas: Option<egui::TextureId>) {
     let Some(level) = level else {
         ui.label("Loading...");
         return;
     };
     ui.horizontal(|ui| {
-        ui.checkbox(&mut editor.mesh.paint, "Paint on click").on_hover_text("In mesh mode, clicking a face paints it");
+        let paint = editor.mesh.on && editor.tool != Tool::Paint;
+        if ui
+            .add_enabled(paint, egui::Button::new("Paint tool").shortcut_text("4"))
+            .on_hover_text("Click or drag across faces to paint")
+            .clicked()
+        {
+            editor.set_tool(Tool::Paint);
+        }
         let can = editor.mesh.brush.is_some() && !editor.mesh.faces.is_empty();
-        if ui.add_enabled(can, egui::Button::new("Paint selection")).clicked() {
+        if ui.add_enabled(can, egui::Button::new("Fill selection")).clicked() {
             editor.mesh_paint(None);
         }
     });
@@ -697,6 +772,59 @@ mod tests {
         assert_eq!(Element::parse("x1"), None);
         editor.set_mesh_mode(false);
         assert!(!editor.mesh.on);
+    }
+
+    #[test]
+    fn a_paint_stroke_paints_each_face_once_and_undoes_as_one_step() {
+        let mut editor = crate::sandbox();
+        let before = editor.doc.value().clone();
+        editor.set_mesh_mode(true);
+        editor.set_tool(Tool::Paint);
+        let (a, b) = (floor(&editor, 2, 2), floor(&editor, 2, 3));
+        editor.paint_stroke(0, a);
+        assert!(!editor.doc.is_dirty(), "no brush, nothing painted: {}", editor.status);
+        // Alt-click picks a face's texture as the brush.
+        let level = editor.doc.level().unwrap();
+        editor.pick_texture(&level, 0, a);
+        let picked = editor.mesh.brush.unwrap();
+        editor.mesh.brush = Some((picked + 1) % level.textures.len());
+        let texture = editor.mesh.brush.unwrap();
+        let quad = |e: &Editor, f: Face| match f {
+            Face::Quad(i) => e.doc.value()["rooms"][0]["quads"][i][4].as_u64().unwrap() as usize,
+            Face::Triangle(_) => unreachable!(),
+        };
+        editor.paint_stroke(0, a);
+        assert_eq!(quad(&editor, a), texture, "a face shows painted while the stroke goes on");
+        assert!(editor.preview);
+        editor.paint_stroke(0, a);
+        editor.paint_stroke(0, b);
+        editor.end_stroke();
+        assert_eq!((quad(&editor, a), quad(&editor, b)), (texture, texture));
+        assert_eq!(editor.doc.undo_steps(), 1);
+        editor.undo();
+        assert_eq!(editor.doc.value(), &before);
+    }
+
+    #[test]
+    fn turning_a_texture_cycles_the_selected_faces_corners() {
+        let mut editor = crate::sandbox();
+        let before = editor.doc.value().clone();
+        editor.set_mesh_mode(true);
+        editor.mesh_rotate_texture();
+        assert!(editor.status.contains("Select"), "{}", editor.status);
+        let Face::Quad(i) = floor(&editor, 2, 2) else { panic!() };
+        editor.mesh_click(0, Some(Element::Face(Face::Quad(i))), false);
+        let corners = |e: &Editor| e.doc.value()["rooms"][0]["quads"][i].clone();
+        let start = corners(&editor);
+        editor.mesh_rotate_texture();
+        let turned = corners(&editor);
+        assert_eq!(turned[0], start[1]);
+        assert_eq!(turned[3], start[0]);
+        assert_eq!(turned[4], start[4], "the texture stays the same entry");
+        let level = editor.doc.level().unwrap();
+        assert!(authoring::sector_mismatches(&level, 0).is_empty());
+        editor.undo();
+        assert_eq!(editor.doc.value(), &before);
     }
 
     #[test]

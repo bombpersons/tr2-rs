@@ -1,10 +1,12 @@
-//! A move/turn handle around the selection's centre. Arrows move along one
-//! level axis; the ring turns every selected object about the centre. Hold
-//! Ctrl to snap to quarter-sector clicks (256 units) and 15 degrees. In mesh
-//! mode only the arrows show, always snapped to the sector grid.
+//! A move/turn handle around the selection's centre. With the Move tool,
+//! arrows move along one level axis; with Rotate, the ring turns every
+//! selected object about the centre. Snapping to quarter-sector clicks (256
+//! units) and 15 degrees follows the toolbar's Snap, and Ctrl inverts it. In
+//! mesh mode only the arrows show, always snapped to the sector grid.
 use crate::{
     Editor,
     edit::TURN,
+    toolbar::Tool,
     viewport::{ViewportFocus, file_offset, placement_position, world},
 };
 use bevy::prelude::*;
@@ -74,6 +76,9 @@ fn direction(axis: usize) -> Vec3 {
 
 /// Where the handles are and how big they look.
 fn layout(editor: &Editor, level: Option<&WorldGeometry>, camera: &GlobalTransform) -> Option<(Vec3, f32)> {
+    if !shows(editor, Handle::Axis(0)) && !shows(editor, Handle::Ring) {
+        return None;
+    }
     let points: Vec<_> = if editor.mesh.on {
         crate::mesh::selection_points(editor, level)
     } else {
@@ -84,6 +89,14 @@ fn layout(editor: &Editor, level: Option<&WorldGeometry>, camera: &GlobalTransfo
     }
     let pivot = points.iter().sum::<Vec3>() / points.len() as f32;
     Some((pivot, camera.translation().distance(pivot).max(0.5) * 0.15))
+}
+
+/// Whether the current tool shows a handle.
+fn shows(editor: &Editor, handle: Handle) -> bool {
+    match handle {
+        Handle::Axis(_) => editor.tool == Tool::Move,
+        Handle::Ring => editor.tool == Tool::Rotate && !editor.mesh.on,
+    }
 }
 
 /// The point on the line `origin + t * direction` closest to `ray`.
@@ -135,7 +148,7 @@ pub fn interact(
         return;
     };
     let Ok(ray) = camera.viewport_to_world(eye, cursor) else { return };
-    let snap = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
+    let snap = editor.snap != keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     if let Some(drag) = &handles.drag {
         let pressed = mouse.pressed(MouseButton::Left);
         if editor.mesh.on {
@@ -166,7 +179,7 @@ pub fn interact(
     }
     let screen = |p: Vec3| camera.world_to_viewport(eye, p).ok();
     let mut best = (12.0, None);
-    for axis in 0..3 {
+    for axis in (0..3).filter(|&axis| shows(&editor, Handle::Axis(axis))) {
         if let (Some(a), Some(b)) = (screen(pivot), screen(pivot + direction(axis) * size)) {
             let distance = segment_distance(cursor, a, b);
             if distance < best.0 {
@@ -175,7 +188,7 @@ pub fn interact(
         }
     }
     let ring: Vec<_> =
-        if editor.mesh.on { vec![] } else { ring_points(pivot, size * 1.3).filter_map(screen).collect() };
+        if shows(&editor, Handle::Ring) { ring_points(pivot, size * 1.3).filter_map(screen).collect() } else { vec![] };
     for pair in ring.windows(2) {
         let distance = segment_distance(cursor, pair[0], pair[1]);
         if distance < best.0 {
@@ -266,12 +279,12 @@ fn draw(
     let shade =
         |handle: Handle, color: Color| if current == Some(handle) { Color::srgb(1.0, 0.95, 0.3) } else { color };
     let colors = [Color::srgb(0.95, 0.25, 0.25), Color::srgb(0.3, 0.9, 0.3), Color::srgb(0.3, 0.5, 1.0)];
-    for (axis, color) in colors.into_iter().enumerate() {
+    for (axis, color) in colors.into_iter().enumerate().filter(|&(axis, _)| shows(&editor, Handle::Axis(axis))) {
         gizmos
             .arrow(pivot, pivot + direction(axis) * size, shade(Handle::Axis(axis), color))
             .with_tip_length(size * 0.2);
     }
-    if editor.mesh.on {
+    if !shows(&editor, Handle::Ring) {
         return;
     }
     gizmos.circle(

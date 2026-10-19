@@ -272,10 +272,11 @@ fn ctrl(keys: &ButtonInput<KeyCode>) -> bool {
     keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight, KeyCode::SuperLeft, KeyCode::SuperRight])
 }
 
-/// The Data window's room (or the first room), for framing.
+/// The room mesh mode edits, else the Data window's room (or the first room), for framing.
 fn room_bounds(editor: &Editor) -> (Vec3, f32) {
     let mut parts = editor.pointer.split('/').skip(1);
     let index = match (parts.next(), parts.next().and_then(|s| s.parse::<usize>().ok())) {
+        _ if editor.mesh.on => editor.mesh.room,
         (Some("rooms"), Some(index)) => index,
         _ => 0,
     };

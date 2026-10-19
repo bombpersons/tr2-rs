@@ -135,6 +135,16 @@ impl LevelDocument {
         !self.redo.is_empty()
     }
 
+    /// Join every undo step after the first `steps` into one, so an action
+    /// applied piece by piece (a paint stroke) undoes at once.
+    pub fn merge_since(&mut self, steps: usize) {
+        if self.undo.len() <= steps + 1 {
+            return;
+        }
+        let changes = self.undo.drain(steps..).flat_map(|edit| edit.0).collect();
+        self.undo.push(Edit(changes));
+    }
+
     pub fn undo(&mut self) -> bool {
         let Some(edit) = self.undo.pop() else { return false };
         Self::revert(&mut self.value, &edit.0);

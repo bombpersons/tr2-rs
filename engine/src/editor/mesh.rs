@@ -797,6 +797,20 @@ pub fn paint(level: &mut Level, room: usize, faces: &[Face], texture: usize) -> 
     Ok(())
 }
 
+/// Turn the textures of faces a quarter turn (a triangle's a third) by
+/// cycling their corners. Corners carry the texture coordinates, so positions,
+/// winding and the sectors a face covers stay as they were.
+pub fn rotate_texture(level: &mut Level, room: usize, faces: &[Face]) -> Result<(), String> {
+    let r = level.rooms.get_mut(room).ok_or("no such room")?;
+    for face in faces {
+        match *face {
+            Face::Quad(i) => r.quads.get_mut(i).ok_or("no such face")?[..4].rotate_left(1),
+            Face::Triangle(i) => r.triangles.get_mut(i).ok_or("no such face")?[..3].rotate_left(1),
+        }
+    }
+    Ok(())
+}
+
 /// Whether every floor and ceiling face of a room agrees with its sector.
 pub fn sector_mismatches(level: &Level, room: usize) -> Vec<String> {
     let mut out = vec![];

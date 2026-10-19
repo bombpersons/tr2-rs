@@ -123,6 +123,30 @@ fn multi_field_edits_are_one_validated_undo_step_and_can_add_optional_fields() {
 }
 
 #[test]
+fn steps_applied_piece_by_piece_merge_into_one_undo_step() {
+    let path = fixture("merge");
+    let bytes = fs::read(&path).unwrap();
+    let mut doc = LevelDocument::open(&path).unwrap();
+    doc.replace("/name", "\"first\"").unwrap();
+    let steps = doc.undo_steps();
+    // A stroke can set the same field twice; undo still restores what was before it.
+    doc.replace("/placements/0/position/0", "4096").unwrap();
+    doc.replace("/placements/0/position/0", "5120").unwrap();
+    doc.replace("/placements/1/position/0", "4096").unwrap();
+    doc.merge_since(steps);
+    assert_eq!(doc.undo_steps(), steps + 1);
+    assert!(doc.undo());
+    assert_eq!(doc.level().unwrap().name, "first");
+    assert_eq!(doc.undo_steps(), steps);
+    assert!(doc.redo());
+    assert_eq!(doc.value()["placements"][0]["position"][0], 5120);
+    assert_eq!(doc.value()["placements"][1]["position"][0], 4096);
+    assert!(doc.undo() && doc.undo());
+    doc.save().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+#[test]
 fn save_replacing_overwrites_a_confirmed_destination_atomically() {
     let path = fixture("replace");
     let mut doc = LevelDocument::open(&path).unwrap();

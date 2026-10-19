@@ -257,3 +257,20 @@ fn painting_sets_face_textures() {
     assert_eq!((level.rooms[0].quads[0][4], level.rooms[0].quads[1][4]), (1, 1));
     assert!(paint(&mut level, 0, &[Face::Quad(0)], 2).is_err());
 }
+
+#[test]
+fn rotating_a_texture_cycles_corners_and_keeps_the_sector() {
+    let mut level = box_level(3, 3);
+    let quad = face_at(&level, 1, 1, Surface::Floor);
+    let before = level.rooms[0].quads[quad];
+    let face = sector_face(&level.rooms[0], &before);
+    rotate_texture(&mut level, 0, &[Face::Quad(quad)]).unwrap();
+    let after = level.rooms[0].quads[quad];
+    assert_eq!(after, [before[1], before[2], before[3], before[0], before[4]]);
+    assert_eq!(sector_face(&level.rooms[0], &after), face);
+    for _ in 0..3 {
+        rotate_texture(&mut level, 0, &[Face::Quad(quad)]).unwrap();
+    }
+    assert_eq!(level.rooms[0].quads[quad], before, "four quarter turns are a whole turn");
+    consistent(&level);
+}

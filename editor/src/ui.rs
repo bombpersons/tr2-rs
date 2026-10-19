@@ -92,7 +92,8 @@ fn ui(
     world: Option<Res<WorldGeometry>>,
     server: Res<AssetServer>,
 ) -> Result {
-    let atlas = (editor.windows.textures)
+    // The Textures window and the toolbar's brush swatch draw from the atlas.
+    let atlas = (editor.windows.textures || editor.mesh.on)
         .then(|| contexts.add_image(EguiTextureHandle::Strong(server.load::<Image>(editor.atlas()))));
     let ctx = contexts.ctx_mut()?;
     let editor = &mut *editor;
@@ -100,6 +101,7 @@ fn ui(
     let types = types.as_deref().unwrap_or(&empty);
     shortcuts(ctx, editor);
     let top = menu_bar(ctx, editor);
+    let top = top + crate::toolbar::toolbar(ctx, editor, top, world.as_deref().map(|w| &*w.data), atlas);
     status_bar(ctx, editor);
     let area = ctx.viewport_rect();
     let mut windows = std::mem::take(&mut editor.windows);
@@ -182,7 +184,7 @@ fn shortcuts(ctx: &egui::Context, editor: &mut Editor) {
     });
 }
 
-fn select_all(editor: &mut Editor) {
+pub fn select_all(editor: &mut Editor) {
     let count = editor.doc.value()["placements"].as_array().map_or(0, Vec::len);
     editor.selection = (0..count).collect();
 }

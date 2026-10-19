@@ -116,7 +116,8 @@ def wall_candidates(level, index):
 
 
 def mesh_smoke(client, copy, level, captures):
-    """Mesh mode on a real document: select, raise, paint, push a wall, undo, save."""
+    """Mesh mode on a real document: select, raise, paint, turn a texture,
+    choose a tool, push a wall, undo, save."""
     original = copy.read_bytes()
     state = command(client, select='none', mode='mesh', mesh_room=0)
     assert state['mode'] == 'mesh', state
@@ -143,6 +144,11 @@ def mesh_smoke(client, copy, level, captures):
     assert '256' in state['message'], state
     state = settled(client, state, mesh_paint=1)
     assert state['message'].startswith('Painted'), state
+    state = settled(client, state, mesh_rotate=True)
+    assert state['message'].startswith('Turned'), state
+    # The toolbar's Paint tool with the brush that filled the face.
+    state = command(client, tool='paint')
+    assert state['tool'] == 'paint' and state['brush'] == 1, state
     client.edit('Editor', 'EditorCommand', {'show_textures': True})
     time.sleep(2)
     captures.append(client.capture('mesh-textures'))
@@ -161,7 +167,7 @@ def mesh_smoke(client, copy, level, captures):
     while state['dirty'] and undone < 6:
         state = settled(client, state, undo=True)
         undone += 1
-    assert not state['dirty'] and undone == (3 if pushed else 2), (undone, state)
+    assert not state['dirty'] and undone == (4 if pushed else 3), (undone, state)
     state = command(client, save=True)
     assert copy.read_bytes() == original, 'mesh edits undone changed bytes'
     # Keep one raise, save it, and check what reached the file.
@@ -178,7 +184,8 @@ def mesh_smoke(client, copy, level, captures):
     for other, before in enumerate(level['rooms']):
         if other != index and compact:
             assert json.dumps(before, separators=(',', ':')) in text, f'untouched room {other} changed bytes'
-    command(client, mode='object')
+    state = command(client, mode='object')
+    assert state['tool'] == 'move', 'painting does not carry over to object mode'
     return {'room': index, 'raised_face': quad, 'sector': [x, z], 'pushed_wall': pushed}
 
 

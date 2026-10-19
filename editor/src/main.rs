@@ -4,6 +4,7 @@ mod edit;
 mod files;
 mod gizmo;
 mod mesh;
+mod toolbar;
 mod ui;
 mod viewport;
 use bevy::{
@@ -48,6 +49,10 @@ struct Editor {
     ask: Option<files::Ask>,
     /// Mesh mode's room, selection and tools.
     mesh: mesh::MeshEdit,
+    /// What clicks and drags in the 3D view do.
+    tool: toolbar::Tool,
+    /// Object moves and turns snap (Ctrl inverts while dragging).
+    snap: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,6 +81,8 @@ impl Editor {
             windows: default(),
             ask: None,
             mesh: default(),
+            tool: default(),
+            snap: false,
         }
     }
 }
@@ -116,8 +123,12 @@ struct EditorCommand {
     mesh_push: bool,
     /// Paint the selected faces with this texture-table entry.
     mesh_paint: i64,
+    /// Turn the selected faces' textures a quarter turn.
+    mesh_rotate: bool,
     /// Open the Textures window.
     show_textures: bool,
+    /// "select", "move", "rotate" or "paint".
+    tool: String,
 }
 
 #[derive(Component, Reflect, Default)]
@@ -135,6 +146,8 @@ struct EditorStatus {
     mode: String,
     mesh_room: usize,
     mesh_selection: String,
+    tool: String,
+    brush: i64,
 }
 
 fn main() -> AppExit {
@@ -207,6 +220,7 @@ fn main() -> AppExit {
             viewport::ViewportPlugin,
             gizmo::GizmoPlugin,
             mesh::MeshPlugin,
+            toolbar::ToolbarPlugin,
             animation::AnimationPreviewPlugin,
         ))
         .init_resource::<files::FileDialogs>();
@@ -317,6 +331,17 @@ fn automation(mut editor: ResMut<Editor>, mut command: Query<&mut EditorCommand>
         c.mesh_push = false;
         editor.mesh_push();
     }
+    if !c.tool.is_empty() {
+        let text = std::mem::take(&mut c.tool);
+        match toolbar::Tool::parse(&text) {
+            Some(tool) => editor.set_tool(tool),
+            None => editor.status = format!("No tool named {text}"),
+        }
+    }
+    if c.mesh_rotate {
+        c.mesh_rotate = false;
+        editor.mesh_rotate_texture();
+    }
     if c.show_textures {
         c.show_textures = false;
         editor.windows.textures = true;
@@ -390,12 +415,14 @@ impl Editor {
         }
     }
     fn undo(&mut self) {
+        self.end_stroke();
         self.overlay.clear();
         if self.doc.undo() {
             self.changed("Undone");
         }
     }
     fn redo(&mut self) {
+        self.end_stroke();
         self.overlay.clear();
         if self.doc.redo() {
             self.changed("Redone");
@@ -554,6 +581,8 @@ fn status(editor: Res<Editor>, mut status: Query<&mut EditorStatus>) {
         status.mode = if editor.mesh.on { "mesh" } else { "object" }.into();
         status.mesh_room = editor.mesh.room;
         status.mesh_selection = editor.mesh_selection_text();
+        status.tool = editor.tool.name().to_lowercase();
+        status.brush = editor.mesh.brush.map_or(-1, |b| b as i64);
     }
 }
 

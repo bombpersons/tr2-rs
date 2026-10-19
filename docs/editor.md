@@ -30,8 +30,9 @@ game's type table are ignored. The editor never runs the registered controllers.
 
 ## Current authoring surface
 
-The 3D view fills the window. A **File / Edit / View** menu bar sits on top,
-a status bar along the bottom, and the tool windows float over the view.
+The 3D view fills the window. A **File / Edit / View** menu bar sits on top
+with the toolbar under it, a status bar along the bottom, and the tool
+windows float over the view.
 Windows can be moved, resized, collapsed or closed; **View** reopens them.
 The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
 
@@ -56,6 +57,21 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
 - **Textures** shows the texture table cut from the atlas, for painting faces
   in mesh mode (see "Mesh editing").
 
+The **toolbar** has four groups. Each button runs the same function as its
+key and menu item, and a button that does not apply is greyed out with the
+reason in its tooltip. [editor-design.md](editor-design.md) has the plan it
+grows into.
+
+- **Mode:** Objects or Mesh (Tab switches). Rooms is shown but not yet built.
+- **Tool:** Select (1) only selects; Move (2) shows the arrows; Rotate (3)
+  shows the ring (objects only); Paint (4) paints faces (mesh only).
+  Leaving a mode drops a tool that does nothing in the other one, back to
+  Move.
+- **Actions:** in object mode Frame and Select all; in mesh mode Raise,
+  Lower, Push wall, Fill (paint the selected faces) and Turn texture.
+- **Settings:** in object mode Snap; in mesh mode the edited room (with
+  Frame room) and the brush swatch, which opens the Textures window.
+
 In the 3D view, click an object to select it. Shift- or Ctrl-click adds it
 to the selection, or removes it. Clicking a room or empty space clears the
 selection. Selected objects get boxes drawn through walls; the active one is
@@ -66,11 +82,12 @@ culls Bevy's front faces; the sandbox is wound the same way. Clicks pass
 through a room's outer side to the objects inside. Objects without a rendered model can still
 be selected through the Objects window.
 
-The selection's centre carries a handle. Drag an arrow to move every selected
-object along level X (red), height (green, up is negative Y) or Z (blue).
-Drag the ring to turn the selection about its centre, which also turns each
-object's heading. Hold Ctrl while dragging to snap to 256 units (a quarter
-sector) or 15 degrees. A drag shows live and becomes one undo step when you
+With the Move tool, the selection's centre carries arrows. Drag one to move
+every selected object along level X (red), height (green, up is negative Y)
+or Z (blue). With the Rotate tool it carries a ring instead: drag it to turn
+the selection about its centre, which also turns each object's heading.
+Moves snap to 256 units (a quarter sector) and turns to 15 degrees while
+the toolbar's Snap is on; holding Ctrl while dragging inverts it. A drag shows live and becomes one undo step when you
 let go. Moves and turns update the objects in place; other edits rebuild the
 preview.
 
@@ -89,6 +106,7 @@ the level format's units, with Y increasing downward.
 | Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z | Undo / redo (also under Edit) |
 | Ctrl+A / Edit > Select all objects | Select every placement |
 | Tab / Edit > Mesh mode | Switch between object and mesh mode (after clicking the view) |
+| 1 / 2 / 3 / 4 | Select / Move / Rotate / Paint tool (after clicking the view) |
 | Click / Shift-click / Ctrl-click | Select / add or remove (viewport and Objects window) |
 | F / View > Frame selection | Frame the selection (or the Data window's room) |
 | View > Overview | Frame the first room |
@@ -144,7 +162,7 @@ its lowest floor and its vertices as small crosses.
 - Click a vertex (within a few pixels) or a face to select it; Shift- or
   Ctrl-click adds or removes. Clicking another room's face switches to that
   room. Esc clears. Faces are hit from the side they are drawn for.
-- Drag a gizmo arrow to move the selection: x and z move in whole sectors
+- With the Move tool, drag an arrow to move the selection: x and z move in whole sectors
   (1024 units) and height in 256-unit steps. The move shows in orange while
   you drag and is applied as one undo step when you let go. Moving a vertex
   moves every face that uses it, as imported rooms share corners: raising
@@ -161,10 +179,19 @@ its lowest floor and its vertices as small crosses.
   border, the grid first grows by a row of solid sectors on that side; growing
   toward negative x or z moves the room origin and re-expresses vertices and
   portals so everything stays in place.
-- The **Textures** window (View > Textures) shows the texture table cut from
-  the atlas. Click one to make it the brush, then **Paint selection**, or
-  tick **Paint on click** and click faces. Painting sets a quad's fifth (a
-  triangle's fourth) field.
+- The **Textures** window (View > Textures, or click the toolbar's brush)
+  shows the texture table cut from the atlas. Click one to make it the brush.
+  With the **Paint** tool (4), click a face or drag across faces to paint
+  them, in any room; the face under the cursor is outlined in cyan. Each face
+  shows painted at once, and the whole stroke is one undo step. **Fill**
+  (toolbar) or **Fill selection** (Textures window) paints the selected
+  faces. **Alt-click** a face with any tool to make its texture the brush.
+  Painting sets a quad's fifth (a triangle's fourth) field.
+- **Turn texture** (R) turns the selected faces' textures a quarter turn by
+  cycling their corners, which carry the texture coordinates; positions,
+  winding and the sectors they cover stay as they were. Mirroring would
+  reverse the winding and so the side a face is drawn from, so it is not
+  offered.
 
 Each edit re-derives every sector whose floor or ceiling face it touched,
 and refuses (with the reason in the status bar, leaving the document as it
@@ -180,7 +207,7 @@ rebuilt, so creature pathing over an edited area keeps its old boxes, and
 pushing a wall does not join it to a neighbouring room.
 
 The operations are engine code (`engine::editor::{move_vertices, extrude,
-push_wall, paint}`) over the typed `Level`; `LevelDocument::apply_level`
+push_wall, paint, rotate_texture}`) over the typed `Level`; `LevelDocument::apply_level`
 turns the edited copy into JSON pointer edits for only the fields that
 changed, keeping properties the format does not know, as one undo step.
 
@@ -266,7 +293,7 @@ python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-
 The smoke script copies the level and atlas under `validation/editor-smoke/`,
 checks no-op save, Save As, multi-selection, edit, undo, redo, invalid
 references, the unsaved-changes question, mesh mode (raise a floor, a refused unsnapped
-move, paint, the Textures window, push a wall, undo back to the original
+move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,
 and records real 1280x800 screenshots and the MCP transcript. It never edits
