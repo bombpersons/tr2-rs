@@ -353,7 +353,7 @@ def new_room_smoke(client, level, captures):
     """Draw a 2 x 2 room on the map beside the sandbox room's open floor,
     create it, and connect it through its first wall (cutting the sandbox's
     room-wide wall down to one sector). The only new problems are the new
-    room's missing navigation boxes."""
+    room's missing navigation boxes, until navigation is rebuilt."""
     rooms = len(level['rooms'])
     state = command(client, mode='object', room=0)
     before = state['problems_new']
@@ -372,11 +372,20 @@ def new_room_smoke(client, level, captures):
         time.sleep(0.2)
     state = status(client)
     assert state['problems_new'] == before + 4, state
+    # Rebuilding navigation gives the new room (and the sandbox, which has
+    # none of its own) boxes, leaving only the earlier steps' problems.
+    state = settled(client, state, rebuild_nav=True)
+    assert state['message'].startswith('Rebuilt navigation'), state
+    deadline = time.monotonic() + 20
+    while status(client)['problems_new'] != before and time.monotonic() < deadline:
+        time.sleep(0.2)
+    state = status(client)
+    assert state['problems_new'] == before, state
     state = command(client, frame_room=True)
     time.sleep(1.5)
     captures.append(client.capture('new-room-connected'))
-    state = settled(client, state, undo=True)
-    state = settled(client, state, undo=True)
+    for _ in range(3):
+        state = settled(client, state, undo=True)
     assert state['rooms'] == rooms, state
     command(client, mode='object', room=0)
     return {'room': rooms, 'connected_to': 0}

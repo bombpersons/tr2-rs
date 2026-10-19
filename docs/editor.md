@@ -103,8 +103,8 @@ The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
   opposite normal, reversed winding, one unit short of the plane on the
   positive side), or setting an object's room to the one it stands in.
   **Fix all new** applies every fix offered for new problems as one undo
-  step. There is no fix for heights or navigation boxes; rebuilding boxes is
-  planned (docs/editor-design.md).
+  step. There is no fix for heights. **Rebuild navigation** (see below)
+  resolves every navigation-box problem, new or inherited, in one step.
 
 The **toolbar** has four groups. Each button runs the same function as its
 key and menu item, and a button that does not apply is greyed out with the
@@ -281,6 +281,30 @@ problems afterwards.
   no new diagnostics problems (the smoke test does this for rooms 0 and 3,
   and for the 90-sector hole between rooms 6 and 13).
 
+### Navigation boxes
+
+Creatures path and the chase camera keeps its eye inside navigation boxes:
+rectangles of world sectors with a floor height, joined by overlap lists and
+grouped into zones (see `engine::editor::rebuild_navigation` for what the
+imported levels show about each). **Rebuild navigation** in the Diagnostics
+window rebuilds only what is missing or stale: open sectors with no box,
+sectors outside their box, and every sector of a box whose floor changed
+since the level was opened. All other boxes keep their bytes; on every
+imported level a rebuild changes nothing.
+
+Rebuilt boxes are rectangles of sectors in one room with one floor and
+slope (a sloped box takes the slope's lowest corner; the imported data
+follows no single rule for sloped boxes). A replaced box's index is reused,
+extra boxes are appended, and boxes left over are removed and renumbered.
+Overlap lists join a box to the boxes reached by stepping off each of its
+edge sectors, through doorways and down holes, at any height difference;
+changed lists are written after the existing ones so unchanged boxes keep
+their entries. Zones extend the connected areas with the step limits the
+imported data shows (1, 2, 3 and 4 steps, and any height for flying, for
+both the normal and flipped arrays), merging zones a new box joins. Sectors
+over a hole take the box of the floor beneath. Rebuilt boxes lose the
+authored blockable and blocked bits that doors use.
+
 Connect cuts a wall that spans several sectors (the sandbox's walls each
 span the room) into one face per sector first, so only the doorway's sector
 opens.
@@ -396,7 +420,8 @@ through a doorway into the next room (on levels with several rooms) and
 undoing it, Diagnostics reporting a deleted return portal as new and Fix all
 new restoring it, disconnecting a doorway and a hole and opening them again
 with Connect and Open hole (on levels that have them), drawing a room beside
-the sandbox room on the map and connecting it, mesh mode (raise a floor, a refused unsnapped
+the sandbox room on the map, connecting it and rebuilding navigation, mesh
+mode (raise a floor, a refused unsnapped
 move, paint, turn a texture, the Paint tool and brush, the Textures window, push a wall, undo back to the original
 bytes, then save a raise and check the file's sectors against its faces and
 that every other room kept its bytes), save, and reopen in a new process,

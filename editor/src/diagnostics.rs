@@ -72,6 +72,26 @@ impl Editor {
         });
     }
 
+    /// Rebuild navigation boxes, overlaps and zones wherever sectors lack a
+    /// box, lie outside theirs, or changed height since the level was opened.
+    pub fn rebuild_navigation(&mut self) {
+        let opened = self.diagnostics.opened.clone();
+        let report =
+            self.level_edit("Rebuilt navigation", |level| engine::editor::rebuild_navigation(level, opened.as_deref()));
+        match report {
+            Some(r) if r.built == 0 && r.removed == 0 => self.status = "Navigation is up to date".into(),
+            Some(r) => {
+                self.status = format!(
+                    "Rebuilt navigation: {} boxes for {} sectors{} - Ctrl+Z to undo",
+                    r.built,
+                    r.sectors,
+                    if r.removed > 0 { format!(", {} old boxes removed", r.removed) } else { String::new() }
+                )
+            }
+            None => (),
+        }
+    }
+
     /// Show where a problem is: its object, or its room (and in mesh mode the
     /// sector's floor).
     pub fn go_to(&mut self, problem: &Problem, level: &Level) {
@@ -122,6 +142,20 @@ pub fn window(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>) {
             .clicked()
         {
             editor.fix_problems(&fixable);
+        }
+        let navigation = problems
+            .iter()
+            .filter(|(p, _)| matches!(p.check, Check::NavBoxMissing | Check::NavBoxOutside | Check::NavBoxStale))
+            .count();
+        if ui
+            .add_enabled(navigation > 0, egui::Button::new(format!("Rebuild navigation ({navigation})")))
+            .on_hover_text(
+                "Build navigation boxes, overlaps and zones for sectors without a box, outside theirs, or whose \
+                 floor changed; every other box stays as authored",
+            )
+            .clicked()
+        {
+            editor.rebuild_navigation();
         }
     });
     ui.separator();
@@ -197,5 +231,26 @@ mod tests {
         let undone = Arc::new(editor.doc.level().unwrap());
         editor.diagnostics.refresh(&undone);
         assert_eq!((editor.diagnostics.new_count(), editor.diagnostics.problems.len()), (0, inherited));
+    }
+
+    #[test]
+    fn rebuilding_navigation_gives_every_open_sector_a_box_in_one_undo_step() {
+        let mut editor = crate::sandbox();
+        let navigation = |editor: &Editor| {
+            let level = Arc::new(editor.doc.level().unwrap());
+            diagnose(&level, None)
+                .iter()
+                .filter(|p| matches!(p.check, Check::NavBoxMissing | Check::NavBoxOutside | Check::NavBoxStale))
+                .count()
+        };
+        assert_eq!(navigation(&editor), 16, "the sandbox ships without navigation");
+        editor.rebuild_navigation();
+        assert!(editor.status.starts_with("Rebuilt navigation"), "{}", editor.status);
+        assert_eq!(navigation(&editor), 0);
+        assert_eq!(editor.doc.undo_steps(), 1);
+        editor.rebuild_navigation();
+        assert_eq!(editor.status, "Navigation is up to date");
+        editor.undo();
+        assert!(!editor.doc.is_dirty());
     }
 }

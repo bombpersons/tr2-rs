@@ -162,6 +162,8 @@ struct EditorCommand {
     show_diagnostics: bool,
     /// Apply every fix offered for a new problem.
     fix_new: bool,
+    /// Rebuild navigation where it is missing or stale.
+    rebuild_nav: bool,
     /// "select", "move", "rotate" or "paint".
     tool: String,
 }
@@ -457,6 +459,10 @@ fn automation(
     if c.show_diagnostics {
         c.show_diagnostics = false;
         editor.windows.diagnostics = true;
+    }
+    if c.rebuild_nav {
+        c.rebuild_nav = false;
+        editor.rebuild_navigation();
     }
     if c.fix_new {
         c.fix_new = false;

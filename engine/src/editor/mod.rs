@@ -6,6 +6,7 @@
 //! the same typed format and reference validation as the preview.
 mod diagnostics;
 mod mesh;
+mod navigation;
 mod rooms;
 mod splice;
 mod validate;
@@ -13,6 +14,7 @@ mod validate;
 use crate::world::Level;
 pub use diagnostics::*;
 pub use mesh::*;
+pub use navigation::*;
 pub use rooms::*;
 use serde_json::Value;
 use std::{

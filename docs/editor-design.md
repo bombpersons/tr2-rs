@@ -178,7 +178,8 @@ window, the map and clicking faces in mesh mode all choose the same room.
 
 ### Later
 
-- Rebuild navigation boxes for edited areas.
+- Rebuild navigation boxes for edited areas. (Built: Diagnostics' Rebuild
+  navigation.)
 - Flip-room view and editing of `alternate`.
 - Possibly a managed-region mode for new levels: paint columns with several
   floor/ceiling spans and let the editor partition them into rooms. Most
@@ -221,5 +222,5 @@ nothing in the game.
 3. Diagnostics. (Done.)
 4. Connect / open hole (done, with Disconnect), new room (done), then
    split and merge.
-5. Navigation box rebuild.
+5. Navigation box rebuild. (Done: incremental, for missing and stale boxes.)
 6. Lights and baking.
