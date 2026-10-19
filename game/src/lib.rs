@@ -10,6 +10,7 @@
 //! rendering so they run in tests.
 pub mod audio;
 pub mod braid;
+pub mod caustics;
 pub mod display;
 pub mod interactions;
 pub mod player;

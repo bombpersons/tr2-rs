@@ -19,6 +19,9 @@ pub struct RoomVertex {
 /// with their corners here so a policy need not know the file's UV ordering.
 pub struct RoomFace {
     pub vertices: Vec<RoomVertex>,
+    /// Authored room vertex indices, paired with `vertices`. Policies may
+    /// use stable vertex identity for deformation or animated shading.
+    pub source_indices: Vec<usize>,
     pub texture_attribute: u16,
 }
 
@@ -26,6 +29,7 @@ pub struct RoomFace {
 /// use Bevy's convention: metres, y up, forward along -z.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RoomView {
+    pub room: usize,
     pub view_from_room: Mat4,
     pub clip_from_view: Mat4,
     pub atlas_size: UVec2,
@@ -153,6 +157,7 @@ impl RoomMeshSource {
                         }
                     })
                     .collect(),
+                source_indices: indices.to_vec(),
                 texture_attribute: texture.attribute,
             }
         };
@@ -184,7 +189,7 @@ pub(super) fn rebuild(
     camera: Query<(&Transform, &Projection, &Camera), With<GameCamera>>,
     images: Res<Assets<Image>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut rooms: Query<(Entity, &Transform, &Visibility, &mut RoomMeshSource, &mut RoomMeshStats), With<InRoom>>,
+    mut rooms: Query<(Entity, &Transform, &Visibility, &InRoom, &mut RoomMeshSource, &mut RoomMeshStats)>,
 ) {
     let Some(policy) = policy else { return };
     let revision = policy.last_changed().get();
@@ -195,12 +200,13 @@ pub(super) fn rebuild(
         projection.get_clip_from_view()
     };
     let view_from_level = camera.to_matrix().inverse() * Mat4::from_scale(view::LEVEL_TO_RENDER);
-    for (entity, transform, visibility, mut source, mut stats) in &mut rooms {
+    for (entity, transform, visibility, room, mut source, mut stats) in &mut rooms {
         if *visibility == Visibility::Hidden {
             continue;
         }
         let Some(atlas) = images.get(&source.atlas) else { continue };
         let context = RoomView {
+            room: room.0,
             view_from_room: view_from_level * transform.to_matrix(),
             clip_from_view,
             atlas_size: atlas.size(),
@@ -328,7 +334,7 @@ mod tests {
                 Mesh3d(surface.clone()),
                 RoomMeshStats::default(),
                 RoomMeshSource {
-                    faces: vec![RoomFace { vertices: vertices.to_vec(), texture_attribute: 0 }],
+                    faces: vec![RoomFace { vertices: vertices.to_vec(), source_indices: vec![0, 1, 2], texture_attribute: 0 }],
                     atlas,
                     surface: surface.clone(),
                     underlay: None,

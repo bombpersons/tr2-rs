@@ -37,6 +37,7 @@ fn subdivided_room_face_matches_recorded_psx_leaf_texels_shades_and_depths() {
     let camera = view::camera_transform(position(reference.eye), position(reference.target));
     let projection = PerspectiveProjection { fov: game::display::view_settings().fov, ..default() };
     let view = RoomView {
+        room: 0,
         view_from_room: camera.to_matrix().inverse()
             * Mat4::from_scale(view::LEVEL_TO_RENDER)
             * Mat4::from_translation(position(reference.origin)),
@@ -47,6 +48,7 @@ fn subdivided_room_face_matches_recorded_psx_leaf_texels_shades_and_depths() {
         atlas_size: UVec2::splat(256),
     };
     let face = RoomFace {
+        source_indices: (0..reference.vertices.len()).collect(),
         vertices: reference
             .vertices
             .iter()

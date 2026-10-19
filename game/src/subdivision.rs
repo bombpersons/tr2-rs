@@ -26,17 +26,27 @@ pub struct SubdivisionPlugin;
 
 impl Plugin for SubdivisionPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(RoomMeshPolicy(Box::new(RoomSubdivision::default())))
+        app.add_plugins(crate::caustics::CausticsPlugin)
+            .insert_resource(RoomMeshPolicy(Box::new(RoomSubdivision::default())))
             .add_systems(Startup, |mut commands: Commands| {
                 commands.spawn((Name::new("RoomSubdivision"), RoomSubdivision::default()));
             })
-            .add_systems(Update, sync_controls.before(LevelSystems::Meshes));
+            .add_systems(Update, sync_controls.after(LevelSystems::Visibility).before(LevelSystems::Meshes));
     }
 }
 
-fn sync_controls(controls: Query<&RoomSubdivision, Changed<RoomSubdivision>>, mut policy: ResMut<RoomMeshPolicy>) {
+fn sync_controls(
+    controls: Query<Ref<RoomSubdivision>>,
+    effects: Query<Ref<crate::caustics::Caustics>>,
+    tables: Res<crate::caustics::CausticTables>,
+    world: Option<Res<engine::world::WorldGeometry>>,
+    mut policy: ResMut<RoomMeshPolicy>,
+) {
+    let (Some(world), Ok(effects)) = (world, effects.single()) else { return };
     for controls in &controls {
-        *policy = RoomMeshPolicy(Box::new(*controls));
+        if controls.is_changed() || effects.is_changed() || world.is_changed() {
+            *policy = crate::caustics::room_policy(*controls, *effects, &world.data, tables.clone());
+        }
     }
 }
 
@@ -209,6 +219,7 @@ mod tests {
     fn view() -> RoomView {
         let projection = PerspectiveProjection { fov: 2.0 * (120.0_f32 / 228.0).atan(), ..default() };
         RoomView {
+            room: 0,
             view_from_room: Mat4::from_scale(Vec3::new(1.0, 1.0, -1.0)),
             clip_from_view: projection.get_clip_from_view(),
             atlas_size: UVec2::splat(256),
@@ -218,6 +229,7 @@ mod tests {
 
     fn quad(depth: i32) -> RoomFace {
         RoomFace {
+            source_indices: vec![0, 1, 2, 3],
             vertices: [(-128, -128, 0, 0), (128, -128, 63, 0), (128, 128, 63, 63), (-128, 128, 0, 63)]
                 .map(|(x, y, u, v)| RoomVertex {
                     position: IVec3::new(x, y, depth),

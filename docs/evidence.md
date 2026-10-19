@@ -81,3 +81,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Submerged stroke/glide/tread and steering](swimming-evidence.md):700 exact ticks,16 compared columns, three fresh independent replays and126 full-game pose checks. Authored dispatch, pitch/bank/turn inertia, quantized movement and ordinary air consumption verified; transitions/collisions/drowning/appearance remain pending.
 
 - [Underwater palette](underwater-palette-evidence.md): 16384 observed palette pairs, all 32 red levels, room/camera selection code and a fresh full-game visual comparison. Caustics remain pending.
+
+- [Wet-room vertex lighting](caustics-evidence.md): 1256 native corner updates, all 64 wave entries, fresh odd-phase observations, 140 exact clock ticks and full-game animation/restoration checks.

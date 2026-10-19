@@ -88,7 +88,7 @@ The full-game MCP smoke replays all six routes after initial alignment and
 checks126 complete-game poses, including reflected motion, animation, oxygen
 and the rendered body quaternion. Native/rebuilt views were visually inspected:
 body orientation and authored poses agree, while the original's underwater
-green palette was subsequently ported in [a separate verified change](underwater-palette-evidence.md); caustics remain missing. The camera is
+green palette was subsequently ported in [a separate verified change](underwater-palette-evidence.md); wet-room caustics were later ported in [another independent change](caustics-evidence.md). The camera is
 aligned to recorded PSX samples for this pose check; default underwater camera
 behavior is not claimed by this comparison.
 

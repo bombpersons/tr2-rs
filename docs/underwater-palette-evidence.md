@@ -26,7 +26,7 @@ that value from its room flag. Lara's renderer makes the same choice at
 0x24060..0x240AC. The room renderer 0x617B0..0x61804 selects a packed CLUT
 adjustment of 0x20000000, applied at 0x61954, corresponding to 128 palette rows.
 Traces retain actual wet/dry calls. Caustics use another global and are a
-separate pending effect.
+separate effect, subsequently ported in [wet-room vertex lighting](caustics-evidence.md).
 
 The game derives one ordinary Bevy `Image` from the baked atlas: recover its
 five-bit red, halve it, then expand it using the same floor(r*255/31) as the
@@ -42,7 +42,7 @@ captured after implementation. It verifies 86616 changed pixels, unchanged
 green/blue everywhere, unchanged health-bar pixels and exact restoration of
 the previous image. A dry Home comparison is byte-identical with the effect
 on/off. In the fixed wall crop, mean red changes 156.57→74.88; native is 67.66.
-Remaining shade/geometry differences include unported caustics; this is not a
+Remaining shade/geometry differences include caustics, ported in the subsequent change; this is not a
 claim of pixel parity. The images were inspected alongside the native view.
 The existing 21-pose full-game swimming steering replay remains exact.
 
