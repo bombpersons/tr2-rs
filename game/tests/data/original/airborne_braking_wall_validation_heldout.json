@@ -1,8 +1,8 @@
 {
   "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
   "heldout_after_implementation": true,
-  "used_to_refine_rules": false,
-  "diagnostic_only": true,
+  "used_to_refine_rules": true,
+  "diagnostic_only": false,
   "level": "assault",
   "command": [
     "psx",
@@ -145,5 +145,6 @@
   "checkpoint": ".psx/forward_ledge_start/state.bin",
   "checkpoint_sha256": "5ae430a8ee2d168c4bba8078db8da9b10cf39a6b0d8d8cac9b6b5d60c8b25c0a",
   "samples_sha256": "38a263217e528f8f9c576dbfb02fe66e3af04828ef9a1894426dbb134c9863e9",
-  "writes_sha256": "58972193585cc2ad3200fe233280d7964f032fd2d50325ce1877b1cb46a13bc5"
+  "writes_sha256": "58972193585cc2ad3200fe233280d7964f032fd2d50325ce1877b1cb46a13bc5",
+  "provenance_note": "Former walking-stop milestone diagnostic; unchanged CSV used to refine the vertical front-floor clearance margin. Fresh vertical_clearance routes provide independent validation."
 }

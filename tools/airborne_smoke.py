@@ -3,6 +3,9 @@
 from backward_collision_smoke import main
 
 CAPTURES = {
+    'braking_wall_validation_heldout': [190, 216, 218, 224, 226, 228, 230, 246, 256],
+    'vertical_clearance_heldout': [24, 28, 30, 36, 38, 40, 62, 82, 84, 86, 98, 100, 102, 142, 144, 210],
+    'vertical_clearance_delay_heldout': [42, 46, 48, 54, 56, 58, 80, 100, 102, 104, 116, 118, 120, 160, 162, 250],
     'forward_ledge_release_heldout': [80, 116, 140, 184, 194, 196, 198, 220],
     'forward_ledge_walk_heldout': [58, 60, 78, 80, 82, 116, 118, 130, 132, 170, 172, 174, 204, 206, 208],
     'walk_stop_left_heldout': [100, 102, 126, 128, 130, 158, 160, 162, 220],
