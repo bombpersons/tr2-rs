@@ -131,6 +131,11 @@ it off. Record partial progress below without checking the parent item.
   death branches remain. [Evidence](docs/swimming-evidence.md),
   [tests](game/tests/swimming.rs).
 - [ ] Water transitions: entry, surface, submerge and climb out; oxygen behavior.
+  Surfacing, surface strokes/turns/wall contact, the tread dive, climb-out,
+  deep-water entry and surface air refill now match eleven complete PSX routes,
+  five independent. [Evidence](docs/surface-evidence.md),
+  [tests](game/tests/surface.rs). Wading, swan-dive entry, submerged wall
+  collision and the surface air bar remain.
 
 ## Combat and interactions
 

@@ -1,9 +1,7 @@
 //! Submerged stroke, glide and tread, from PSX0x80045384..0x800456DC.
 //! Free-space motion/steering is verified separately from water transitions
 //! and the still-provisional wall/floor/surface response.
-use super::{
-    AnimationState, Motion, ORIGINAL_FPS, Player, PlayerAnimations, PlayerMode, Traversal, original_frames, units,
-};
+use super::{AnimationState, Motion, ORIGINAL_FPS, Player, PlayerAnimations, Traversal, original_frames, units};
 use bevy::prelude::*;
 use engine::{
     animation::advance,
@@ -31,6 +29,20 @@ pub struct SwimmingTuning {
     pub bank_push: i32,
     pub bank_drag: i32,
     pub bank_limit: i32,
+    pub surface: SurfaceTuning,
+}
+
+/// Surface swimming (0x80044264..0x80044FC4); speeds in the source's
+/// quarter-units per tick, turns in binary angle units per tick.
+#[derive(Reflect, serde::Deserialize, Debug, Clone)]
+pub struct SurfaceTuning {
+    pub max_speed: i32,
+    pub acceleration: i32,
+    pub drag: i32,
+    pub turn: i32,
+    pub side_turn: i32,
+    pub dive_hold_ticks: i32,
+    pub air_refill: i32,
 }
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -43,15 +55,19 @@ pub struct SubmergedMotion {
     pub bank: f32,
     /// The source's oxygen counter, one per authored tick (0x8008C4FE).
     pub air_ticks: i32,
+    /// Ticks Jump has been held while treading at the surface (0x8008C500).
+    pub dive_hold: i32,
 }
 impl Default for SubmergedMotion {
     fn default() -> Self {
-        Self { speed: 0.0, bank: 0.0, air_ticks: 1800 }
+        Self { speed: 0.0, bank: 0.0, air_ticks: 1800, dive_hold: 0 }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 enum Phase {
+    /// State35: the authored dive from the surface or a jump into water.
+    Diving,
     Treading,
     Stroking,
     Gliding,
@@ -62,17 +78,18 @@ impl Phase {
             13 => Some(Self::Treading),
             17 => Some(Self::Stroking),
             18 => Some(Self::Gliding),
+            35 => Some(Self::Diving),
             _ => None,
         }
     }
 }
-fn angle(radians: f32) -> i32 {
+pub(super) fn angle(radians: f32) -> i32 {
     (radians * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32
 }
-fn radians(angle: i32) -> f32 {
+pub(super) fn radians(angle: i32) -> f32 {
     angle as f32 * std::f32::consts::TAU / 65536.0
 }
-fn decay(value: i32, amount: i32) -> i32 {
+pub(super) fn decay(value: i32, amount: i32) -> i32 {
     value - value.signum() * value.abs().min(amount)
 }
 
@@ -98,6 +115,17 @@ pub(super) fn control(
     }
     if player.health <= 0 {
         traversal.goal = 44;
+        return;
+    }
+    if let Phase::Diving = phase {
+        // Dive control0x800456DC only steers down; it keeps its entry speed.
+        // The wrapper's turn and bank decay still apply.
+        if pad.held(Button::Up) {
+            motion.pitch = radians(angle(motion.pitch) - tuning.pitch_step / 2);
+        }
+        motion.turn_rate = decay(motion.turn_rate, tuning.turn_drag);
+        water.bank = radians(decay(angle(water.bank), tuning.bank_drag));
+        player.yaw = radians((angle(player.yaw) + motion.turn_rate) as i16 as i32);
         return;
     }
     let pitch = angle(motion.pitch)
@@ -140,6 +168,7 @@ pub(super) fn control(
                 traversal.goal = 13;
             }
         }
+        Phase::Diving => {}
         Phase::Treading => {
             if pad.held(Button::Square) {
                 traversal.goal = 17;
@@ -190,10 +219,8 @@ pub(super) fn step(
             let half = units(((sin(pitch) * 762) >> 14).abs().max(200) as f32 / 2.0);
             player.position =
                 proposed.with_y(proposed.y.clamp(hit.height + half, (hit.ceiling - half).max(hit.height + half)));
+            // A dry room hands over to LaraControl's surfacing test next tick.
             player.room = hit.room;
-            if !hit.water {
-                player.mode = PlayerMode::Fall;
-            }
         } else {
             water.speed = 0.0;
             motion.velocity = Vec3::ZERO;

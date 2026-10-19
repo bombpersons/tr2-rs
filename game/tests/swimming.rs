@@ -47,6 +47,7 @@ fn compare_case(csv: &str, metadata: &str) {
                 speed: at(start, "swim_speed") as f32 * 30.0 / 4096.0,
                 bank: angle(at(start, "roll")),
                 air_ticks: at(start, "air"),
+                dive_hold: 0,
             },
         ))
         .id();

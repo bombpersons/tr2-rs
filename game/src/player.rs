@@ -23,8 +23,9 @@ pub use traversal::Traversal;
 mod backward;
 mod forward;
 mod rolling;
+mod surface;
 mod swimming;
-pub use swimming::{SubmergedMotion, SwimmingTuning};
+pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -169,7 +170,10 @@ pub enum PlayerMode {
     Rolling {
         entering: bool,
     },
+    /// Submerged: stroke, glide, tread and the dive (water mode 1).
     Swimming,
+    /// On the water surface: tread and the four strokes (water mode 2).
+    Surface,
     Dead,
 }
 
@@ -428,6 +432,13 @@ fn wall_ahead(world: Option<&WorldGeometry>, position: Vec3, yaw: f32, room: usi
     world.floor_at(position + offset, room).is_none_or(|hit| hit.height >= test || hit.ceiling <= test)
 }
 
+/// UpdateLaraRoom 0x8001C0E8: the room containing a point `offset` original
+/// units above the feet (381 for ordinary and transition updates, so the
+/// body rather than the feet decides when Lara crosses a water surface).
+fn body_room(world: &WorldGeometry, position: Vec3, room: usize, offset: f32) -> usize {
+    world.floor_at(position + Vec3::Y * units(offset), room).map_or(room, |hit| hit.room)
+}
+
 fn floor(world: Option<&WorldGeometry>, position: Vec3, room: usize) -> Option<FloorHit> {
     match world {
         Some(world) => world.floor_at(position, room),
@@ -501,8 +512,9 @@ fn turn(
     fast_turn: bool,
     animation_state: Option<usize>,
 ) {
-    if player.mode == PlayerMode::Swimming {
-        // Submerged control owns turn acceleration, decay and bank.
+    if matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
+        // Water control owns its turning: submerged inertia and bank, or
+        // the surface handlers' direct yaw changes.
         return;
     }
     let controls = GroundControls::read(pad);
@@ -570,30 +582,56 @@ fn turn(
 fn apply_turn_rate(time: Res<Time>, mut players: Query<(&mut Player, &Motion)>) {
     let ticks = original_frames(time.delta_secs());
     for (mut player, motion) in &mut players {
-        if motion.turn_rate != 0 && player.mode != PlayerMode::Swimming {
+        if motion.turn_rate != 0 && !matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
             let yaw = player.yaw + motion.turn_rate as f32 * ticks * std::f32::consts::TAU / 65536.0;
             player.yaw = yaw.rem_euclid(std::f32::consts::TAU);
         }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn control(
     pad: Res<ControllerState>,
     time: Res<Time>,
     clips: Option<Res<PlayerAnimations>>,
+    world: Option<Res<WorldGeometry>>,
     tuning: Res<SwimmingTuning>,
     mut players: Query<(
         &mut Player,
         &mut Motion,
         &mut WeaponState,
-        &AnimationState,
+        &mut AnimationState,
         &mut Traversal,
         &mut SubmergedMotion,
     )>,
 ) {
     let dt = time.delta_secs();
     let controls = GroundControls::read(&pad);
-    for (mut player, mut motion, mut weapon, animation, mut traversal, mut submerged) in &mut players {
+    for (mut player, mut motion, mut weapon, mut animation, mut traversal, mut submerged) in &mut players {
+        // LaraControl's water transitions precede the tick's state handler.
+        if let Some(world) = world.as_deref() {
+            match player.mode {
+                PlayerMode::Swimming => surface::leave_water(
+                    &mut player,
+                    &mut motion,
+                    &mut submerged,
+                    &mut animation,
+                    &mut traversal,
+                    world,
+                ),
+                PlayerMode::Surface | PlayerMode::Dead => {}
+                _ => surface::enter_water(
+                    &mut player,
+                    &mut motion,
+                    &mut submerged,
+                    &mut animation,
+                    &mut traversal,
+                    world,
+                    &tuning,
+                ),
+            }
+        }
+        let animation = &*animation;
         let was_running = player.mode == PlayerMode::Run;
         let was_walking = player.mode == PlayerMode::Walk;
         let was_standing =
@@ -752,6 +790,19 @@ fn control(
         let side = controls.side;
         let forward = player.forward();
         let right = Vec3::new(forward.z, 0.0, -forward.x);
+        if player.mode == PlayerMode::Surface {
+            surface::control(
+                &mut player,
+                &mut motion,
+                &mut submerged,
+                animation,
+                &mut traversal,
+                &pad,
+                clips.as_deref(),
+                &tuning,
+            );
+            continue;
+        }
         if player.mode == PlayerMode::Swimming {
             swimming::control(
                 &mut player,
@@ -924,6 +975,20 @@ fn integrate(
     let dt = time.delta_secs();
     let geometry = world.as_deref();
     for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged) in &mut players {
+        if player.mode == PlayerMode::Surface {
+            surface::step(
+                &mut player,
+                &mut motion,
+                &mut submerged,
+                &mut animation,
+                &mut traversal,
+                geometry,
+                clips.as_deref(),
+                !weapon.drawn && pad.held(Button::Cross),
+                dt,
+            );
+            continue;
+        }
         if player.mode == PlayerMode::Swimming {
             swimming::step(
                 &mut player,
@@ -1054,21 +1119,8 @@ fn integrate(
                 motion.velocity = direction * units(30.0 * ORIGINAL_FPS);
             }
         }
-        if current_floor.water && player.health > 0 {
-            player.mode = PlayerMode::Swimming;
-            motion.grounded = false;
-            motion.oxygen_seconds = (motion.oxygen_seconds - dt).max(0.0);
-            if motion.oxygen_seconds == 0.0 {
-                player.damage((dt * 150.0).ceil() as i32);
-            }
-        } else {
-            motion.oxygen_seconds = 60.0;
-            if player.mode == PlayerMode::Swimming {
-                player.mode = PlayerMode::Fall;
-            }
-        }
-        let swimming = player.mode == PlayerMode::Swimming;
-        if !motion.grounded && !swimming {
+        motion.oxygen_seconds = 60.0;
+        if !motion.grounded {
             let gravity = if -motion.velocity.y >= units(128.0 * ORIGINAL_FPS) { GRAVITY / 6.0 } else { GRAVITY };
             motion.velocity.y -= gravity * dt;
             if motion.velocity.y < 0.0 && player.health > 0 {
@@ -1084,7 +1136,7 @@ fn integrate(
             let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round() as i32;
             displacement.x = units(((engine::camera::chase::sin(angle) * speed) >> 14) as f32 * original_frames(dt));
             displacement.z = units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * original_frames(dt));
-        } else if !swimming {
+        } else {
             // Native positions are integral units. Per-axis floor is visible:
             // at the recorded oblique heading, a2-unit jump speed moves(-2,0).
             // Suppress trigonometric roundoff at exact cardinal headings.
@@ -1103,7 +1155,7 @@ fn integrate(
             PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
         );
         let passable = |hit: &FloorHit| {
-            hit.ceiling - hit.height >= if swimming { units(400.0) } else { PLAYER_HEIGHT }
+            hit.ceiling - hit.height >= PLAYER_HEIGHT
                 // Original jump.csv includes the last horizontal displacement
                 // on the landing tick. Test a descending sweep's upper endpoint
                 // so crossing the floor does not become a horizontal wall.
@@ -1163,7 +1215,7 @@ fn integrate(
                 probe[axis] = proposed[axis] + delta.signum() * PLAYER_RADIUS;
                 if floor(geometry, probe, player.room).as_ref().is_some_and(passable) {
                     player.position[axis] = proposed[axis];
-                } else if motion.grounded && !swimming {
+                } else if motion.grounded {
                     player.position[axis] = wall_contact(old[axis], proposed[axis]);
                 }
             }
@@ -1250,11 +1302,9 @@ fn integrate(
         let Some(hit) = blocked_run_floor.or_else(|| floor(geometry, player.position, player.room)) else {
             continue;
         };
-        player.room = hit.room;
         player.position.y = proposed.y;
-        if swimming {
-            player.position.y = player.position.y.clamp(hit.height, (hit.ceiling - units(400.0)).max(hit.height));
-        } else if player.position.y <= hit.height && motion.velocity.y <= 0.0 {
+        player.room = geometry.map_or(hit.room, |world| body_room(world, player.position, hit.room, 381.0));
+        if player.position.y <= hit.height && motion.velocity.y <= 0.0 {
             if !motion.grounded {
                 landing_damage(&mut player, motion.velocity);
             }
@@ -1398,6 +1448,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::WalkStopping => STANDING_CLIP,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
         PlayerMode::Rolling { .. } => 146,
+        PlayerMode::Surface => 110,
         PlayerMode::Swimming => {
             if pad.held(Button::Square) {
                 86
@@ -1525,7 +1576,7 @@ fn sync_transform(mut players: Query<(&Player, &Motion, &SubmergedMotion, &mut T
     for (player, motion, submerged, mut transform) in &mut players {
         transform.translation = player.position;
         transform.rotation = Quat::from_rotation_y(player.yaw);
-        if player.mode == PlayerMode::Swimming {
+        if matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
             transform.rotation *= Quat::from_rotation_x(-motion.pitch) * Quat::from_rotation_z(-submerged.bank);
         }
     }

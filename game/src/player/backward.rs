@@ -182,14 +182,7 @@ fn fall(
     // Hop-fall collision0x8003B9A8 keeps the backward heading and lands
     // without a second animation advance. The next tick accepts goal2.
     if let Some(hit) = world.floor_at(player.position, player.room) {
-        player.room = hit.room;
-        if hit.water {
-            // Preserve the existing provisional water handoff. Entry and
-            // swimming behavior are the next separate evidence milestone.
-            player.mode = PlayerMode::Swimming;
-            motion.grounded = false;
-            return;
-        }
+        player.room = super::body_room(world, player.position, hit.room, 381.0);
         if player.position.y <= hit.height && motion.velocity.y < 0.0 {
             landing_damage(player, motion.velocity);
             player.position.y = hit.height;

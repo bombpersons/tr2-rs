@@ -96,7 +96,7 @@ Wall/ceiling/floor deflection, current volumes, water entry, surface movement,
 climbing out, underwater roll, weapons and fatal drowning remain unverified.
 The controller retains a bounded floor/body-clearance fallback; it does not
 claim that fallback reproduces the original `0x80045CB8` collision routine.
-The existing water-entry/surface/save reconstruction also remains provisional.
+Surfacing, surface swimming, the dive and deep-water entry were later ported in [a separate verified change](surface-evidence.md).
 
 All-features workspace tests and Clippy completed; existing unrelated warnings
 remain. The engine sandbox ran offscreen. The editor Home Lara stroke preview

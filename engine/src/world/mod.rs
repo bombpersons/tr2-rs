@@ -216,6 +216,43 @@ impl WorldGeometry {
         })
     }
 
+    /// Height of the water surface over (x, z), level metres, or `None`
+    /// without water there. Inside a water room it is the ceiling of the
+    /// highest water sector in the stack; in a dry room it is the floor of
+    /// the lowest dry sector above water (PSX 0x8001E6BC). Only horizontal
+    /// portals are followed to find the starting room.
+    pub fn water_surface(&self, pos: Vec3, room: usize) -> Option<f32> {
+        let x = (pos.x * 1024.0).floor() as i32;
+        let z = (pos.z * 1024.0).floor() as i32;
+        let rooms = &self.data.rooms;
+        let mut room = room;
+        for _ in 0..rooms.len().min(64) {
+            let sector = self.sector(room, x, z)?;
+            match self.data.floor_info(sector).portal.filter(|&r| r != room && r < rooms.len()) {
+                Some(next) => room = next,
+                None => break,
+            }
+        }
+        let mut sector = self.sector(room, x, z)?;
+        if rooms.get(room)?.water {
+            for _ in 0..64 {
+                match sector.above.filter(|&r| rooms.get(r).is_some_and(|r| r.water)) {
+                    Some(above) => sector = self.sector(above, x, z)?,
+                    None => break,
+                }
+            }
+            return Some(-sector.ceiling as f32 / 1024.0);
+        }
+        for _ in 0..64 {
+            let below = sector.below?;
+            if rooms.get(below)?.water {
+                return Some(-sector.floor as f32 / 1024.0);
+            }
+            sector = self.sector(below, x, z)?;
+        }
+        None
+    }
+
     /// Select rooms connected by nearby portals. Geometry remains real world
     /// meshes; this only prevents distant rooms showing through open portals.
     pub fn visible_rooms(&self, room: usize, pos: Vec3) -> Vec<bool> {
