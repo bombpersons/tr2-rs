@@ -37,11 +37,74 @@ impl ItemLight {
     }
 }
 
-/// S_CalculateLight 0x8006c6f4 (static-light branch, room light mode 0): each
-/// room light gives intensity*f^2/(d^2/4096 + f^2) with f^2 = falloff^2>>12;
-/// the brightest wins and is halved. Dynamic lights (0x8008b240) and the
+/// A short-lived point light (muzzle flashes, explosions), in level units
+/// with y down. The original keeps up to ten per frame in a table filled by
+/// 0x80028A28 and cleared every frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
+pub struct DynamicLight {
+    pub position: IVec3,
+    /// Brightness at the centre is `1 << intensity` (8191 = darkest shade).
+    pub intensity: u32,
+    /// Reach: the light ends `1 << falloff` units away, fading with the
+    /// squared distance.
+    pub falloff: u32,
+}
+
+impl DynamicLight {
+    /// Brightness at `point`: `2^intensity - d^2 / 2^(2*falloff - intensity)`
+    /// inside the cube and sphere of radius `2^falloff`, else none
+    /// (0x8006CB08..0x8006CBC8 for items, 0x8006CCBC for static meshes).
+    pub fn at(&self, point: IVec3) -> Option<i32> {
+        let reach = 1i64 << self.falloff;
+        let d = (point - self.position).as_i64vec3();
+        if d.abs().max_element() > reach {
+            return None;
+        }
+        let squared = d.length_squared();
+        let shift = (2 * self.falloff).saturating_sub(self.intensity);
+        (squared <= reach * reach).then(|| ((1i64 << self.intensity) - (squared >> shift)) as i32)
+    }
+
+    /// A room vertex's grey shade byte lit by this light (0x8006CE30):
+    /// brightness / 32 is added, clamped to 0..=255. Shade 255 is left alone.
+    pub fn light_room_vertex(&self, shade: u8, point: IVec3) -> u8 {
+        match self.at(point) {
+            Some(light) if shade != 0xff => (i32::from(shade) + ((light << 16) >> 21)).clamp(0, 255) as u8,
+            _ => shade,
+        }
+    }
+
+    /// Whether the light can reach a room's floor area at all: the original
+    /// skips rooms whose sectors, less the outer walls, its cube misses
+    /// (0x8006CF0C..0x8006CF68). `origin` is the room's, `sectors` its x/z
+    /// sector counts.
+    pub fn reaches_room(&self, origin: IVec3, sectors: [i32; 2]) -> bool {
+        let reach = 1i32 << self.falloff;
+        let (x, z) = (self.position.x - origin.x, self.position.z - origin.z);
+        x - reach <= (sectors[0] - 1) * 1024
+            && z - reach <= (sectors[1] - 1) * 1024
+            && x + reach > 1023
+            && z + reach > 1023
+    }
+}
+
+/// This frame's [`DynamicLight`]s. Games replace them every frame; the
+/// renderer lights items and (with a room mesh policy) room vertices.
+#[derive(Resource, Reflect, Clone, Debug, Default, PartialEq)]
+#[reflect(Resource)]
+pub struct DynamicLights(pub Vec<DynamicLight>);
+
+/// S_CalculateLight 0x8006c6f4 (room light mode 0): each room light gives
+/// intensity*f^2/(d^2/4096 + f^2) with f^2 = falloff^2>>12; the brightest
+/// wins. Each dynamic light in reach adds its brightness and, when brighter
+/// than the best so far, takes over the direction. The sum is halved. The
 /// flickering light modes are not yet ported.
 pub fn item_light(data: &Level, room: usize, point: IVec3) -> ItemLight {
+    item_light_with(data, room, point, &[])
+}
+
+/// [`item_light`] with this frame's dynamic lights.
+pub fn item_light_with(data: &Level, room: usize, point: IVec3, dynamic: &[DynamicLight]) -> ItemLight {
     let Some(room) = data.rooms.get(room) else { return ItemLight::default() };
     let mut brightest = 0i64;
     let mut offset = IVec3::ZERO;
@@ -59,7 +122,19 @@ pub fn item_light(data: &Level, room: usize, point: IVec3) -> ItemLight {
             offset = d.as_ivec3();
         }
     }
-    let strength = (brightest >> 1) as i32;
+    let mut total = brightest;
+    let mut best = brightest;
+    for light in dynamic {
+        if let Some(shade) = light.at(point) {
+            let shade = i64::from(shade);
+            if best < shade {
+                best = shade;
+                offset = point - light.position;
+            }
+            total += shade;
+        }
+    }
+    let strength = (total >> 1) as i32;
     let ambient = room.ambient.shade;
     if strength == 0 {
         return ItemLight { ambient, strength: 0, direction: Vec3::ZERO };
@@ -75,6 +150,23 @@ mod tests {
     fn room_shade_uses_the_low_byte_with_128_neutral() {
         // A RAM room vertex 0x14520401 (first game) draws grey 0x52.
         assert_eq!(room_vertex_shade(0x1452), 82.0 / 128.0);
+    }
+
+    #[test]
+    fn dynamic_lights_fade_with_squared_distance_to_their_reach() {
+        let light = DynamicLight { position: IVec3::new(1000, 0, 0), intensity: 12, falloff: 11 };
+        assert_eq!(light.at(light.position), Some(4096));
+        // 4096 - 1024^2 >> 10.
+        assert_eq!(light.at(IVec3::new(2024, 0, 0)), Some(3072));
+        assert_eq!(light.at(IVec3::new(3048, 0, 0)), Some(0));
+        assert_eq!(light.at(IVec3::new(3049, 0, 0)), None, "outside the cube");
+        assert_eq!(light.at(IVec3::new(2600, 0, 1300)), None, "inside the cube, outside the sphere");
+        // Rooms add a 32nd, clamped, and leave full-bright vertices alone.
+        assert_eq!(light.light_room_vertex(100, light.position), 228);
+        assert_eq!(light.light_room_vertex(200, light.position), 255);
+        assert_eq!(light.light_room_vertex(255, light.position), 255);
+        assert!(light.reaches_room(IVec3::ZERO, [3, 3]));
+        assert!(!light.reaches_room(IVec3::new(4096, 0, 0), [3, 3]));
     }
 
     #[test]

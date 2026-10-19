@@ -97,6 +97,13 @@ pub struct Avatar {
     /// Weapons drawn: combat triggers need it.
     pub armed: bool,
     pub alive: bool,
+    /// The avatar is aiming: the camera frames it from behind its aim, this
+    /// yaw/pitch offset (65536 per turn) from its facing. `None` is the
+    /// ordinary chase camera.
+    pub aim: Option<[i16; 2]>,
+    /// The avatar's state asks the camera to read floors and ceilings as
+    /// they are this tick, without flattening steep slopes.
+    pub camera_exact_slopes: bool,
 }
 
 pub struct SchedulePlugin;

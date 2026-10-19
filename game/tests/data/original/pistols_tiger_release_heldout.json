@@ -1,0 +1,666 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc via psx native; no pokes",
+  "scope": "Pistol targeting, arm aim, shots and tiger 18 hit points per field",
+  "heldout_after_implementation": true,
+  "level": "wall",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    ".psx/pistols_tiger_start/state.bin",
+    "--frames",
+    "300",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"TRIANGLE\"], \"until\": 4}, {\"frame\": 40, \"buttons\": [\"RIGHT\"], \"until\": 92}, {\"frame\": 100, \"buttons\": [\"CROSS\"], \"until\": 130}, {\"frame\": 160, \"buttons\": [\"CROSS\"], \"until\": 200}, {\"frame\": 200, \"buttons\": [\"CROSS\", \"RIGHT\"], \"until\": 230}, {\"frame\": 230, \"buttons\": [\"CROSS\"], \"until\": 300}]",
+    "--snapshot-every",
+    "2",
+    "--watch",
+    "80089d54:4",
+    "--save-state",
+    "--out",
+    "validation/pistols/tiger_release_heldout",
+    "--summary",
+    "--sample",
+    "8019cf64:i32:x",
+    "--sample",
+    "8019cf68:i32:y",
+    "--sample",
+    "8019cf6c:i32:z",
+    "--sample",
+    "8019cf72:i16:yaw",
+    "--sample",
+    "8019cf44:i16:animation",
+    "--sample",
+    "8019cf46:i16:animation_frame",
+    "--sample",
+    "8019cf3e:i16:state",
+    "--sample",
+    "8019cf40:i16:goal",
+    "--sample",
+    "8019cf48:i16:room",
+    "--sample",
+    "8019cf4e:i16:speed",
+    "--sample",
+    "8019cf50:i16:fall_speed",
+    "--sample",
+    "8019cf52:i16:health",
+    "--sample",
+    "8008c570:i16:turn_rate",
+    "--sample",
+    "8008b258:i32:camera_x",
+    "--sample",
+    "8008b25c:i32:camera_y",
+    "--sample",
+    "8008b260:i32:camera_z",
+    "--sample",
+    "8008b268:i32:target_x",
+    "--sample",
+    "8008b26c:i32:target_y",
+    "--sample",
+    "8008b270:i32:target_z",
+    "--sample",
+    "8008aad4:x32:input",
+    "--sample",
+    "8008c4ea:i16:gun_status",
+    "--sample",
+    "8008c4ec:i16:gun_type",
+    "--sample",
+    "8008c4ee:i16:request_gun",
+    "--sample",
+    "8008c584:i16:left_frame",
+    "--sample",
+    "8008c598:i16:right_frame",
+    "--sample",
+    "8008c590:i16:left_flash",
+    "--sample",
+    "8008c5a4:i16:right_flash",
+    "--sample",
+    "8008c5a8:i32:pistol_ammo",
+    "--sample",
+    "8008c568:x32:target",
+    "--sample",
+    "8008c58a:i16:left_yaw",
+    "--sample",
+    "8008c58c:i16:left_pitch",
+    "--sample",
+    "8008c59e:i16:right_yaw",
+    "--sample",
+    "8008c5a0:i16:right_pitch",
+    "--sample",
+    "8008c574:i16:head_yaw",
+    "--sample",
+    "8008c576:i16:head_pitch",
+    "--sample",
+    "8008c57a:i16:torso_yaw",
+    "--sample",
+    "8008c57c:i16:torso_pitch",
+    "--sample",
+    "8019cecc:i32:tiger_x",
+    "--sample",
+    "8019ced0:i32:tiger_y",
+    "--sample",
+    "8019ced4:i32:tiger_z",
+    "--sample",
+    "8019ceda:i16:tiger_yaw",
+    "--sample",
+    "8019ceac:i16:tiger_animation",
+    "--sample",
+    "8019ceae:i16:tiger_frame",
+    "--sample",
+    "8019ceb0:i16:tiger_room",
+    "--sample",
+    "8019ceba:i16:tiger_hp",
+    "--sample",
+    "8019cea6:i16:tiger_state",
+    "--sample",
+    "8019cee0:x32:tiger_flags",
+    "--sample",
+    "801a29c8:i16:slot0",
+    "--sample",
+    "8008c56c:i16:aim_yaw",
+    "--sample",
+    "8008c56e:i16:aim_pitch",
+    "--sample",
+    "8008c588:i16:left_lock",
+    "--sample",
+    "8008c59c:i16:right_lock",
+    "--sample",
+    "80089d54:x32:seed"
+  ],
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "TRIANGLE"
+      ],
+      "until": 4
+    },
+    {
+      "frame": 40,
+      "buttons": [
+        "RIGHT"
+      ],
+      "until": 92
+    },
+    {
+      "frame": 100,
+      "buttons": [
+        "CROSS"
+      ],
+      "until": 130
+    },
+    {
+      "frame": 160,
+      "buttons": [
+        "CROSS"
+      ],
+      "until": 200
+    },
+    {
+      "frame": 200,
+      "buttons": [
+        "CROSS",
+        "RIGHT"
+      ],
+      "until": 230
+    },
+    {
+      "frame": 230,
+      "buttons": [
+        "CROSS"
+      ],
+      "until": 300
+    }
+  ],
+  "samples": [
+    "8019cf64:i32:x",
+    "8019cf68:i32:y",
+    "8019cf6c:i32:z",
+    "8019cf72:i16:yaw",
+    "8019cf44:i16:animation",
+    "8019cf46:i16:animation_frame",
+    "8019cf3e:i16:state",
+    "8019cf40:i16:goal",
+    "8019cf48:i16:room",
+    "8019cf4e:i16:speed",
+    "8019cf50:i16:fall_speed",
+    "8019cf52:i16:health",
+    "8008c570:i16:turn_rate",
+    "8008b258:i32:camera_x",
+    "8008b25c:i32:camera_y",
+    "8008b260:i32:camera_z",
+    "8008b268:i32:target_x",
+    "8008b26c:i32:target_y",
+    "8008b270:i32:target_z",
+    "8008aad4:x32:input",
+    "8008c4ea:i16:gun_status",
+    "8008c4ec:i16:gun_type",
+    "8008c4ee:i16:request_gun",
+    "8008c584:i16:left_frame",
+    "8008c598:i16:right_frame",
+    "8008c590:i16:left_flash",
+    "8008c5a4:i16:right_flash",
+    "8008c5a8:i32:pistol_ammo",
+    "8008c568:x32:target",
+    "8008c58a:i16:left_yaw",
+    "8008c58c:i16:left_pitch",
+    "8008c59e:i16:right_yaw",
+    "8008c5a0:i16:right_pitch",
+    "8008c574:i16:head_yaw",
+    "8008c576:i16:head_pitch",
+    "8008c57a:i16:torso_yaw",
+    "8008c57c:i16:torso_pitch",
+    "8019cecc:i32:tiger_x",
+    "8019ced0:i32:tiger_y",
+    "8019ced4:i32:tiger_z",
+    "8019ceda:i16:tiger_yaw",
+    "8019ceac:i16:tiger_animation",
+    "8019ceae:i16:tiger_frame",
+    "8019ceb0:i16:tiger_room",
+    "8019ceba:i16:tiger_hp",
+    "8019cea6:i16:tiger_state",
+    "8019cee0:x32:tiger_flags",
+    "801a29c8:i16:slot0",
+    "8008c56c:i16:aim_yaw",
+    "8008c56e:i16:aim_pitch",
+    "8008c588:i16:left_lock",
+    "8008c59c:i16:right_lock",
+    "80089d54:x32:seed"
+  ],
+  "build": {
+    "id": "src-a3beb4f814bc417d-release",
+    "profile": "release",
+    "source_sha256": "a3beb4f814bc417d1c270692875e91f541ea371d6a6102e167fd61c3469f3c2d",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.0"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.0",
+    "bios": "/home/maisy/.local/share/psx/bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": ".psx/pistols_tiger_start/state.bin",
+    "media": "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 8,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "frames": {
+    "end": 21940,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 300,
+    "requested": 300,
+    "start": 21640,
+    "unit": "vsync"
+  },
+  "checkpoint": ".psx/pistols_tiger_start/state.bin",
+  "checkpoint_sha256": "1cad03b9f390e1759dc80b595e962bc3dc40173ff464b201354ba895de279864",
+  "checkpoint_preparation": {
+    "source": ".psx/wall_game/state.bin",
+    "fields": 640,
+    "input": [
+      {
+        "frame": 0,
+        "buttons": [
+          "UP"
+        ],
+        "until": 420
+      },
+      {
+        "frame": 450,
+        "buttons": [
+          "RIGHT"
+        ],
+        "until": 500
+      },
+      {
+        "frame": 530,
+        "buttons": [
+          "UP"
+        ],
+        "until": 580
+      }
+    ]
+  },
+  "samples_sha256": "5696e861a4f7c2f3839de8014f6be7ae442135c2c94e8b332407f34bce4d4710",
+  "random_writes": [
+    {
+      "frame": 21741,
+      "old": 3966518878,
+      "value": 4064201279
+    },
+    {
+      "frame": 21741,
+      "old": 4064201279,
+      "value": 2987753228
+    },
+    {
+      "frame": 21741,
+      "old": 2987753228,
+      "value": 2938433621
+    },
+    {
+      "frame": 21741,
+      "old": 2938433621,
+      "value": 1253206634
+    },
+    {
+      "frame": 21761,
+      "old": 1253206634,
+      "value": 1650445147
+    },
+    {
+      "frame": 21761,
+      "old": 1650445147,
+      "value": 1981906936
+    },
+    {
+      "frame": 21761,
+      "old": 1981906936,
+      "value": 1930509521
+    },
+    {
+      "frame": 21761,
+      "old": 1930509521,
+      "value": 1501872950
+    },
+    {
+      "frame": 21801,
+      "old": 1501872950,
+      "value": 1120256567
+    },
+    {
+      "frame": 21801,
+      "old": 1120256567,
+      "value": 3706364836
+    },
+    {
+      "frame": 21801,
+      "old": 3706364836,
+      "value": 3264992525
+    },
+    {
+      "frame": 21801,
+      "old": 3264992525,
+      "value": 1817304258
+    },
+    {
+      "frame": 21821,
+      "old": 1817304258,
+      "value": 271207123
+    },
+    {
+      "frame": 21821,
+      "old": 271207123,
+      "value": 922768912
+    },
+    {
+      "frame": 21821,
+      "old": 922768912,
+      "value": 633189641
+    },
+    {
+      "frame": 21821,
+      "old": 633189641,
+      "value": 753206030
+    },
+    {
+      "frame": 21841,
+      "old": 753206030,
+      "value": 3477389615
+    },
+    {
+      "frame": 21841,
+      "old": 3477389615,
+      "value": 2356986684
+    },
+    {
+      "frame": 21841,
+      "old": 2356986684,
+      "value": 285448389
+    },
+    {
+      "frame": 21841,
+      "old": 285448389,
+      "value": 2222080538
+    },
+    {
+      "frame": 21845,
+      "old": 2222080538,
+      "value": 4008067403
+    },
+    {
+      "frame": 21845,
+      "old": 4008067403,
+      "value": 1794168616
+    },
+    {
+      "frame": 21845,
+      "old": 1794168616,
+      "value": 2064251969
+    },
+    {
+      "frame": 21845,
+      "old": 2064251969,
+      "value": 157443558
+    },
+    {
+      "frame": 21845,
+      "old": 157443558,
+      "value": 802531111
+    },
+    {
+      "frame": 21845,
+      "old": 802531111,
+      "value": 2786082260
+    },
+    {
+      "frame": 21845,
+      "old": 2786082260,
+      "value": 1303976829
+    },
+    {
+      "frame": 21845,
+      "old": 1303976829,
+      "value": 2111765106
+    },
+    {
+      "frame": 21847,
+      "old": 2111765106,
+      "value": 778800835
+    },
+    {
+      "frame": 21847,
+      "old": 778800835,
+      "value": 1998414656
+    },
+    {
+      "frame": 21849,
+      "old": 1998414656,
+      "value": 2940269177
+    },
+    {
+      "frame": 21849,
+      "old": 2940269177,
+      "value": 2870889406
+    },
+    {
+      "frame": 21851,
+      "old": 2870889406,
+      "value": 3924710431
+    },
+    {
+      "frame": 21851,
+      "old": 3924710431,
+      "value": 655717228
+    },
+    {
+      "frame": 21853,
+      "old": 655717228,
+      "value": 3738516789
+    },
+    {
+      "frame": 21853,
+      "old": 3738516789,
+      "value": 2775541194
+    },
+    {
+      "frame": 21855,
+      "old": 2775541194,
+      "value": 1705907003
+    },
+    {
+      "frame": 21855,
+      "old": 1705907003,
+      "value": 798775896
+    },
+    {
+      "frame": 21857,
+      "old": 798775896,
+      "value": 556365745
+    },
+    {
+      "frame": 21857,
+      "old": 556365745,
+      "value": 1158026390
+    },
+    {
+      "frame": 21859,
+      "old": 1158026390,
+      "value": 1071687703
+    },
+    {
+      "frame": 21859,
+      "old": 1071687703,
+      "value": 2124989444
+    },
+    {
+      "frame": 21861,
+      "old": 2124989444,
+      "value": 4172078573
+    },
+    {
+      "frame": 21861,
+      "old": 4172078573,
+      "value": 1602675746
+    },
+    {
+      "frame": 21861,
+      "old": 1602675746,
+      "value": 3661475507
+    },
+    {
+      "frame": 21861,
+      "old": 3661475507,
+      "value": 1223695472
+    },
+    {
+      "frame": 21861,
+      "old": 1223695472,
+      "value": 2777050089
+    },
+    {
+      "frame": 21861,
+      "old": 2777050089,
+      "value": 240328814
+    },
+    {
+      "frame": 21863,
+      "old": 240328814,
+      "value": 1884979983
+    },
+    {
+      "frame": 21863,
+      "old": 1884979983,
+      "value": 2534576028
+    },
+    {
+      "frame": 21863,
+      "old": 2534576028,
+      "value": 2840649125
+    },
+    {
+      "frame": 21865,
+      "old": 2840649125,
+      "value": 227857786
+    },
+    {
+      "frame": 21867,
+      "old": 227857786,
+      "value": 935739691
+    },
+    {
+      "frame": 21869,
+      "old": 935739691,
+      "value": 2038892936
+    },
+    {
+      "frame": 21871,
+      "old": 2038892936,
+      "value": 3398872865
+    },
+    {
+      "frame": 21873,
+      "old": 3398872865,
+      "value": 708422
+    },
+    {
+      "frame": 21875,
+      "old": 708422,
+      "value": 1709556999
+    },
+    {
+      "frame": 21877,
+      "old": 1709556999,
+      "value": 2403808820
+    },
+    {
+      "frame": 21879,
+      "old": 2403808820,
+      "value": 3557694557
+    },
+    {
+      "frame": 21881,
+      "old": 3557694557,
+      "value": 596941266
+    },
+    {
+      "frame": 21881,
+      "old": 596941266,
+      "value": 3079645859
+    },
+    {
+      "frame": 21881,
+      "old": 3079645859,
+      "value": 1262191008
+    },
+    {
+      "frame": 21881,
+      "old": 1262191008,
+      "value": 194322777
+    },
+    {
+      "frame": 21881,
+      "old": 194322777,
+      "value": 3263070494
+    },
+    {
+      "frame": 21883,
+      "old": 3263070494,
+      "value": 3597159935
+    },
+    {
+      "frame": 21885,
+      "old": 3597159935,
+      "value": 610736076
+    },
+    {
+      "frame": 21887,
+      "old": 610736076,
+      "value": 485325333
+    },
+    {
+      "frame": 21889,
+      "old": 485325333,
+      "value": 1837994282
+    },
+    {
+      "frame": 21891,
+      "old": 1837994282,
+      "value": 3086863131
+    },
+    {
+      "frame": 21893,
+      "old": 3086863131,
+      "value": 2631132344
+    },
+    {
+      "frame": 21895,
+      "old": 2631132344,
+      "value": 4097352337
+    },
+    {
+      "frame": 21901,
+      "old": 4097352337,
+      "value": 3402339830
+    },
+    {
+      "frame": 21901,
+      "old": 3402339830,
+      "value": 3533962743
+    },
+    {
+      "frame": 21901,
+      "old": 3533962743,
+      "value": 3409876068
+    },
+    {
+      "frame": 21901,
+      "old": 3409876068,
+      "value": 3291731661
+    }
+  ]
+}

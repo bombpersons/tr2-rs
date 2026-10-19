@@ -49,6 +49,10 @@ pub struct CameraState {
     pub fixed_camera: Option<usize>,
     /// None means untimed; zero means expired until this trigger is left.
     pub ticks_left: Option<u32>,
+    /// Squared horizontal chase distance (0x8008b298): written by the chase
+    /// camera only, so the aiming camera's shift reuses the last chase value.
+    #[reflect(ignore)]
+    chase_distance2: Option<i32>,
     last_camera: Option<usize>,
     #[reflect(ignore)]
     used: BTreeSet<usize>,
@@ -76,7 +80,11 @@ impl Plugin for CameraRulesPlugin {
         );
         app.init_resource::<CameraCues>().init_resource::<CameraState>().init_resource::<CameraStartup>().add_systems(
             FixedUpdate,
-            update_camera.in_set(CameraSystems::Update).in_set(WorldSystems::Camera).in_set(GameSystems::Game).run_if(simulation_enabled),
+            update_camera
+                .in_set(CameraSystems::Update)
+                .in_set(WorldSystems::Camera)
+                .in_set(GameSystems::Game)
+                .run_if(simulation_enabled),
         );
     }
 }
@@ -132,8 +140,8 @@ fn actor_target(data: &Level, player: &Avatar, animation: Option<&AnimationState
 /// These distances are provisional port choices, not newly verified PSX rules.
 pub fn chase_pose(player: &Avatar, world: Option<&WorldGeometry>, look: bool) -> (Vec3, Vec3, usize) {
     let target = player.position + Vec3::Y * 0.65;
-    let mut desired =
-        target - Vec3::new(player.yaw.sin(), 0.0, player.yaw.cos()) * if look { 1.0 } else { 2.25 } + Vec3::Y * if look { 0.6 } else { 0.55 };
+    let mut desired = target - Vec3::new(player.yaw.sin(), 0.0, player.yaw.cos()) * if look { 1.0 } else { 2.25 }
+        + Vec3::Y * if look { 0.6 } else { 0.55 };
     let mut room = player.room;
     if let Some(world) = world {
         let mut safe = target;
@@ -158,20 +166,68 @@ fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, anim
     let wanted = actor_target(&world.data, player, animation);
     let target_y = if camera.initialized { approach_eye(camera.target, wanted, 4).y } else { wanted.y };
     let mut target = Point::from_world(wanted.with_y(target_y), player.room);
-    // 0x8001a154..0x8001a198: camera geometry stays on unless the target is
-    // below its floor.
-    let hit = world.floor_at_for(target.world(), player.room, true);
+    // 0x80019CF4 turns camera geometry on unless the avatar's state asked
+    // for exact slopes (camera flags 2); 0x8001a154..0x8001a198 turn it off
+    // again when the target is below its floor.
+    let geometry = !player.camera_exact_slopes;
+    let hit = world.floor_at_for(target.world(), player.room, geometry);
     target.room = hit.map_or(player.room, |hit| hit.room);
-    let space = chase::Space { world, camera: hit.is_some_and(|hit| hit.height <= target.world().y) };
+    let space = chase::Space { world, camera: geometry && hit.is_some_and(|hit| hit.height <= target.world().y) };
     let mut eye = Point::from_world(camera.position, camera.room);
     let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
     let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, 0, chase::CHASE_DISTANCE);
+    camera.chase_distance2 = Some(distance2);
     if !camera.initialized {
         eye = ideal;
     }
     chase::shift_ideal(space, target, eye, &mut ideal, distance2);
     // 0x8001a22c: divisor 10 for chase.
     let offset = chase::move_eye(space, target, &mut eye, ideal, 10);
+    camera.position = eye.world();
+    camera.target = target.world();
+    camera.room = eye.room;
+    camera.view_offset = -offset as f32 / 1024.0;
+}
+
+/// Distance from the target to the aiming eye (0x80019614 stores 0xa00).
+pub const AIM_DISTANCE: i32 = 2560;
+/// The aiming target sits this far above the chase target (0x8001A050).
+const AIM_RAISE: i32 = 256;
+/// Eye approach divisor while aiming (0x8001A068: speed 8 for camera type 3).
+const AIM_DIVISOR: i32 = 8;
+
+/// Combat framing (0x8001a038..0x8001a07c then 0x80019578): the target is
+/// the avatar's x/z, its height a quarter of the way toward 256 above the
+/// chase height each tick (an arithmetic shift, so it rounds down), and the
+/// eye sits 2560 behind the aim direction, then shifts and moves as the
+/// chase eye does at divisor 8.
+fn aim(
+    camera: &mut CameraState,
+    world: &WorldGeometry,
+    player: &Avatar,
+    animation: Option<&AnimationState>,
+    aim: [i16; 2],
+) {
+    use chase::Point;
+    let wanted = Point::from_world(actor_target(&world.data, player, animation), player.room);
+    let current = Point::from_world(camera.target, player.room);
+    let y =
+        if camera.initialized { current.y + ((wanted.y - AIM_RAISE - current.y) >> 2) } else { wanted.y - AIM_RAISE };
+    let target = Point { y, ..wanted };
+    // 0x80019CF4: camera flags 2 leave the slope-flattening flag clear.
+    let space = chase::Space { world, camera: !player.camera_exact_slopes };
+    let mut eye = Point::from_world(camera.position, camera.room);
+    let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32 + i32::from(aim[0]);
+    let (mut ideal, _) = chase::orbit_eye(target, eye.room, yaw, i32::from(aim[1]), AIM_DISTANCE);
+    if !camera.initialized {
+        eye = ideal;
+    }
+    // Before any chase tick the stored value is the level's resting chase
+    // distance: 1536^2 in .psx/wall_game and unchanged after 110 combat ticks
+    // (validation/pistols/run_fire_heldout/ram.bin).
+    let resting = chase::CHASE_DISTANCE * chase::CHASE_DISTANCE;
+    chase::shift_ideal(space, target, eye, &mut ideal, camera.chase_distance2.unwrap_or(resting));
+    let offset = chase::move_eye(space, target, &mut eye, ideal, AIM_DIVISOR);
     camera.position = eye.world();
     camera.target = target.world();
     camera.room = eye.room;
@@ -212,8 +268,7 @@ fn update_camera(
         let eye = position(record.position);
         // 0x8001f3ec: authored speed is 8*n+1 on activation. The end-of-tick
         // reset at 0x8001a22c restores divisor 10 for continuing fixed shots.
-        let divisor =
-            if previous == Some(cue.index) && !restarting { 10 } else { u32::from(cue.speed) * 8 + 1 };
+        let divisor = if previous == Some(cue.index) && !restarting { 10 } else { u32::from(cue.speed) * 8 + 1 };
         if !camera.initialized {
             let (eye, target, _) = chase_pose(player, Some(&world), false);
             camera.position = eye;
@@ -236,6 +291,8 @@ fn update_camera(
         camera.target = target;
         camera.room = room;
         camera.view_offset = 0.0;
+    } else if let Some(offset) = player.aim {
+        aim(&mut camera, &world, player, animation, offset);
     } else {
         follow(&mut camera, &world, player, animation);
     }

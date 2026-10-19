@@ -404,12 +404,76 @@ fn rotation(a: [u16; 3]) -> Quat {
     Quat::from_rotation_y(y) * Quat::from_rotation_x(-x) * Quat::from_rotation_z(-z)
 }
 
-fn bone_transforms(model: &Model, pose: &Pose) -> Vec<Transform> {
+/// A model frame's key: a frame number counted across the model's clips
+/// (each clip covers `frame_start..=frame_end`), as `(clip, key index)`.
+/// Frames between keys use the key before them.
+pub fn model_frame_key(data: &Level, model: &Model, frame: usize) -> Option<(usize, usize)> {
+    (model.animations[0]..model.animations[1].min(data.animations.len())).find_map(|index| {
+        let clip = &data.animations[index];
+        let key = frame.checked_sub(clip.frame_start)? / clip.frame_rate.max(1);
+        (frame <= clip.frame_end && key < clip.poses.len()).then_some((index, key))
+    })
+}
+
+/// How a presentation layer changes one joint of an animated model, on top
+/// of its clip. The default changes nothing.
+///
+/// A joint's local rotation is `before * key * after`, where `key` is its
+/// clip key (or the [`keys`](Self::keys) frame instead). With
+/// [`from_root`](Self::from_root) the joint still hangs at its offset from
+/// the parent, but takes its orientation from the model root rather than
+/// from the parent, so the parent's turns do not carry over to it or its
+/// children.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Reflect)]
+pub struct JointPose {
+    /// Take this joint's key from `(clip, key index)` of another clip
+    /// (usually another model with the same skeleton) instead of its own.
+    pub keys: Option<(usize, usize)>,
+    pub from_root: bool,
+    /// Extra turns, `[x, y, z]` binary angles (65536 per turn) applied in the
+    /// same y, x, z order as clip keys.
+    pub before: [i16; 3],
+    pub after: [i16; 3],
+}
+
+impl JointPose {
+    fn is_identity(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// Per-joint [`JointPose`]s for a posed model's root entity, indexed by
+/// joint. Missing entries leave their joint to the clip. Presentation only:
+/// rules that need joint positions pose models without it.
+#[derive(Component, Reflect, Clone, Debug, Default, PartialEq)]
+#[reflect(Component)]
+pub struct PoseOverrides(pub Vec<JointPose>);
+
+/// A turn by `[x, y, z]` binary angles in clip-key order (y, then x, then z),
+/// as a rotation in level space (y up).
+pub fn joint_turn(angles: [i16; 3]) -> Quat {
+    rotation(angles.map(|a| a as u16))
+}
+
+fn bone_transforms(data: &Level, model: &Model, pose: &Pose, overrides: &[JointPose]) -> Vec<Transform> {
     let mut transforms = Vec::<Transform>::with_capacity(model.meshes.len());
     for (i, j) in model.joints.iter().enumerate() {
-        let q = rotation(pose.angles.get(i).copied().unwrap_or_default());
+        let joint = overrides.get(i).copied().unwrap_or_default();
+        let angles = joint
+            .keys
+            .and_then(|(clip, key)| data.animations.get(clip)?.poses.get(key)?.angles.get(i).copied())
+            .or_else(|| pose.angles.get(i).copied())
+            .unwrap_or_default();
+        let q = if joint.is_identity() {
+            rotation(angles)
+        } else {
+            joint_turn(joint.before) * rotation(angles) * joint_turn(joint.after)
+        };
         let local = Transform::from_translation(position(if i == 0 { pose.root } else { j.offset })).with_rotation(q);
         let t = match j.parent {
+            Some(parent) if joint.from_root => {
+                Transform::from_translation(transforms[parent].transform_point(local.translation)).with_rotation(q)
+            }
             Some(parent) => transforms[parent].mul_transform(local),
             None => local,
         };
@@ -421,13 +485,25 @@ fn bone_transforms(model: &Model, pose: &Pose) -> Vec<Transform> {
 /// Bone transforms relative to the model root (level space, y up), with
 /// keys interpolated linearly.
 pub fn model_pose(data: &Level, model: &Model, anim: usize, frame: f32) -> Vec<Transform> {
+    model_pose_with(data, model, anim, frame, &[])
+}
+
+/// [`model_pose`] with per-joint presentation overrides ([`PoseOverrides`]).
+/// Override keys are not interpolated; the joints they hang from are.
+pub fn model_pose_with(
+    data: &Level,
+    model: &Model,
+    anim: usize,
+    frame: f32,
+    overrides: &[JointPose],
+) -> Vec<Transform> {
     let clip = data.animations.get(anim).filter(|_| (model.animations[0]..model.animations[1]).contains(&anim));
     if let Some(clip) = clip.filter(|c| !c.poses.is_empty()) {
         let key = frame / clip.frame_rate.max(1) as f32;
         let i = (key.floor() as usize).min(clip.poses.len() - 1);
         let j = (i + 1).min(clip.poses.len() - 1);
-        let first = bone_transforms(model, &clip.poses[i]);
-        let second = bone_transforms(model, &clip.poses[j]);
+        let first = bone_transforms(data, model, &clip.poses[i], overrides);
+        let second = bone_transforms(data, model, &clip.poses[j], overrides);
         first
             .into_iter()
             .zip(second)
@@ -438,7 +514,7 @@ pub fn model_pose(data: &Level, model: &Model, anim: usize, frame: f32) -> Vec<T
             })
             .collect()
     } else if let Some(pose) = &model.initial_pose {
-        bone_transforms(model, pose)
+        bone_transforms(data, model, pose, overrides)
     } else {
         vec![]
     }

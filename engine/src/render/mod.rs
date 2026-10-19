@@ -19,7 +19,7 @@ use bevy::{
 };
 
 use crate::{
-    animation::{AnimationLibrary, AnimationState, ObjectAnimation, model_pose},
+    animation::{AnimationLibrary, AnimationState, ObjectAnimation, PoseOverrides, model_pose_with},
     camera::{CameraState, chase_pose},
     controller::{Button, ControllerState},
     lighting,
@@ -85,7 +85,29 @@ struct Bone {
     root: Entity,
     model: usize,
     joint: usize,
+    /// The model's own mesh for this joint.
+    mesh: usize,
 }
+
+/// Per-joint mesh replacements on a posed model's root entity: entry `j`
+/// draws level mesh `Some(index)` at joint `j` instead of the model's own.
+/// Missing or `None` entries keep the model's mesh.
+#[derive(Component, Reflect, Clone, Debug, Default, PartialEq)]
+#[reflect(Component)]
+pub struct JointMeshes(pub Vec<Option<usize>>);
+
+/// Something drawn at a joint of a posed model: put it on a child of the
+/// model's root entity and it follows `joint` with `offset` in the joint's
+/// frame (level units, y up, before the root's transform).
+#[derive(Component, Clone, Debug)]
+pub struct JointAttachment {
+    pub joint: usize,
+    pub offset: Transform,
+}
+
+/// The current level's object meshes, indexed like `Level::meshes`.
+#[derive(Resource, Default, Clone)]
+pub struct ObjectMeshes(pub Vec<Handle<Mesh>>);
 
 /// The 3D camera that shows the level.
 #[derive(Component)]
@@ -228,7 +250,7 @@ impl Plugin for RenderPlugin {
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (fit_view_to_screen, overlay::place).before(LevelSystems::Meshes))
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
-            .add_systems(Update, (pose_models, follow_camera).in_set(LevelSystems::Pose))
+            .add_systems(Update, (pose_models, swap_joint_meshes, follow_camera).in_set(LevelSystems::Pose))
             .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility))
             .add_systems(Update, rooms::rebuild.in_set(LevelSystems::Meshes))
             .add_systems(Update, textures::apply.in_set(LevelSystems::Textures));
@@ -348,6 +370,30 @@ impl MeshBuilder {
     }
 }
 
+/// An object mesh without normals drawn under a fixed light level, as
+/// S_CalculateStaticLight 0x8006CC14 sets one: every vertex shade gains
+/// `light - 4096` and draws as grey `255 - clamp(shade, 0, 8191) / 32`
+/// (128 neutral). Meshes with normals are built as [`object_mesh`].
+pub fn static_lit_mesh(m: &crate::world::ObjectMesh, textures: &[Texture], light: i32) -> Mesh {
+    if !m.normals.is_empty() {
+        return object_mesh(m, textures);
+    }
+    let vs: Vec<_> = m.vertices.iter().map(|v| position([v[0], v[1], v[2]]).to_array()).collect();
+    let shade: Vec<_> = m
+        .vertices
+        .iter()
+        .map(|v| (255.0 - (v[3] + light - 4096).clamp(0, 8191) as f32 / 32.0) / lighting::NEUTRAL_SHADE)
+        .collect();
+    let mut b = MeshBuilder::new();
+    for f in &m.quads {
+        b.face(&f[..4], &textures[f[4]], &vs, &shade);
+    }
+    for f in &m.triangles {
+        b.face(&f[..3], &textures[f[3]], &vs, &shade);
+    }
+    b.finish()
+}
+
 /// Build an authored object mesh with its atlas UVs and vertex lighting.
 /// Model placement, posing and material choice belong to the caller.
 pub fn object_mesh(m: &crate::world::ObjectMesh, textures: &[Texture]) -> Mesh {
@@ -405,11 +451,17 @@ fn finish_level(
     // Keep rule-space positions local. Only the render hierarchy changes
     // handedness; camera conversion applies the same boundary separately.
     let render_root = commands
-        .spawn((Transform::from_scale(view::LEVEL_TO_RENDER), Visibility::default(), LevelEntity, Name::new("LevelWorld")))
+        .spawn((
+            Transform::from_scale(view::LEVEL_TO_RENDER),
+            Visibility::default(),
+            LevelEntity,
+            Name::new("LevelWorld"),
+        ))
         .id();
     let world = WorldGeometry { data: data.clone() };
     let atlas = server.load(atlas_path);
-    let material = materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });
+    let material =
+        materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });
     let underlay_material = room_policy.as_ref().map(|_| {
         materials.add(PsxMaterial {
             texture: Some(atlas.clone()),
@@ -466,13 +518,7 @@ fn finish_level(
             }
         }
     }
-    let object_meshes: Vec<_> = data
-        .meshes
-        .iter()
-        .map(|m| {
-            meshes.add(object_mesh(m, &data.textures))
-        })
-        .collect();
+    let object_meshes: Vec<_> = data.meshes.iter().map(|m| meshes.add(object_mesh(m, &data.textures))).collect();
     for (room_index, room) in data.rooms.iter().enumerate() {
         for s in &room.static_placements {
             let Some(def) = data.static_meshes.iter().find(|m| m.id == s.mesh_id) else { continue };
@@ -480,7 +526,8 @@ fn finish_level(
             commands.spawn((
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material.clone()),
-                Transform::from_translation(position(s.position)).with_rotation(Quat::from_rotation_y(angle(s.rotation))),
+                Transform::from_translation(position(s.position))
+                    .with_rotation(Quat::from_rotation_y(angle(s.rotation))),
                 InRoom(room_index),
                 LevelEntity,
                 ChildOf(render_root),
@@ -492,13 +539,15 @@ fn finish_level(
         let model = data.models.iter().enumerate().find(|(_, m)| m.id == placement.kind);
         let t = Transform::from_translation(position(placement.position))
             .with_rotation(Quat::from_rotation_y(angle(placement.rotation)));
-        let lit = model.map(|_| materials.add(PsxMaterial {
-            texture: Some(atlas.clone()),
-            lit: true,
-            use_scene_lighting: false,
-            double_sided: true,
-            ..default()
-        }));
+        let lit = model.map(|_| {
+            materials.add(PsxMaterial {
+                texture: Some(atlas.clone()),
+                lit: true,
+                use_scene_lighting: false,
+                double_sided: true,
+                ..default()
+            })
+        });
         let mut entity = commands.spawn((
             t,
             Visibility::default(),
@@ -533,11 +582,17 @@ fn finish_level(
         commands.entity(root).insert(ItemLighting(lit.clone()));
         for (joint, &mi) in model.meshes.iter().enumerate() {
             let part = commands
-                .spawn((Mesh3d(object_meshes[mi].clone()), MeshMaterial3d(lit.clone()), Transform::default(), Bone { root, model: model_index, joint }))
+                .spawn((
+                    Mesh3d(object_meshes[mi].clone()),
+                    MeshMaterial3d(lit.clone()),
+                    Transform::default(),
+                    Bone { root, model: model_index, joint, mesh: mi },
+                ))
                 .id();
             commands.entity(root).add_child(part);
         }
     }
+    commands.insert_resource(ObjectMeshes(object_meshes));
     commands.insert_resource(AnimationLibrary::from(data.as_ref()));
     commands.insert_resource(CameraState::default());
     commands.insert_resource(world);
@@ -557,6 +612,7 @@ pub struct ItemLighting(pub Handle<PsxMaterial>);
 #[allow(clippy::type_complexity)]
 fn light_items(
     world: Option<Res<WorldGeometry>>,
+    dynamic: Option<Res<lighting::DynamicLights>>,
     mut materials: ResMut<Assets<PsxMaterial>>,
     items: Query<(
         &ItemLighting,
@@ -570,8 +626,10 @@ fn light_items(
     let Some(world) = world else { return };
     for (lighting, t, avatar, animation, object, object_animation) in &items {
         let room = avatar.map(|p| p.room).or(object.map(|o| o.room)).unwrap_or(0);
-        let (anim, frame) =
-            animation.map(|a| (a.animation, a.frame)).or(object_animation.map(|a| (a.animation, a.frame))).unwrap_or((usize::MAX, 0.0));
+        let (anim, frame) = animation
+            .map(|a| (a.animation, a.frame))
+            .or(object_animation.map(|a| (a.animation, a.frame)))
+            .unwrap_or((usize::MAX, 0.0));
         let centre = world
             .data
             .animations
@@ -583,17 +641,23 @@ fn light_items(
                 (!c.poses.is_empty()).then(|| c.bounds.get(key)).flatten()
             })
             .map_or(Vec3::ZERO, |&b| {
-                Vec3::new((b[0] + b[1]) as f32 / 2.0, -((b[2] + b[3]) as f32) / 2.0, (b[4] + b[5]) as f32 / 2.0) / 1024.0
+                Vec3::new((b[0] + b[1]) as f32 / 2.0, -((b[2] + b[3]) as f32) / 2.0, (b[4] + b[5]) as f32 / 2.0)
+                    / 1024.0
             });
         let point = t.translation + t.rotation * centre;
-        let point = IVec3::new((point.x * 1024.0).round() as i32, (-point.y * 1024.0).round() as i32, (point.z * 1024.0).round() as i32);
-        let light = lighting::item_light(&world.data, room, point);
+        let point = IVec3::new(
+            (point.x * 1024.0).round() as i32,
+            (-point.y * 1024.0).round() as i32,
+            (point.z * 1024.0).round() as i32,
+        );
+        let light = lighting::item_light_with(&world.data, room, point, dynamic.as_ref().map_or(&[], |d| &d.0));
         let Some(mut material) = materials.get_mut(&lighting.0) else { continue };
         let ambient = (255.0 - light.ambient.clamp(0, 8191) as f32 / 32.0) / lighting::NEUTRAL_SHADE;
         // Normal, light-vector and rotation scales are all 16384 in the
         // original lighter, so the directional shade is strength * n.L.
         let k = light.strength as f32 / (32.0 * lighting::NEUTRAL_SHADE);
-        let dir = view::render_position(Vec3::new(light.direction.x, -light.direction.y, light.direction.z)).normalize_or_zero();
+        let dir = view::render_position(Vec3::new(light.direction.x, -light.direction.y, light.direction.z))
+            .normalize_or_zero();
         let mut l = material.lighting;
         l.ambient = Vec3::splat(ambient);
         l.directions[0] = -dir;
@@ -607,23 +671,60 @@ fn light_items(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn pose_models(
     world: Option<Res<WorldGeometry>>,
-    roots: Query<(Entity, Option<&AnimationState>, Option<&ObjectAnimation>)>,
-    mut bones: Query<(&Bone, &mut Transform)>,
+    roots: Query<(Option<&AnimationState>, Option<&ObjectAnimation>, Option<&PoseOverrides>)>,
+    mut bones: Query<(&Bone, &mut Transform), Without<JointAttachment>>,
+    mut attachments: Query<(&JointAttachment, &ChildOf, &mut Transform), Without<Bone>>,
+    models: Query<&Bone>,
 ) {
     let Some(world) = world else { return };
     let mut cache = std::collections::HashMap::<(Entity, usize), Vec<Transform>>::new();
+    let mut pose = |root: Entity, model_index: usize| -> Vec<Transform> {
+        cache
+            .entry((root, model_index))
+            .or_insert_with(|| {
+                let model = &world.data.models[model_index];
+                let Ok((player, object, overrides)) = roots.get(root) else { return vec![] };
+                let (anim, frame) = player
+                    .map(|a| (a.animation, a.frame))
+                    .or_else(|| object.map(|a| (a.animation, a.frame)))
+                    .unwrap_or((model.animations[0], 0.0));
+                model_pose_with(&world.data, model, anim, frame, overrides.map_or(&[], |o| &o.0))
+            })
+            .clone()
+    };
     for (bone, mut t) in &mut bones {
-        let values = cache.entry((bone.root, bone.model)).or_insert_with(|| {
-            let model = &world.data.models[bone.model];
-            let Ok((_, player, object)) = roots.get(bone.root) else { return vec![] };
-            let (anim, frame) =
-                player.map(|a| (a.animation, a.frame)).or_else(|| object.map(|a| (a.animation, a.frame))).unwrap_or((model.animations[0], 0.0));
-            model_pose(&world.data, model, anim, frame)
-        });
-        if let Some(v) = values.get(bone.joint) {
+        if let Some(v) = pose(bone.root, bone.model).get(bone.joint) {
             *t = *v;
+        }
+    }
+    for (attachment, parent, mut t) in &mut attachments {
+        let root = parent.parent();
+        // The root's own model: the one its bone children were spawned from.
+        let Some(model) = models.iter().find(|b| b.root == root).map(|b| b.model) else { continue };
+        if let Some(bone) = pose(root, model).get(attachment.joint) {
+            *t = bone.mul_transform(attachment.offset);
+        }
+    }
+}
+
+/// Apply [`JointMeshes`] to a model's bone meshes when they change.
+fn swap_joint_meshes(
+    meshes: Option<Res<ObjectMeshes>>,
+    roots: Query<Ref<JointMeshes>>,
+    mut bones: Query<(&Bone, &mut Mesh3d)>,
+) {
+    let Some(meshes) = meshes else { return };
+    for (bone, mut mesh) in &mut bones {
+        let Ok(swaps) = roots.get(bone.root) else { continue };
+        if !swaps.is_changed() && !meshes.is_changed() {
+            continue;
+        }
+        let index = swaps.0.get(bone.joint).copied().flatten().unwrap_or(bone.mesh);
+        if let Some(handle) = meshes.0.get(index).filter(|h| **h != mesh.0) {
+            mesh.0 = handle.clone();
         }
     }
 }
@@ -674,6 +775,10 @@ fn room_visibility(
             room.0 = object.room;
         }
         let hidden = object.is_some_and(|o| o.consumed || (!o.active && o.flags & INVISIBLE != 0));
-        *vis = if !hidden && visible.get(room.0).copied().unwrap_or(false) { Visibility::Inherited } else { Visibility::Hidden };
+        *vis = if !hidden && visible.get(room.0).copied().unwrap_or(false) {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
     }
 }

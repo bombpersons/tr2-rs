@@ -115,9 +115,9 @@ pub(super) fn step(
                 // and gives Walk's dive request priority over Action's reach
                 // (0x80038B88..0x80038C48). The current clip owns acceptance;
                 // fall35 has no range for52, so flight continues unchanged.
-                traversal.goal = if !weapon.drawn && pad.held(Button::R1) {
+                traversal.goal = if weapon.hands_free() && pad.held(Button::R1) {
                     52
-                } else if !weapon.drawn && pad.held(Button::Cross) {
+                } else if weapon.hands_free() && pad.held(Button::Cross) {
                     11
                 } else {
                     3
@@ -496,7 +496,7 @@ fn jump_motion(
         };
         if blocked
             && can_grab
-            && !weapon.drawn
+            && weapon.hands_free()
             && pad.held(Button::Cross)
             && delta.abs() <= 6370
             && even

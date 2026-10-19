@@ -4,6 +4,7 @@
 use bevy::{mesh::VertexAttributeValues, prelude::*};
 
 use super::{GameCamera, InRoom, MeshBuilder, ViewSettings, view};
+use crate::lighting::DynamicLights;
 use crate::world::{Level, Room, position};
 
 /// An authored corner in level-file units (y down), with atlas UV and the
@@ -130,6 +131,11 @@ pub struct RoomMeshStats {
 #[derive(Component)]
 pub(super) struct RoomMeshSource {
     faces: Vec<RoomFace>,
+    /// Room origin (level units) and x/z sector counts, for dynamic lights.
+    origin: IVec3,
+    sectors: [i32; 2],
+    /// The dynamic lights that reached this room at the last rebuild.
+    last_lights: Vec<crate::lighting::DynamicLight>,
     atlas: Handle<Image>,
     surface: Handle<Mesh>,
     underlay: Option<Handle<Mesh>>,
@@ -174,6 +180,9 @@ impl RoomMeshSource {
                 .map(|f| face(&f[..4], f[4]))
                 .chain(room.triangles.iter().map(|f| face(&f[..3], f[3])))
                 .collect(),
+            origin: IVec3::from_array(room.origin),
+            sectors: [room.x_sectors as i32, room.z_sectors as i32],
+            last_lights: vec![],
             atlas,
             surface,
             underlay: None,
@@ -188,15 +197,18 @@ impl RoomMeshSource {
 /// Runs after the camera and room visibility in Update, before extraction.
 /// Use the freshly written local camera Transform, not last frame's propagated
 /// GlobalTransform. Rooms are children of the engine's reflected level root.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn rebuild(
     mut commands: Commands,
     policy: Option<Res<RoomMeshPolicy>>,
     settings: Res<ViewSettings>,
     camera: Query<(&Transform, &Projection, &Camera), With<GameCamera>>,
     images: Res<Assets<Image>>,
+    lights: Option<Res<DynamicLights>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut rooms: Query<(Entity, &Transform, &Visibility, &InRoom, &mut RoomMeshSource, &mut RoomMeshStats)>,
 ) {
+    let lights = lights.as_ref().map_or(&[][..], |l| &l.0[..]);
     let Some(policy) = policy else { return };
     let revision = policy.last_changed().get();
     let Ok((camera, projection, camera_view)) = camera.single() else { return };
@@ -219,15 +231,36 @@ pub(super) fn rebuild(
             full_size: settings.full_size,
             margin: camera_view.sub_camera_view.as_ref().map_or(Vec2::ZERO, |sub| settings.margin(sub)),
         };
-        if source.last_view == Some(context) && source.last_policy == Some(revision) {
+        let (origin, sectors) = (source.origin, source.sectors);
+        let reaching: Vec<_> = lights.iter().copied().filter(|l| l.reaches_room(origin, sectors)).collect();
+        if source.last_view == Some(context) && source.last_policy == Some(revision) && source.last_lights == reaching {
             continue;
         }
-        let RoomMeshSource { faces, output, .. } = &mut *source;
+        let RoomMeshSource { faces, output, last_lights, .. } = &mut *source;
         output.surface.clear();
         output.underlay.clear();
-        for face in faces {
-            policy.0.tessellate(face, &context, output);
+        for face in faces.iter() {
+            if reaching.is_empty() {
+                policy.0.tessellate(face, &context, output);
+                continue;
+            }
+            // Dynamic lights brighten the stored vertex shades before the
+            // room is drawn (0x8006CE30), so the policy's own shading
+            // (subdivision, water) starts from the lit values.
+            let mut lit = RoomFace {
+                vertices: face.vertices.clone(),
+                source_indices: face.source_indices.clone(),
+                texture_attribute: face.texture_attribute,
+            };
+            for vertex in &mut lit.vertices {
+                let point = origin + IVec3::new(vertex.position.x, vertex.position.y, vertex.position.z);
+                for light in &reaching {
+                    vertex.shade = light.light_room_vertex(vertex.shade, point);
+                }
+            }
+            policy.0.tessellate(&lit, &context, output);
         }
+        *last_lights = reaching;
         stats.triangles = output.surface.triangle_count();
         stats.underlay_triangles = output.underlay.triangle_count();
         if stats.triangles == 0 {
@@ -341,7 +374,14 @@ mod tests {
                 Mesh3d(surface.clone()),
                 RoomMeshStats::default(),
                 RoomMeshSource {
-                    faces: vec![RoomFace { vertices: vertices.to_vec(), source_indices: vec![0, 1, 2], texture_attribute: 0 }],
+                    faces: vec![RoomFace {
+                        vertices: vertices.to_vec(),
+                        source_indices: vec![0, 1, 2],
+                        texture_attribute: 0,
+                    }],
+                    origin: IVec3::ZERO,
+                    sectors: [1, 1],
+                    last_lights: vec![],
                     atlas,
                     surface: surface.clone(),
                     underlay: None,

@@ -6,8 +6,8 @@ use engine::controller::Button;
 use engine::testing::{TickApp, headless_app};
 use engine::world::{Level, Room, Sector, WorldGeometry};
 use game::player::{
-    AnimationState, Motion, Player, PlayerMode, PlayerRulesPlugin, RUN_SPEED, SimulationEnabled, WALK_SPEED,
-    WeaponState,
+    AnimationState, Gun, GunStatus, Motion, Player, PlayerMode, PlayerRulesPlugin, RUN_SPEED, SimulationEnabled,
+    WALK_SPEED, WeaponState,
 };
 
 fn app() -> (App, Entity) {
@@ -182,6 +182,7 @@ fn swim_uses_square_for_propulsion_and_up_for_downward_pitch() {
 #[test]
 fn lethal_falls_disable_movement_and_firing() {
     let (mut app, entity) = app();
+    app.world_mut().entity_mut(entity).insert(WeaponState::holding(Gun::Pistols));
     app.world_mut().get_mut::<Player>(entity).unwrap().position.y = 12.0;
     app.world_mut().get_mut::<Motion>(entity).unwrap().grounded = false;
     app.run_ticks(180, &[]);
@@ -196,14 +197,36 @@ fn lethal_falls_disable_movement_and_firing() {
 }
 
 #[test]
-fn draw_and_fire_uses_a_shot_counter_for_consumers() {
+fn pistols_draw_for_eighteen_ticks_then_both_arms_fire_after_four_aim_ticks() {
+    // Timing from pistols_draw_fire_holster (PSX, no pokes); see tests/pistols.rs.
     let (mut app, entity) = app();
+    app.world_mut().entity_mut(entity).insert(WeaponState::holding(Gun::Pistols));
+    let weapon = |app: &App| app.world().get::<WeaponState>(entity).unwrap().clone();
+    app.run_tick(&[Button::Triangle]);
+    assert_eq!(weapon(&app).status, GunStatus::Drawing);
+    assert_eq!(weapon(&app).left.frame, 5);
+    app.run_ticks(17, &[]);
+    assert_eq!(weapon(&app).status, GunStatus::Drawing);
+    app.run_tick(&[]);
+    assert_eq!(weapon(&app).status, GunStatus::Ready);
+    app.run_ticks(4, &[Button::Cross]);
+    assert_eq!(weapon(&app).shot_serial, 0);
     app.run_tick(&[Button::Cross]);
-    assert_eq!(app.world().get::<WeaponState>(entity).unwrap().shot_serial, 0);
-    app.run_tick(&[Button::Triangle, Button::Cross]);
-    assert_eq!(app.world().get::<WeaponState>(entity).unwrap().shot_serial, 1);
-    app.run_ticks(30, &[Button::Cross]);
-    assert!(app.world().get::<WeaponState>(entity).unwrap().shot_serial > 1);
+    assert_eq!(weapon(&app).shot_serial, 2, "each arm fires one shot");
+    app.run_ticks(9, &[Button::Cross]);
+    assert_eq!(weapon(&app).shot_serial, 2);
+    app.run_tick(&[Button::Cross]);
+    assert_eq!(weapon(&app).shot_serial, 4, "ten ticks between volleys");
+}
+
+#[test]
+fn draw_does_nothing_without_a_gun() {
+    // Home starts with gun type 0 (0x8008C4EC in .psx/home_start).
+    let (mut app, entity) = app();
+    app.run_ticks(30, &[Button::Triangle, Button::Cross]);
+    let weapon = app.world().get::<WeaponState>(entity).unwrap();
+    assert_eq!(weapon.status, GunStatus::HandsFree);
+    assert_eq!(weapon.shot_serial, 0);
 }
 
 #[test]

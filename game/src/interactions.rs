@@ -13,15 +13,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::prelude::*;
+pub use engine::objects::{CODE_BITS, WorldObject};
 use engine::{
     animation::{AnimationGoal, ObjectAnimation, select_state},
     controller::{Button, ControllerState},
     objects::{AppObjectTypes, ObjectType},
     schedule::{InteractionSystems, ItemSystems, LifecycleSystems, simulation_enabled},
     triggers::{AppTriggerActions, TriggerAction, TriggerState, TriggerSystems},
-    world::{WorldGeometry, clear_line},
+    world::WorldGeometry,
 };
-pub use engine::objects::{CODE_BITS, WorldObject};
 
 use crate::player::{Motion, PLAYER_HEIGHT, PLAYER_RADIUS, Player, PlayerMode, WeaponState};
 use crate::presentation::{LEVELS, LevelRequest, Session};
@@ -48,6 +48,8 @@ struct ObjectTypeData {
     attendant: Option<crate::winston::WinstonTuning>,
     #[serde(default)]
     swimming: Option<crate::player::SwimmingTuning>,
+    #[serde(default)]
+    pistols: Option<crate::player::GunTuning>,
 }
 
 #[derive(serde::Deserialize)]
@@ -142,7 +144,12 @@ pub(crate) fn winston_tuning() -> crate::winston::WinstonTuning {
 }
 
 pub(crate) fn swimming_tuning() -> crate::player::SwimmingTuning {
-    object_types().into_iter().find_map(|entry|entry.swimming).expect("swimming tuning is registered")
+    object_types().into_iter().find_map(|entry| entry.swimming).expect("swimming tuning is registered")
+}
+
+/// Lara's pistols: the gun table entry at 0x80089464.
+pub fn pistol_tuning() -> crate::player::GunTuning {
+    object_types().into_iter().find_map(|entry| entry.pistols).expect("pistol tuning is registered")
 }
 
 /// Register every object type of `data/object_types.json` with the engine.
@@ -250,7 +257,6 @@ pub struct InteractionProgress {
 #[derive(Resource, Default)]
 struct InteractionRuntime {
     level: String,
-    shots: BTreeMap<Entity, u64>,
 }
 
 pub struct InteractionsPlugin;
@@ -262,6 +268,7 @@ impl Plugin for InteractionsPlugin {
         engine::add_once(app, crate::winston::WinstonRulesPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
+        app.add_message::<crate::player::GunHit>();
         app.init_resource::<Inventory>()
             .init_resource::<InteractionProgress>()
             .init_resource::<InteractionRuntime>()
@@ -274,7 +281,7 @@ impl Plugin for InteractionsPlugin {
                     resolve_objects.in_set(InteractionSystems::Resolve),
                     creatures.in_set(ItemSystems::Control),
                     control_doors.in_set(ItemSystems::Control),
-                    combat.in_set(InteractionSystems::Combat),
+                    combat.in_set(InteractionSystems::Combat).after(crate::player::PlayerSystems::Weapons),
                     sync_session.in_set(InteractionSystems::Report),
                 )
                     .run_if(simulation_enabled),
@@ -292,7 +299,7 @@ fn reset_level(
         return;
     };
     if state.level != w.data.name {
-        *state = InteractionRuntime { level: w.data.name.clone(), ..default() };
+        *state = InteractionRuntime { level: w.data.name.clone() };
         *progress = default();
         // Keys/puzzles/secrets belong to a level; weapons, ammo and healing carry.
         inv.items.retain(|&kind, _| !(174..=177).contains(&kind) && !(190..=206).contains(&kind));
@@ -312,7 +319,7 @@ fn collect_and_use(
     let Ok((p, weapon)) = players.single() else {
         return;
     };
-    if p.health <= 0 || weapon.drawn || !pad.held(Button::Cross) {
+    if p.health <= 0 || !weapon.hands_free() || !pad.held(Button::Cross) {
         return;
     }
     for (mut o, t, pickup, switch, keyhole) in &mut objects {
@@ -397,49 +404,22 @@ fn trigger_actions(
     }
 }
 
+/// HitTarget 0x8004132C: each gun hit takes its damage from the creature's
+/// hit points (they may go below zero); the hit that takes the last ones
+/// counts a kill (0x8004133C..0x80041360).
 fn combat(
-    world: Option<Res<WorldGeometry>>,
-    mut state: ResMut<InteractionRuntime>,
+    mut hits: MessageReader<crate::player::GunHit>,
     mut progress: ResMut<InteractionProgress>,
-    players: Query<(Entity, &Player, &WeaponState)>,
-    mut enemies: Query<(&mut Enemy, &mut WorldObject, &Transform)>,
+    mut enemies: Query<(&mut Enemy, &mut WorldObject)>,
 ) {
-    for (e, p, weapon) in &players {
-        let previous = state.shots.insert(e, weapon.shot_serial).unwrap_or(0);
-        let shots = weapon.shot_serial.saturating_sub(previous);
-        if shots == 0 || p.health <= 0 {
-            continue;
+    for hit in hits.read() {
+        let Ok((mut enemy, mut object)) = enemies.get_mut(hit.target) else { continue };
+        if enemy.health > 0 && enemy.health <= hit.damage {
+            enemy.killed = true;
+            progress.kills += 1;
         }
-        let eye = p.position + Vec3::Y * 0.65;
-        let target = enemies
-            .iter()
-            .filter(|(enemy, o, t)| {
-                enemy.health > 0 && o.active && !o.consumed && {
-                    let d = t.translation - p.position;
-                    let flat = d.with_y(0.0);
-                    flat.length() < 8.0
-                        && flat.normalize_or_zero().dot(p.forward()) > 0.85
-                        && d.y.abs() < 2.0
-                        && clear_line(world.as_deref(), eye, t.translation + Vec3::Y * 0.5, p.room)
-                }
-            })
-            .min_by(|a, b| {
-                a.2.translation.distance_squared(p.position).total_cmp(&b.2.translation.distance_squared(p.position))
-            })
-            .map(|(_, o, _)| o.index);
-        if let Some(index) = target {
-            for (mut enemy, mut o, _) in &mut enemies {
-                if o.index == index {
-                    // Each pistol projectile does one hit point in original creature health units.
-                    enemy.health = (enemy.health - shots.min(i32::MAX as u64) as i32).max(0);
-                    o.active = true;
-                    if enemy.health == 0 && !enemy.killed {
-                        enemy.killed = true;
-                        progress.kills += 1;
-                    }
-                }
-            }
-        }
+        enemy.health -= hit.damage;
+        object.active = true;
     }
 }
 

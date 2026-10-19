@@ -34,6 +34,7 @@ pub mod config;
 pub mod editor;
 pub mod lighting;
 pub mod objects;
+pub mod random;
 pub mod render;
 pub mod schedule;
 pub mod triggers;

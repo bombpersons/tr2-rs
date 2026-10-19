@@ -10,7 +10,7 @@ use engine::{
 };
 use game::{
     interactions::*,
-    player::{Player, SimulationEnabled, WeaponState},
+    player::{GunHit, Player, SimulationEnabled},
 };
 fn app() -> App {
     let mut app = headless_app(game::tick_rate(game::REGION));
@@ -23,7 +23,12 @@ fn geometry(trigger: Trigger) -> WorldGeometry {
     sectors[0].floor_info = Some(0);
     let room = Room { top: -4096, bottom: 0, x_sectors: 2, z_sectors: 2, sectors, ..Default::default() };
     let info = FloorInfo { triggers: vec![trigger], ..Default::default() };
-    WorldGeometry::new(Level { name: "fixture".into(), rooms: vec![room], floor_infos: vec![info], ..Default::default() })
+    WorldGeometry::new(Level {
+        name: "fixture".into(),
+        rooms: vec![room],
+        floor_infos: vec![info],
+        ..Default::default()
+    })
 }
 /// A floor trigger with the full code mask that activates placement `index`.
 fn activate(index: u16) -> Trigger {
@@ -76,17 +81,21 @@ fn healing_consumes_the_correct_size_and_never_revives() {
     assert_eq!(inventory.large_medipacks, 1);
 }
 #[test]
-fn each_new_pistol_shot_can_hit_once_and_kill_is_counted_once() {
+fn each_gun_hit_takes_its_damage_and_a_kill_is_counted_once() {
     let mut app = app();
-    let p = app.world_mut().spawn(Player::default()).id();
+    app.world_mut().spawn(Player::default());
     let mut object = WorldObject::new(4, 39, 0, 0);
     object.active = true;
     let enemy = app.world_mut().spawn((object, Transform::from_xyz(0.0, 0.0, 2.0))).id();
     app.run_tick(&[]);
     app.world_mut().get_mut::<Enemy>(enemy).unwrap().health = 1;
-    app.world_mut().get_mut::<WeaponState>(p).unwrap().shot_serial = 1;
+    // HitTarget 0x8004132C: the hit that takes the last hit point counts a kill.
+    app.world_mut().write_message(GunHit { target: enemy, damage: 1, point: IVec3::ZERO });
     app.run_tick(&[]);
     assert_eq!(app.world().get::<Enemy>(enemy).unwrap().health, 0);
+    app.world_mut().write_message(GunHit { target: enemy, damage: 1, point: IVec3::ZERO });
+    app.run_tick(&[]);
+    assert_eq!(app.world().get::<Enemy>(enemy).unwrap().health, -1, "hit points go below zero");
     app.run_ticks(10, &[]);
     assert_eq!(app.world().resource::<InteractionProgress>().kills, 1);
 }
@@ -179,7 +188,11 @@ fn floor_triggers_use_the_position_after_object_collision() {
     let position = app.world().get::<Player>(player).unwrap().position;
     assert!(position.x > 1.0, "the closed door pushed the player out of the trigger sector");
     assert_eq!(app.world().get::<engine::schedule::Avatar>(player).unwrap().position, position);
-    assert_eq!(app.world().get::<Transform>(player).unwrap().translation, position, "render placement includes the collision push");
+    assert_eq!(
+        app.world().get::<Transform>(player).unwrap().translation,
+        position,
+        "render placement includes the collision push"
+    );
     assert!(!app.world().get::<WorldObject>(target).unwrap().active, "the pre-collision sector must not fire");
 }
 
@@ -192,8 +205,15 @@ fn a_door_retargets_its_animation_on_the_tick_after_activation() {
     let mut app = app();
     let mut world = geometry(activate(4));
     let level = std::sync::Arc::make_mut(&mut world.data);
-    level.animations =
-        vec![Animation { state: 0, frame_end: 10, state_changes: vec![StateChange { state: 1, first_frame: 0, last_frame: 11, animation: 1, frame: 0 }], ..default() }, Animation { state: 1, frame_end: 10, ..default() }];
+    level.animations = vec![
+        Animation {
+            state: 0,
+            frame_end: 10,
+            state_changes: vec![StateChange { state: 1, first_frame: 0, last_frame: 11, animation: 1, frame: 0 }],
+            ..default()
+        },
+        Animation { state: 1, frame_end: 10, ..default() },
+    ];
     level.models = vec![Model { id: 106, animations: [0, 2], ..default() }];
     app.insert_resource(world);
     app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0));

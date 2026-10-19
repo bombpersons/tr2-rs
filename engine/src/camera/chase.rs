@@ -74,7 +74,8 @@ pub fn heading(x: i32, z: i32) -> i32 {
     (angle + OCTANTS[octant]).abs() as i16 as i32
 }
 
-fn isqrt(value: i32) -> i32 {
+/// Integer square root (0x80063e84), truncated.
+pub fn isqrt(value: i32) -> i32 {
     (value.max(0) as f64).sqrt() as i32
 }
 
@@ -345,7 +346,13 @@ pub fn shift_ideal(world: Space, target: Point, eye: Point, ideal: &mut Point, d
 /// Ideal chase eye 0x80019214: `distance` behind the target along the
 /// actor's heading plus the requested angle, raised by the elevation.
 pub fn ideal_eye(target: Point, eye_room: usize, yaw: i32, pitch: i32, distance: i32) -> (Point, i32) {
-    let elevation = pitch.clamp(-15470, 15470);
+    orbit_eye(target, eye_room, yaw, pitch.clamp(-15470, 15470), distance)
+}
+
+/// The eye `distance` behind `target` along `yaw`, raised by `pitch`, with
+/// no elevation limit (the combat camera 0x80019578 does not clamp).
+/// Also returns the squared horizontal distance.
+pub fn orbit_eye(target: Point, eye_room: usize, yaw: i32, elevation: i32, distance: i32) -> (Point, i32) {
     let horizontal = (distance * cos(elevation)) >> 14;
     let y = target.y + ((distance * sin(elevation)) >> 14);
     let angle = yaw as i16 as i32;

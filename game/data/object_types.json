@@ -4,6 +4,23 @@
   {
    "id": 0,
    "name": "lara",
+   "pistols": {
+    "_comment": "Gun table entry at 0x80089464 (48 bytes): angles 65536 per turn, distances world units, times ticks.",
+    "lock_yaw": [-10920, 10920],
+    "lock_pitch": [-10920, 10920],
+    "left_yaw": [-30940, 10920],
+    "left_pitch": [-14560, 14560],
+    "right_yaw": [-10920, 30940],
+    "right_pitch": [-14560, 14560],
+    "aim_speed": 1820,
+    "spread": 1456,
+    "gun_height": 650,
+    "damage": 1,
+    "range": 8192,
+    "recoil_frames": 9,
+    "flash_ticks": 3,
+    "shot_sound": 8
+   },
    "swimming": {
     "max_speed": 50.0,
     "acceleration": 2.0,

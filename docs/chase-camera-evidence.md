@@ -51,6 +51,24 @@ within one divisor step of the settled eye, which is why the original eye
 stays still for 55 ticks while Lara turns. The same code confirms the port's
 per-sign slope rounding.
 
+## Camera flags 2: exact slopes
+
+The camera clears flags `B280` after each update (`0x8001A26C`). The only
+store of 2 is the forward slide's state handler `0x80039598` (state 24),
+which also requests elevation `B2A0` = -8190. With flags 2, `0x80019CF4`
+skips setting the camera geometry flag, so that tick's target, ideal, LOS
+and smart-shift queries read steep slopes exactly. Evidence: write watches
+`.psx/shift_b280_watch` and `.psx/shift_flag_watch` on the
+`pistols_tiger_volley` route (flags 2 on exactly the 26 ticks that start in
+state 24) and the smart-shift trace `.psx/shift_trace_103b` at tick 103.
+There the probe one sector toward -x from the clipped ideal (64511, 4194,
+38911) reads floor 4864 (open, box x_min 0xF800) instead of the flattened
+4096, so the shift puts the eye at x 63861 rather than 64767. The port
+publishes this as `Avatar::camera_exact_slopes`. The slide's elevation
+request and the other states' angle/elevation requests with flags 1
+(`0x8003982C`, `0x8003988C`, `0x80039BC8`, `0x80039CE0`, `0x8003A134`,
+`0x8003EADC`, `0x8005EFD8`) are not ported yet.
+
 ## Bounds for the look target
 
 GetFrames `0x80028824` interpolates toward the next stored pose; clips store a

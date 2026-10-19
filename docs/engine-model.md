@@ -66,6 +66,14 @@ word list. *Structural.*
   engine messages; object movement/effect commands remain controller work.
   The editor uses the same step for silent model previews. Legacy creature
   clip selection remains provisional.
+- **Drawing on top of clips:** Lara's draw code `0x80025BDC` is per-type
+  code: it turns torso and head by the gun angles and draws the gun arms
+  from another object's frames, oriented from Lara's root, and the gun code
+  rewrites her mesh table (*PSX*, `docs/pistols-evidence.md`). **Engine:**
+  the generic means (`PoseOverrides`, `JointMeshes`, `JointAttachment`,
+  `DynamicLights` for the original's per-frame dynamic light table
+  `0x8008BB88`). **Game:** `game::player::arms` chooses joints, frames,
+  meshes and lights.
 
 ## Objects
 
@@ -187,7 +195,9 @@ trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
   4. **Lara** `0x800424F0`, which runs, in order: state handler, turn and
      yaw, animation step `0x80042E08`, **object collision** `0x8001C258`
      (pickups, switches, doors, keyholes, creature push), state collision,
-     room update, weapons, **TestTriggers** `0x8001EE30`;
+     room update, weapons (LaraGun `0x8003FC4C`, ported in
+     `game::player::weapons`, [pistols-evidence](pistols-evidence.md)),
+     **TestTriggers** `0x8001EE30`;
   5. hair `0x8002F674`;
   6. camera `0x80019BF0`;
   7. sound sources, flip effect and sound update `0x800290E4`;
@@ -205,6 +215,13 @@ trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
   - Generic object animation follows those controllers. Lara's pose commit
     runs after Motion and before nearby object interaction; recorded
     player/camera trajectories remain exact.
+  - LaraGun is `PlayerSystems::Weapons` in `InteractionSystems::Combat`,
+    after Publish and before the floor triggers; gun hits are `GunHit`
+    messages applied by `game::interactions::combat` in the same set.
+    Gameplay random draws use `engine::random::GameRandom` (the original's
+    control generator at `0x80089D54`); the gun's pistol spread is its only
+    ported consumer. The combat camera is the engine's aiming mode, requested
+    through `Avatar::aim`.
   - Use and Resolve now both precede floor triggers. The Publish set copies
     the collision result to Avatar before combat resolution and triggers.
     This fixes triggers using the position before a door's push.

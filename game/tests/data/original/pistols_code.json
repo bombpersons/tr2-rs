@@ -1,0 +1,125 @@
+{
+  "source": "Supplied USA Rev3 disc via psx; Wall runtime code (.psx/wall_game)",
+  "ram_sha256": "745062c01811c58f18071e7eda7fdd43ca7412fea513d219f4950ae417d177b0",
+  "ranges": [
+    {
+      "start": "0x8003fc4c",
+      "end_exclusive": "0x80040494",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x8003fc4c",
+        "--count",
+        "530",
+        "--text"
+      ],
+      "bytes_sha256": "087c97bb89b626c641a71cf0390d354974829526d62814a8a37cae19e91faf03"
+    },
+    {
+      "start": "0x800404f0",
+      "end_exclusive": "0x800406b4",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x800404f0",
+        "--count",
+        "113",
+        "--text"
+      ],
+      "bytes_sha256": "991d80537f8cbcc61d146505d2918c732cbadd672485097e4cb49ab54b107d87"
+    },
+    {
+      "start": "0x800406b4",
+      "end_exclusive": "0x80040e8c",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x800406b4",
+        "--count",
+        "502",
+        "--text"
+      ],
+      "bytes_sha256": "33ae94cb22a1d888e2b5d719582604f6df5260276c61ededda19d93b9b7b2e5c"
+    },
+    {
+      "start": "0x80040e8c",
+      "end_exclusive": "0x8004132c",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x80040e8c",
+        "--count",
+        "296",
+        "--text"
+      ],
+      "bytes_sha256": "393ba02b18ae0d0eebe894ed81df7616a767b1c641fa64b2dfa4eb4f4ef7310b"
+    },
+    {
+      "start": "0x80047e04",
+      "end_exclusive": "0x800484b0",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x80047e04",
+        "--count",
+        "427",
+        "--text"
+      ],
+      "bytes_sha256": "4781b6144f4ea89500e66239ec72e87301cc9d7c8f45ad286ae55bff9d33ac0f"
+    },
+    {
+      "start": "0x800484b0",
+      "end_exclusive": "0x80048b3c",
+      "command": [
+        "psx",
+        "disasm",
+        "--ram",
+        ".psx/wall_game",
+        "--addr",
+        "0x800484b0",
+        "--count",
+        "419",
+        "--text"
+      ],
+      "bytes_sha256": "e581045e38cb94c1de3272ede0c7b0749f9d5adf620fd227a13aca99651dfcb5"
+    },
+    {
+      "start": "0x80089434",
+      "end_exclusive": "0x800895e4",
+      "command": [
+        "psx",
+        "ram",
+        "view",
+        ".psx/wall_game",
+        "--addr",
+        "0x80089434",
+        "--len",
+        "432",
+        "--as",
+        "i16",
+        "--text"
+      ],
+      "bytes_sha256": "7b489ec041809d3b8efcea365d30070302f5375422229f5420c725a5a5599d8a"
+    }
+  ],
+  "lara_gun": "0x8003fc4c",
+  "pistol_table": "0x80089464",
+  "draw_pistols": "0x80047e60",
+  "undraw_pistols": "0x80047f1c",
+  "pistol_handler": "0x800484b0"
+}

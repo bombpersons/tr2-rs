@@ -9,7 +9,7 @@
 use bevy::prelude::*;
 pub use engine::animation::AnimationState;
 use engine::animation::{
-    ANIMATION_FPS as ORIGINAL_FPS, AnimationLibrary, advance, animation_frames as original_frames,
+    ANIMATION_FPS as ORIGINAL_FPS, AnimationLibrary, ObjectAnimation, advance, animation_frames as original_frames,
 };
 use engine::camera::CameraSystems;
 use engine::controller::{Button, ControllerState};
@@ -27,6 +27,9 @@ mod rolling;
 mod surface;
 mod swimming;
 pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
+pub mod arms;
+pub mod weapons;
+pub use weapons::{Arm, Gun, GunHit, GunSound, GunStatus, GunTuning, WeaponState};
 
 /// The level animation table, as Lara's rules read it.
 pub type PlayerAnimations = AnimationLibrary;
@@ -47,6 +50,8 @@ pub const RUN_JUMP_SPEED: f32 = units(75.0 * ORIGINAL_FPS);
 /// otherwise1. Fresh airborne recordings independently verify the6 branch.
 pub const GRAVITY: f32 = units(6.0 * ORIGINAL_FPS * ORIGINAL_FPS);
 /// PSX object-push world validation0x8001CC00 passes a762-unit body height.
+/// Lara's forward slide state.
+const SLIDE_STATE: usize = 24;
 pub const PLAYER_HEIGHT: f32 = units(762.0);
 /// PSX Lara collision context0x800381E8..0x800381EC starts with radius100.
 pub const PLAYER_RADIUS: f32 = units(100.0);
@@ -200,6 +205,12 @@ pub struct Motion {
     /// Backward entry retains it after a forced stop; fast fall retains
     /// the rebound heading independently of the player's facing yaw.
     pub movement_heading: Option<f32>,
+    /// Guns out (gun status 4) when this tick's state handler ran. The turn
+    /// handlers then ask for the fast turn at once (0x80038DC4/0x80038E94).
+    pub guns_ready: bool,
+    /// The slide handler 0x80039598 (state 24) sets camera flags 2 when it
+    /// runs, so the camera reads slopes exactly this tick.
+    pub camera_exact_slopes: bool,
 }
 
 impl Default for Motion {
@@ -215,6 +226,8 @@ impl Default for Motion {
             turn_frames: 0.0,
             air_animation: 0,
             movement_heading: None,
+            guns_ready: false,
+            camera_exact_slopes: false,
         }
     }
 }
@@ -243,22 +256,15 @@ fn freefall_landing(clips: &PlayerAnimations, animation: &AnimationState) -> Opt
     clips.dispatch(animation, 2)
 }
 
-#[derive(Component, Reflect, Debug, Clone, Default)]
-#[reflect(Component)]
-pub struct WeaponState {
-    pub drawn: bool,
-    pub firing: bool,
-    /// Monotonic shot counter for hit detection, sound and muzzle flashes.
-    pub shot_serial: u64,
-    pub cooldown_seconds: f32,
-}
-
 /// Lara's systems, inside the engine's tick order.
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum PlayerSystems {
     Control,
     Motion,
     Animation,
+    /// LaraGun, after object collision and room update and before the floor
+    /// triggers (0x8003844C, docs/tick-order-evidence.md).
+    Weapons,
 }
 
 use engine::schedule::simulation_enabled;
@@ -292,17 +298,127 @@ impl Plugin for PlayerRulesPlugin {
         engine::add_once(app, AvatarPlugin);
         app.register_type::<Traversal>();
         app.insert_resource(crate::interactions::swimming_tuning());
+        app.insert_resource(crate::interactions::pistol_tuning());
+        app.add_message::<GunSound>().add_message::<GunHit>().register_type::<WeaponState>();
+        app.init_resource::<engine::random::GameRandom>();
         app.configure_sets(FixedUpdate, PlayerSystems::Control.in_set(WorldSystems::Control))
             .configure_sets(FixedUpdate, PlayerSystems::Motion.in_set(WorldSystems::Motion))
             .configure_sets(FixedUpdate, PlayerSystems::Animation.in_set(WorldSystems::Animation))
+            .configure_sets(FixedUpdate, PlayerSystems::Weapons.in_set(InteractionSystems::Combat))
             .add_systems(FixedUpdate, control.in_set(PlayerSystems::Control).run_if(simulation_enabled))
             .add_systems(
                 FixedUpdate,
                 (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
             )
             .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled))
+            .add_systems(FixedUpdate, update_guns.in_set(PlayerSystems::Weapons).run_if(simulation_enabled))
             .add_systems(FixedUpdate, sync_transform.in_set(InteractionSystems::Publish).run_if(simulation_enabled));
     }
+}
+
+/// LaraGun for one tick: Draw and Action are read held (pistols_held_draw).
+#[allow(clippy::too_many_arguments)]
+fn update_guns(
+    pad: Res<ControllerState>,
+    tuning: Res<GunTuning>,
+    world: Option<Res<WorldGeometry>>,
+    mut random: ResMut<engine::random::GameRandom>,
+    mut sounds: MessageWriter<GunSound>,
+    mut hits: MessageWriter<GunHit>,
+    mut players: Query<(&Player, &mut WeaponState)>,
+    creatures: Query<(
+        Entity,
+        &crate::interactions::Enemy,
+        &engine::objects::WorldObject,
+        &Transform,
+        &ObjectAnimation,
+    )>,
+) {
+    let input = weapons::GunInput::read(&pad);
+    let targets = world.as_deref().map_or_else(Vec::new, |world| gun_targets(world, &creatures));
+    let line_of_sight = |from: IVec3, room: usize, to: IVec3, to_room: usize| {
+        use engine::camera::chase::{Point, Space, line_of_sight};
+        let Some(world) = world.as_deref() else { return true };
+        let start = Point { x: from.x, y: from.y, z: from.z, room };
+        let mut end = Point { x: to.x, y: to.y, z: to.z, room: to_room };
+        line_of_sight(Space { world, camera: false }, start, &mut end)
+    };
+    for (player, mut weapon) in &mut players {
+        let gun_world = weapons::GunWorld {
+            position: original_units(player.position),
+            room: player.room,
+            yaw: (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32 as i16,
+            targets: &targets,
+            line_of_sight: &line_of_sight,
+        };
+        let alive = player.health > 0;
+        let tick = weapons::update(
+            &mut weapon,
+            input,
+            alive,
+            weapons::can_draw(player),
+            &tuning,
+            &gun_world,
+            &mut random,
+            &mut |sound| {
+                sounds.write(GunSound(sound));
+            },
+        );
+        hits.write_batch(tick.hits);
+    }
+}
+
+/// A level position in the original's integer units (y down).
+pub(crate) fn original_units(position: Vec3) -> IVec3 {
+    let v = (position * 1024.0).round();
+    IVec3::new(v.x as i32, -v.y as i32, v.z as i32)
+}
+
+/// Active creatures as the guns see them (the creature slots at
+/// 0x8008C1C0 hold active creatures; entity order stands in for slot order).
+fn gun_targets(
+    world: &WorldGeometry,
+    creatures: &Query<(
+        Entity,
+        &crate::interactions::Enemy,
+        &engine::objects::WorldObject,
+        &Transform,
+        &ObjectAnimation,
+    )>,
+) -> Vec<weapons::GunTarget> {
+    use engine::animation::{collision_bounds, model_spheres};
+    use engine::camera::chase::{cos, sin};
+    creatures
+        .iter()
+        .filter(|(_, _, object, _, _)| object.active && !object.consumed)
+        .filter_map(|(entity, enemy, object, transform, animation)| {
+            let position = original_units(transform.translation);
+            let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            let yaw = (yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+            // 0x80040C40: centre of the nearest key's box, a third down from its top.
+            let b = collision_bounds(&world.data, animation.animation, animation.frame)?;
+            let (cx, cz) = ((b[0] + b[1]) / 2, (b[4] + b[5]) / 2);
+            let aim_point = IVec3::new(
+                position.x + ((cos(yaw) * cx + sin(yaw) * cz) >> 14),
+                position.y + b[2] + (b[3] - b[2]) / 3,
+                position.z + ((cos(yaw) * cz - sin(yaw) * cx) >> 14),
+            );
+            let spheres = world.data.model(object.kind).map_or_else(Vec::new, |model| {
+                model_spheres(&world.data, model, animation.animation, animation.frame, transform)
+                    .into_iter()
+                    .map(|s| (original_units(s.center), (s.radius * 1024.0).round() as i32))
+                    .collect()
+            });
+            Some(weapons::GunTarget {
+                entity,
+                position,
+                aim_point,
+                room: object.room,
+                alive: enemy.health > 0,
+                spheres,
+            })
+        })
+        .collect()
 }
 
 /// Lara's object type id: her placement is where the level starts.
@@ -326,7 +442,14 @@ pub fn spawn_lara(entity: &mut bevy::ecs::system::EntityCommands, ctx: &engine::
         player.mode = PlayerMode::Fall;
     }
     let animation = if grounded { AnimationState::default() } else { AnimationState::at_frame(34, 0.0) };
-    entity.insert((player, Motion { grounded, ..default() }, animation, Name::new("Player")));
+    let gun = if weapons::UNARMED_LEVELS.contains(&ctx.world.data.name.as_str()) { Gun::Unarmed } else { Gun::Pistols };
+    entity.insert((
+        player,
+        Motion { grounded, ..default() },
+        animation,
+        WeaponState::holding(gun),
+        Name::new("Player"),
+    ));
     crate::braid::spawn(entity, ctx);
 }
 
@@ -339,7 +462,11 @@ pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &mut A
             room: player.room,
             grounded: motion.grounded,
             falling: player.mode == PlayerMode::Fall,
-            armed: weapon.drawn,
+            armed: weapon.ready(),
+            // LaraGun asks for the combat camera while drawing or ready
+            // (0x8004001C, 0x800401B8), looking at the target or along the aim.
+            aim: weapon.aiming_camera().then(|| weapon.camera_aim()),
+            camera_exact_slopes: motion.camera_exact_slopes,
             alive: player.health > 0,
         });
     }
@@ -541,7 +668,9 @@ fn turn(
                 motion.turn_rate = if motion.turn_rate >= 0 { 1456 } else { -1456 };
             } else {
                 motion.turn_rate += motion.turning * TURN_PUSH;
-                if walk && motion.turn_rate.abs() >= 729 {
+                // With guns ready the handler skips the walk cap and asks for
+                // the fast turn directly (0x80038DC4).
+                if walk && !motion.guns_ready && motion.turn_rate.abs() >= 729 {
                     motion.turn_rate = motion.turn_rate.signum() * 728;
                 }
             }
@@ -600,7 +729,7 @@ fn control(
     mut players: Query<(
         &mut Player,
         &mut Motion,
-        &mut WeaponState,
+        &WeaponState,
         &mut AnimationState,
         &mut Traversal,
         &mut SubmergedMotion,
@@ -608,7 +737,7 @@ fn control(
 ) {
     let dt = time.delta_secs();
     let controls = GroundControls::read(&pad);
-    for (mut player, mut motion, mut weapon, mut animation, mut traversal, mut submerged) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged) in &mut players {
         // LaraControl's water transitions precede the tick's state handler.
         if let Some(world) = world.as_deref() {
             match player.mode {
@@ -654,6 +783,8 @@ fn control(
             .as_deref()
             .and_then(|c| c.state(animation.animation))
             .map_or(motion.turn_frames >= 33.0, |state| state == 20);
+        motion.guns_ready = weapon.ready();
+        motion.camera_exact_slopes = clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(SLIDE_STATE);
         turn(
             &mut player,
             &mut motion,
@@ -662,8 +793,6 @@ fn control(
             fast_turn,
             clips.as_deref().and_then(|c| c.state(animation.animation)),
         );
-        weapon.cooldown_seconds = (weapon.cooldown_seconds - dt).max(0.0);
-        weapon.firing = false;
         if player.health <= 0 && matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
             player.health = -1;
         }
@@ -678,15 +807,6 @@ fn control(
             motion.velocity.x = 0.0;
             motion.velocity.z = 0.0;
             continue;
-        }
-        if player.health > 0 && pad.pressed(Button::Triangle) {
-            weapon.drawn = !weapon.drawn;
-        }
-        if player.health > 0 && weapon.drawn && pad.held(Button::Cross) && weapon.cooldown_seconds == 0.0 {
-            weapon.firing = true;
-            weapon.shot_serial += 1;
-            // Provisional pistol cadence; not yet measured from the PS1 weapon controller.
-            weapon.cooldown_seconds = 0.2;
         }
         if motion.grounded
             && pad.held(Button::Circle)
@@ -989,7 +1109,7 @@ fn integrate(
                 &mut traversal,
                 geometry,
                 clips.as_deref(),
-                !weapon.drawn && pad.held(Button::Cross),
+                weapon.hands_free() && pad.held(Button::Cross),
                 &tuning,
                 dt,
             );
@@ -1030,7 +1150,7 @@ fn integrate(
         }
         if matches!(player.mode, PlayerMode::Jump | PlayerMode::Fall)
             && !motion.grounded
-            && !weapon.drawn
+            && weapon.hands_free()
             && pad.held(Button::Cross)
             && let Some(state) = clips.as_deref().and_then(|c| c.state(animation.animation))
         {
@@ -1173,7 +1293,7 @@ fn integrate(
         if can_move {
             player.position.x = proposed.x;
             player.position.z = proposed.z;
-        } else if !weapon.drawn
+        } else if weapon.hands_free()
             && pad.held(Button::Cross)
             && pad.direction().y > 0.1
             && candidate_floor.is_some()
@@ -1363,7 +1483,11 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
             // Slow-turn control0x80038DD0/0x80038EA0 requests fast turn
             // above728 before decay (above364 afterward). The clip's
             // authored dispatch window decides when it can take effect.
-            if motion.turning != 0 && motion.turn_rate.abs() > TURN_DECAY && !controls.walk {
+            // With guns ready the turn handler requests it on each tick it
+            // runs; the stand tick that starts the turn (turn_frames 1) only
+            // asks for state 6/7 (pistols_turn_ready).
+            let ready_turn = motion.guns_ready && motion.turn_frames > 1.0;
+            if motion.turning != 0 && (ready_turn || (motion.turn_rate.abs() > TURN_DECAY && !controls.walk)) {
                 44
             } else if motion.turning < 0 {
                 13

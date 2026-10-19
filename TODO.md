@@ -158,12 +158,28 @@ it off. Record partial progress below without checking the parent item.
   routes and retained native sphere-output fixtures.
 
 
-- [ ] Pistols: draw/holster, firing cadence, targeting and shot/damage timing.
+- [x] Pistols: draw/holster, firing cadence, targeting and shot/damage timing.
+  LaraGun's status machine, held Draw/Action, arm frames, recoil and the
+  no-target re-tap quirk, target search/locks/arm swing, head/torso and
+  ResetLook, spread from the control random generator, sphere hits,
+  HitTarget, the fast turn with guns ready and the combat camera match18
+  no-poke routes tick by tick, nine held out, including a pad-only tiger
+  checkpoint with every shot's hit/miss and a kill.
+  [Evidence](docs/pistols-evidence.md), [tests](game/tests/pistols.rs).
+  Other guns, flares, hands-busy climbs/pickups and ricochets/smashables
+  remain. The slide's camera flag (exact slopes) now keeps the tiger
+  routes' camera exact through the knock-down slide.
 - [ ] Tiger and spider behavior: attack selection, contact and damage windows.
 - [ ] Pickups: alignment, animation and collection timing.
 - [ ] Switches and key/puzzle use: alignment, animation and trigger timing.
 - [ ] Doors: collision and floor/portal changes during opening/closing,
   including occupancy override.
+- [ ] State camera requests: Lara's state handlers set camera angle/elevation
+  offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
+  elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,
+  `0x80039BC8`, `0x80039CE0`, `0x8003A134`, `0x8003EADC`, `0x8005EFD8`.
+  Only the slide's flags 2 (exact slopes) is ported. Needs chase-mode
+  recordings. [Notes](docs/chase-camera-evidence.md).
 
 ## Appearance
 
@@ -175,6 +191,16 @@ it off. Record partial progress below without checking the parent item.
   vertex phase, animated field clock and dry-room isolation. All 64 wave-table
   entries exercised by native corner observations.
   [Evidence](docs/caustics-evidence.md), [tests](game/tests/caustics.rs).
+- [x] Pistol presentation: arm poses from the pistol animation object
+  (upper arms oriented from Lara's root, torso/head turns), hand/holster mesh
+  swaps at draw frame 13 and per-arm holster frame 12, muzzle flash meshes
+  and the gunfire dynamic light on items and room vertices. Draw, grip,
+  ready, aim and recoil screenshots line up with native captures.
+  [Evidence](docs/pistols-evidence.md#presentation),
+  [tests](game/tests/pistol_presentation.rs), `tools/pistols_visual_smoke.py`.
+  The additive gun-flash glow sprite (sprite sequences are not imported) and
+  the braid's collision with the gun arms (HairControl 0x8002F67C reads the
+  arm frames) remain.
 - [ ] Water-surface rendering, distortion and bubbles.
 - [ ] Distance darkening: original room/object depth shading and boundaries.
 - [ ] Distant texture LOD: original >=8192 room policy and texture selection.
@@ -328,6 +354,19 @@ it off. Record partial progress below without checking the parent item.
   the smoke now selects the post-edit doorway face. No format or template
   changes. Existing unrelated format/lint warnings remain.
   [Evidence](docs/drowning-evidence.md).
+- 2026-10-19: Pistol milestone: LaraGun, pistol draw/holster/aim/fire,
+  target search, HitTarget, ResetLook, the guns-ready fast turn and the
+  combat camera ported from the Wall runtime code. Eighteen no-poke routes
+  (nine held out) match tick by tick; the tiger routes replay the creature's
+  recorded pose and inject the recorded control-random state on shot ticks.
+  `cargo test --workspace --all-features` (423 tests) passed; Clippy is clean
+  for the changed files; the engine sandbox starts headless. Arm-pose
+  rendering is queued under Appearance.
+- 2026-10-19: Slide camera flag: the forward slide's handler sets camera
+  flags 2, which keeps the camera's slope flattening off for that tick
+  (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
+  routes now match the camera on every tick (was windowed to tick 102).
+  [Evidence](docs/chase-camera-evidence.md).
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
