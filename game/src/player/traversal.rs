@@ -110,7 +110,17 @@ pub(super) fn step(
         match clips.state(animation.animation) {
             Some(15) if pad.held(Button::Up) && jump_ahead_clear(world, player) => traversal.goal = 3,
             Some(3) if !matches!(traversal.goal, 1 | 2 | 8) => {
-                traversal.goal = if !weapon.drawn && pad.held(Button::Cross) { 11 } else { 3 };
+                // Forward-flight control resets reach/dive requests each tick
+                // and gives Walk's dive request priority over Action's reach
+                // (0x80038B88..0x80038C48). The current clip owns acceptance;
+                // fall35 has no range for52, so flight continues unchanged.
+                traversal.goal = if !weapon.drawn && pad.held(Button::R1) {
+                    52
+                } else if !weapon.drawn && pad.held(Button::Cross) {
+                    11
+                } else {
+                    3
+                };
             }
             _ => {}
         }

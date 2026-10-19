@@ -34,6 +34,11 @@ it off. Record partial progress below without checking the parent item.
   end before restarting. Five additional routes, with re-hold calibration
   explicitly labelled. [Evidence](docs/run-stop-evidence.md),
   [tests](game/tests/airborne.rs).
+- [x] Authored forward walking release and restart: both foot ranges,
+  committed stop/re-hold and release during walk-start/acceleration. Airborne
+  Walk requests and braking-wall state overrides also pass the former diagnostics
+  and five independent routes. [Evidence](docs/walk-stop-evidence.md),
+  [tests](game/tests/airborne.rs).
 
 ## Traversal
 
@@ -87,8 +92,8 @@ it off. Record partial progress below without checking the parent item.
   [tests](game/tests/airborne.rs).
 - [x] Ordinary cardinal running ledge departure and authored running/standing
   landing, with release, ignored airborne jump and later restart. Three complete
-  routes include two independent validations. Separate Walk and braking-wall
-  diagnostics remain open. [Evidence](docs/ledge-fall-evidence.md),
+  routes include two independent validations. The subsequent walking milestone
+  resolves its Walk and braking-wall diagnostics. [Evidence](docs/ledge-fall-evidence.md),
   [tests](game/tests/airborne.rs).
 
 ## Water
@@ -187,6 +192,18 @@ it off. Record partial progress below without checking the parent item.
   The full airborne smoke passes201 poses across22 routes, including41 new
   ledge-fall poses.
   [Evidence](docs/ledge-fall-evidence.md).
-- Next: the retained Walk and braking-wall diagnostics, corner airborne ceiling
-  impacts, fast-fall/slide recovery, remaining traversal and water.
+- 2026-10-18: Walking-stop and braking-wall milestone: the two unchanged prior
+  diagnostics now pass as explicitly labelled calibration, joined by five fresh
+  independent routes. All897 sampled ticks across thirteen columns pass. Walking
+  finishes authored strides and stops before restarting; airborne Walk requests52
+  without interrupting the fall clip, and braking-wall contact retains state12
+  until clip11's natural end. Workspace tests (218 passed), Clippy, all-target
+  builds, sandbox movement/rendering, and editor sandbox/Home byte-exact saves
+  and clip3 preview pass. No engine format or template change was needed.
+  All283 full-game poses across29 routes pass, including82 new poses.
+  A fresh diagnostic retains a vertical jump's front-wall clearance mismatch
+  beginning at field228. [Evidence](docs/walk-stop-evidence.md).
+- Next: vertical jump clearance over the front wall (the retained braking-wall
+  jump diagnostic), corner airborne ceiling impacts, fast-fall/slide recovery,
+  remaining traversal and water.
   Combat, interactions and appearance remain queued above.
