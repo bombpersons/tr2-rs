@@ -92,8 +92,10 @@ it off. Record partial progress below without checking the parent item.
   back-fall wall rebound now match six routes
   ([evidence](docs/fall-recovery-evidence.md)). Slide jumps, the back jump,
   mid-air twists, back-flight fast falls and the shared ledge fall match
-  twelve more ([evidence](docs/slide-jump-evidence.md)). Sideways jump
-  collision, the hop fall's reach and the standing jump's twist remain.
+  twelve more ([evidence](docs/slide-jump-evidence.md)). Side and
+  directional standing jumps, the running twist and the hop fall's reach
+  match sixteen more ([evidence](docs/side-jump-evidence.md)). The stop
+  collision's ceiling/clamp restore and wading compression remain.
 - [x] Ordinary grounded run-start room-wall stop and held-jump retry.
   The retained diagnostic and two fresh independent routes pass; see
   [evidence](docs/run-start-evidence.md) and [tests](game/tests/airborne.rs).
@@ -406,7 +408,7 @@ it off. Record partial progress below without checking the parent item.
   (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
   routes now match the camera on every tick (was windowed to tick 102).
   [Evidence](docs/chase-camera-evidence.md).
-- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, sideways jumps,
+- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
 
@@ -498,3 +500,11 @@ it off. Record partial progress below without checking the parent item.
   workspace tests pass; Clippy has only existing unrelated warnings; the
   standalone smoke matches 70 poses. No engine, format, editor or template
   change. [Evidence](docs/slide-jump-evidence.md).
+- 2026-10-20: Side and directional standing jumps: compression picks
+  Forward, Left, Right or Back by the first clear floor; the right, left and
+  standing back jumps share back flight at their own headings; Jump is taken
+  only from stop and run; the running twist, hop-fall reach and reach fast
+  fall match. Sixteen controlled-spawn routes compare 1376 ticks, nine
+  independent. All 496 workspace tests pass; Clippy reports nothing in the
+  changed files; the standalone smoke matches 67 poses. No engine, format,
+  editor or template change. [Evidence](docs/side-jump-evidence.md).

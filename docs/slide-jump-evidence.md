@@ -163,9 +163,8 @@ claimed.
 
 ## Not covered
 
-- The hop fall's reach 11 (clip 93 has a range into reach 94); the port
-  does not request it.
-- The standing jump's twist clip 207 (from clips 17/19).
+- The hop fall's reach 11 and the running jump's twist 207: since covered
+  by the [side-jump milestone](side-jump-evidence.md).
 - The stop collision's ceiling/clamp restore and slopes-as-walls/pits flags.
 - The 0x8008C4F6 front-rebound skip.
 - Generic `Fall` remains only for restored saves and the clipless fallback.

@@ -360,3 +360,32 @@ slide_jump_case!(heldout_roll_during_a_standing_jump_twists, "twist_roll_heldout
 slide_jump_case!(heldout_back_after_the_twist_window_keeps_flying, "twist_late_heldout");
 slide_jump_case!(heldout_roll_during_a_slide_back_jump_twists, "back_twist_roll_heldout");
 slide_jump_case!(heldout_hop_back_into_a_pit_fast_falls, "hop_pit_heldout");
+
+macro_rules! side_jump_case {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            compare_case(
+                include_str!(concat!("data/original/side_jump_", $case, ".csv")),
+                include_str!(concat!("data/original/side_jump_", $case, ".json")),
+            );
+        }
+    };
+}
+
+side_jump_case!(original_left_jump_off_the_block_fast_falls_into_the_pit, "left_pit");
+side_jump_case!(original_right_jump_across_the_block_lands_on_a_slope, "right_block");
+side_jump_case!(original_right_jump_toward_a_wall_jumps_straight_up, "right_wall");
+side_jump_case!(original_back_during_a_running_jump_twists_into_a_back_jump, "run_twist");
+side_jump_case!(original_action_during_a_hop_fall_reaches_and_grabs, "hop_reach");
+side_jump_case!(heldout_right_jump_off_the_block_fast_falls_into_the_pit, "right_pit_heldout");
+side_jump_case!(heldout_left_jump_toward_a_wall_jumps_straight_up, "left_wall_heldout");
+side_jump_case!(heldout_left_and_right_take_the_left_jump, "left_over_right_heldout");
+side_jump_case!(heldout_forward_and_right_take_the_forward_jump, "forward_over_right_heldout");
+side_jump_case!(heldout_blocked_right_and_back_take_the_back_jump, "wall_then_back_heldout");
+side_jump_case!(heldout_standing_back_jump_fast_falls_into_the_pit, "standing_back_heldout");
+side_jump_case!(heldout_opposite_direction_during_a_side_jump_does_not_twist, "side_twist_heldout");
+side_jump_case!(heldout_roll_during_a_running_jump_twists, "run_twist_roll_heldout");
+side_jump_case!(heldout_turning_running_jump_jumps_forward, "run_turn_jump_heldout");
+side_jump_case!(heldout_late_hop_fall_reach_misses_and_fast_falls, "hop_reach_late_heldout");
+side_jump_case!(heldout_walking_ignores_jump, "walk_jump_heldout");

@@ -66,11 +66,11 @@ fn apply_offset(player: &mut Player, offset: [i32; 3]) {
     player.position += Vec3::new((cos * x + sin * z).round(), -y, (cos * z - sin * x).round()) / 1024.0;
 }
 
-/// Compression handler0x800390C8 accepts a forward jump when the floor256
-/// ahead is no more than384 above the feet. GetHeightAhead0x8003DF60 samples
-/// at the head (762 above the feet), following portals at that height.
-fn jump_ahead_clear(world: &WorldGeometry, player: &Player) -> bool {
-    let angle = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+/// Compression handler0x800390C8 accepts a jump direction when the floor256
+/// that way is no more than384 above the feet. GetHeightAhead0x8003DF60
+/// samples at the head (762 above the feet), following portals at that height.
+fn jump_ahead_clear(world: &WorldGeometry, player: &Player, heading: f32) -> bool {
+    let angle = (heading * 65536.0 / std::f32::consts::TAU).round() as i32;
     let offset = Vec3::new(
         units(((engine::camera::chase::sin(angle) * 256) >> 14) as f32),
         PLAYER_HEIGHT,
@@ -117,7 +117,28 @@ pub(super) fn step(
     let entering = traversal.enter.take();
     if entering.is_none() && matches!(mode, PlayerMode::JumpingForward) {
         match clips.state(animation.animation) {
-            Some(15) if pad.held(Button::Up) && jump_ahead_clear(world, player) => traversal.goal = 3,
+            Some(15) => {
+                // Compression tries Forward, Left, Right then Back, taking
+                // the first clear one: goal3, 27, 26 or25, with the movement
+                // heading turned that way (0x800390F0..0x8003923C). With
+                // none, the request stays and compression ends in jump28.
+                use std::f32::consts::{FRAC_PI_2, PI};
+                let requests = [
+                    (Button::Up, 0.0, 3),
+                    (Button::Left, -FRAC_PI_2, 27),
+                    (Button::Right, FRAC_PI_2, 26),
+                    (Button::Down, PI, 25),
+                ];
+                if let Some(&(_, turn, goal)) = requests
+                    .iter()
+                    .find(|&&(button, turn, _)| pad.held(button) && jump_ahead_clear(world, player, player.yaw + turn))
+                {
+                    traversal.goal = goal;
+                    motion.movement_heading = Some(player.yaw + turn);
+                }
+            }
+            // Reach control0x80039070 requests fast fall9 at fall speed132.
+            Some(11) if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED => traversal.goal = 9,
             Some(3) => {
                 // Forward-flight control0x80038B88 resets reach/dive requests,
                 // then (unless landing1/2/8 is pending) requests in turn,
@@ -202,12 +223,13 @@ pub(super) fn step(
         }
     }
     let state = clips.state(animation.animation).unwrap_or(2);
-    if state == 25 && matches!(mode, PlayerMode::JumpingForward) {
-        // Twist210 chains into211, whose back-jump handler0x8003B71C
-        // owns this tick's move and collision.
+    if matches!(state, 25..=27) && matches!(mode, PlayerMode::JumpingForward) {
+        // Twist210 chains into211, and compression into takeoff74, 80 or
+        // 78; the back- and side-jump handlers (0x8003B71C..0x8003B7B8)
+        // own this tick's move and collision.
         player.mode = PlayerMode::FallingBack;
         traversal.enter = Some((animation.animation, animation.frame));
-        return super::backward::fall(player, motion, animation, traversal, world, clips, pad, dt);
+        return super::backward::fall(player, motion, animation, traversal, world, clips, weapon, pad, dt);
     }
     if mode == PlayerMode::FatalLanding {
         // Fatal fast-fall collision leaves the fall clip with goal8; its

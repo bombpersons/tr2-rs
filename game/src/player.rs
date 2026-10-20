@@ -115,7 +115,8 @@ pub enum PlayerMode {
     Back,
     /// State5: a complete backward hop; releasing Down does not cancel it.
     HopBack,
-    /// Hop-back over an edge: authored clip93, then its landing dispatch.
+    /// Back and side flight: the hop-back fall (state29), back jump (25) and
+    /// right/left jumps (26/27), through their landing dispatch.
     FallingBack,
     /// States22/21: finish the current stride and stop pose after release.
     StepLeft {
@@ -709,6 +710,9 @@ fn turn(
                 motion.turn_frames = 0.0;
             }
         }
+        // Stop requests compression on Jump before reading Up, Left or Right
+        // (0x80038B00); compression itself does not turn.
+        PlayerMode::Idle if alive && animation_state == Some(2) && pad.held(Button::Square) => {}
         // Stop delegates to the walk/run handler on the tick UP is pressed.
         PlayerMode::Idle if alive && direction.y > 0.1 => push(&mut motion.turn_rate, if walk { 728 } else { 1456 }),
         // Stop delegates DOWN+walk to state16 (0x80038B44..0x80038B5C).
@@ -1110,14 +1114,18 @@ fn control(
         let jump_requested = pad.pressed(Button::Square)
             || ((was_standing || (was_running && traversal.run_jump_ready)) && pad.held(Button::Square));
         if jump_requested && (!was_running || traversal.run_jump_ready) {
-            if direction.y >= 0.0 && direction.x.abs() <= 0.1 && side == 0.0 && clips.is_some() {
-                // Stop+Jump enters compression73 even with Up. Running asks
-                // for goal3 through its authored foot-dependent ranges;
-                // these select16 or18 (0x8003899C/0x800387B0).
-                traversal.enter = if was_running { None } else { Some((73, 0.0)) };
-                traversal.goal = if was_running { 3 } else { 15 };
-                player.mode = PlayerMode::JumpingForward;
-                motion.velocity = Vec3::ZERO;
+            if clips.is_some() {
+                // Only standing and running take Jump, whatever else is
+                // held. Stop+Jump enters compression73, whose control picks
+                // the direction. Running asks for goal3 through its authored
+                // foot-dependent ranges; these select16 or18
+                // (0x8003899C/0x800387B0).
+                if was_standing || was_running {
+                    traversal.enter = if was_running { None } else { Some((73, 0.0)) };
+                    traversal.goal = if was_running { 3 } else { 15 };
+                    player.mode = PlayerMode::JumpingForward;
+                    motion.velocity = Vec3::ZERO;
+                }
                 continue;
             }
             let jump_forward = if mode == PlayerMode::Run { RUN_JUMP_SPEED } else { JUMP_FORWARD_SPEED };
@@ -1252,6 +1260,7 @@ fn integrate(
             &mut traversal,
             geometry,
             clips.as_deref(),
+            weapon,
             &pad,
             dt,
         ) {

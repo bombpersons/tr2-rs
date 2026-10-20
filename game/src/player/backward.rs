@@ -15,12 +15,13 @@ pub(super) fn step(
     traversal: &mut Traversal,
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
+    weapon: &WeaponState,
     pad: &ControllerState,
     dt: f32,
 ) -> bool {
     let (Some(world), Some(clips)) = (world, clips) else { return false };
     if player.mode == PlayerMode::FallingBack {
-        return fall(player, motion, animation, traversal, world, clips, pad, dt);
+        return fall(player, motion, animation, traversal, world, clips, weapon, pad, dt);
     }
     if !motion.grounded || !matches!(player.mode, PlayerMode::Back | PlayerMode::HopBack) {
         return false;
@@ -155,9 +156,20 @@ pub(super) fn probes(position: Vec3, yaw: f32) -> [Vec3; 3] {
     offsets.map(|[x, z]| position + Vec3::new(units(x as f32), 0.0, units(z as f32)))
 }
 
-/// Back flight: the hop-back fall (state29) and back jump (state25),
-/// whose handlers share collision0x8003C250. Hands this tick to forward
-/// flight or fast fall when the clip enters state3 or9; returns false then.
+/// The flight heading relative to yaw: the back jump and hop-back fall
+/// face behind, the right and left jumps to the side (0x8003B71C..0x8003B7B8).
+fn flight_turn(state: Option<usize>) -> f32 {
+    match state {
+        Some(26) => std::f32::consts::FRAC_PI_2,
+        Some(27) => -std::f32::consts::FRAC_PI_2,
+        _ => std::f32::consts::PI,
+    }
+}
+
+/// Back and side flight: the hop-back fall (state29), back jump (25) and
+/// right/left jumps (26/27), whose handlers share collision0x8003C250 at
+/// their own headings. Hands this tick to forward flight, reach or fast
+/// fall when the clip enters state3, 11 or9; returns false then.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn fall(
     player: &mut Player,
@@ -166,20 +178,33 @@ pub(super) fn fall(
     traversal: &mut Traversal,
     world: &WorldGeometry,
     clips: &PlayerAnimations,
+    weapon: &WeaponState,
     pad: &ControllerState,
     dt: f32,
 ) -> bool {
     traversal.animation_stepped = true;
     let entering = traversal.enter.take();
-    if entering.is_none() && !matches!(traversal.goal, 1 | 2) {
-        // Back-jump control0x800395D4 requests twist68 on Forward or Roll
-        // (input&0x1001); both controls request fast fall9 at fall speed
-        // 132 (0x800395E8, 0x80039728). Hop-fall reach11 is not ported.
+    if entering.is_none() {
+        // Each control requests fast fall9 at fall speed132. Otherwise the
+        // back jump requests twist68 on Forward or Roll (input&0x1001)
+        // unless goal1 or2 is pending, and the right and left jumps on the
+        // opposite direction unless goal2 is; their clips have no twist
+        // range (0x800395D4, 0x80039638, 0x8003969C). Hop-fall control
+        // then requests reach11 on Action with free hands (0x80039720).
         let fall_speed = -motion.velocity.y * 1024.0 / ORIGINAL_FPS;
+        let twist = match clips.state(animation.animation) {
+            Some(25) => !matches!(traversal.goal, 1 | 2) && (pad.held(Button::Up) || pad.held(Button::Circle)),
+            Some(26) => traversal.goal != 2 && pad.held(Button::Left),
+            Some(27) => traversal.goal != 2 && pad.held(Button::Right),
+            _ => false,
+        };
         if fall_speed >= 132.0 {
             traversal.goal = 9;
-        } else if clips.state(animation.animation) == Some(25) && (pad.held(Button::Up) || pad.held(Button::Circle)) {
+        } else if twist {
             traversal.goal = 68;
+        }
+        if clips.state(animation.animation) == Some(29) && weapon.hands_free() && pad.held(Button::Cross) {
+            traversal.goal = 11;
         }
     }
     let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
@@ -198,18 +223,20 @@ pub(super) fn fall(
         }
     }
     let state = clips.state(a.animation);
-    if matches!(state, Some(3 | 9)) {
-        // Twist213 continues as forward flight; fall83/36 as fast fall.
-        // Their handlers own this tick's move and collision.
-        player.mode = if state == Some(3) { PlayerMode::JumpingForward } else { PlayerMode::FastFalling };
+    if matches!(state, Some(3 | 9 | 11)) {
+        // Twist213 continues as forward flight, hop-fall reach94 as
+        // forward reach, and fall83/84/85/36 as fast fall. Their handlers
+        // own this tick's move and collision.
+        player.mode = if state == Some(9) { PlayerMode::FastFalling } else { PlayerMode::JumpingForward };
         traversal.enter = Some((a.animation, a.frame));
         return false;
     }
-    let facing = player.yaw + std::f32::consts::PI;
+    let facing = player.yaw + flight_turn(state);
     let back = Vec3::new(facing.sin(), 0.0, facing.cos());
-    if motion.grounded && state == Some(25) {
-        // Back-jump takeoff74 moves at its authored speed with no gravity;
-        // its end command launches75 (slide_jump_back.csv: 99, then 50/-94).
+    if motion.grounded && matches!(state, Some(25..=27)) {
+        // Takeoffs74/80/78 move at their authored speed with no gravity;
+        // the end command launches75/81/79 (slide_jump_back.csv: 99, then
+        // 50/-94).
         motion.velocity = back * clips.speed(animation).unwrap_or(0.0);
     }
     for cue in cues {
@@ -237,8 +264,9 @@ pub(super) fn fall(
     // velocity already points that way, so only its magnitude is needed.
     let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round();
     player.position += ground_displacement(motion.velocity, dt);
-    // Hop-fall collision0x8003B9A8 faces backwards and shares forward-jump
-    // collision's limits and deflection (0x8003B9C0..0x8003B9F4). It lands
+    // Hop-fall collision0x8003B9A8 faces backwards, and the jumps their own
+    // way; all share forward-jump collision's limits and deflection
+    // (0x8003B9C0..0x8003B9F4, 0x8003C250). It lands
     // without a second animation advance; the next tick accepts goal2.
     motion.movement_heading = Some(facing);
     motion.velocity =
