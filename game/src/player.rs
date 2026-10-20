@@ -462,8 +462,9 @@ pub fn spawn_lara(entity: &mut bevy::ecs::system::EntityCommands, ctx: &engine::
         .world
         .floor_at(player.position, player.room)
         .is_some_and(|hit| (hit.height - player.position.y).abs() < 0.05);
+    // Mid-air, that clip is forward flight's state3 with goal3.
     if !grounded {
-        player.mode = PlayerMode::Fall;
+        player.mode = PlayerMode::JumpingForward;
     }
     let animation = if grounded { AnimationState::default() } else { AnimationState::at_frame(34, 0.0) };
     let gun = if weapons::UNARMED_LEVELS.contains(&ctx.world.data.name.as_str()) { Gun::Unarmed } else { Gun::Pistols };
@@ -472,20 +473,22 @@ pub fn spawn_lara(entity: &mut bevy::ecs::system::EntityCommands, ctx: &engine::
         Motion { grounded, ..default() },
         animation,
         WeaponState::holding(gun),
+        Traversal { goal: if grounded { 2 } else { 3 }, ..default() },
         Name::new("Player"),
     ));
     crate::braid::spawn(entity, ctx);
 }
 
 /// Copy Lara's state into the engine's [`Avatar`].
-pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &mut Avatar)>) {
-    for (player, motion, weapon, mut avatar) in &mut players {
+pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &AnimationState, &mut Avatar)>) {
+    for (player, motion, weapon, animation, mut avatar) in &mut players {
         avatar.set_if_neq(Avatar {
             position: player.position,
             yaw: player.yaw,
             room: player.room,
             grounded: motion.grounded,
-            falling: player.mode == PlayerMode::Fall,
+            // A mid-air spawn plays forward flight's fall clip34.
+            falling: player.mode == PlayerMode::Fall || (!motion.grounded && animation.animation == 34),
             armed: weapon.ready(),
             // LaraGun asks for the combat camera while drawing or ready
             // (0x8004001C, 0x800401B8), looking at the target or along the aim.
@@ -904,11 +907,23 @@ fn control(
             continue;
         }
         match player.mode {
-            PlayerMode::Sliding { direction, .. } => {
+            PlayerMode::Sliding { direction, backwards } => {
                 // WALL.PSX clip70: speed50. Native Wall entry confirms no-input
                 // sliding at50 units/tick and cardinal downhill headings.
                 motion.velocity = direction * units(50.0 * ORIGINAL_FPS);
-                if pad.pressed(Button::Square) {
+                if clips.is_some() {
+                    // Slide controls0x80039598/0x80039808 read held Jump
+                    // without the opposite direction (input&0x12, &0x11):
+                    // a forward slide requests jump3, a back slide jump25.
+                    // The slide clip's authored range enters the takeoff.
+                    let away = if backwards { pad.held(Button::Up) } else { pad.held(Button::Down) };
+                    traversal.goal = match (pad.held(Button::Square) && !away, backwards) {
+                        (true, false) => 3,
+                        (true, true) => 25,
+                        (false, false) => 24,
+                        (false, true) => 32,
+                    };
+                } else if pad.pressed(Button::Square) {
                     player.mode = PlayerMode::Jump;
                     motion.grounded = false;
                     motion.velocity += Vec3::Y * JUMP_SPEED;
@@ -1099,7 +1114,7 @@ fn control(
                 // Stop+Jump enters compression73 even with Up. Running asks
                 // for goal3 through its authored foot-dependent ranges;
                 // these select16 or18 (0x8003899C/0x800387B0).
-                traversal.enter = if was_running { None } else { Some(73) };
+                traversal.enter = if was_running { None } else { Some((73, 0.0)) };
                 traversal.goal = if was_running { 3 } else { 15 };
                 player.mode = PlayerMode::JumpingForward;
                 motion.velocity = Vec3::ZERO;
@@ -1213,6 +1228,22 @@ fn integrate(
             dt,
         ) {
             continue;
+        }
+        if let PlayerMode::Sliding { backwards, .. } = player.mode
+            && let (Some(world), Some(clips)) = (geometry, clips.as_deref())
+            && matches!(traversal.goal, 3 | 25)
+        {
+            // A slide-jump request leaves through the slide clip's authored
+            // range into takeoff76 (state3) or74 (state25), at the frame
+            // the range names. That clip's handler owns this tick's move and collision.
+            let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
+            let mut goal = AnimationGoal { state: traversal.goal };
+            advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt));
+            if clips.state(a.animation) == Some(traversal.goal) {
+                player.mode = if backwards { PlayerMode::FallingBack } else { PlayerMode::JumpingForward };
+                traversal.enter = Some((a.animation, a.frame));
+                motion.velocity = Vec3::ZERO;
+            }
         }
         if backward::step(
             &mut player,
@@ -1559,15 +1590,17 @@ fn integrate(
                 traversal.goal = goal;
                 traversal.animation_stepped = true;
                 animation.enter(clip, 0.0, clip);
-            } else if old.y - hit.height <= STEP_HEIGHT {
+            } else if old.y - hit.height <= if clips.is_some() { units(384.0) } else { STEP_HEIGHT } {
+                // Ground collisions settle any drop the ledge-fall test
+                // accepts (stop0x8003AAB8, walk0x8003A818).
                 player.position.y = hit.height;
             } else {
                 motion.grounded = false;
-                if player.mode == PlayerMode::Run && clips.is_some() && old.y - hit.height > units(384.0) {
-                    // Run collision calls the shared ledge-fall test
-                    // 0x8003A500: a drop >384 enters clip34/state3, retains
-                    // horizontal speed and starts with zero fall speed.
-                    // Subsequent flight and landing use forward collision.
+                if clips.is_some() {
+                    // Stop, walk, run, step and wade collisions share the
+                    // ledge-fall test0x8003A500: a centre drop >384 enters
+                    // clip34/state3, retains horizontal speed and starts with
+                    // zero fall speed. Forward collision owns the flight.
                     player.mode = PlayerMode::JumpingForward;
                     motion.velocity.y = 0.0;
                     traversal.goal = 3;

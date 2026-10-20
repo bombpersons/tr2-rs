@@ -335,3 +335,28 @@ fall_case!(original_backward_hop_onto_a_steep_ramp_slides_off_backwards, "ramp_h
 fall_case!(heldout_angled_pit_jump_fast_falls_into_a_heavy_landing, "pit_angled_heldout");
 fall_case!(heldout_delayed_ramp_run_slides_off_and_restarts, "ramp_run_late_heldout");
 fall_case!(heldout_backward_hop_from_a_new_start_slides_off_backwards, "ramp_back_near_heldout");
+
+macro_rules! slide_jump_case {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            compare_case(
+                include_str!(concat!("data/original/slide_jump_", $case, ".csv")),
+                include_str!(concat!("data/original/slide_jump_", $case, ".json")),
+            );
+        }
+    };
+}
+
+slide_jump_case!(original_jump_from_a_forward_slide_takes_the_running_jump, "forward");
+slide_jump_case!(original_jump_from_a_back_slide_takes_the_back_jump, "back");
+slide_jump_case!(heldout_late_jump_from_a_forward_slide, "forward_late_heldout");
+slide_jump_case!(heldout_back_with_jump_keeps_the_forward_slide, "forward_away_heldout");
+slide_jump_case!(heldout_jump_held_into_a_back_slide_jumps_at_once, "back_held_heldout");
+slide_jump_case!(heldout_forward_with_jump_keeps_the_back_slide, "back_away_heldout");
+slide_jump_case!(original_back_during_a_standing_jump_twists_into_a_back_jump, "twist_pit");
+slide_jump_case!(original_forward_during_a_slide_back_jump_twists_into_forward_flight, "twist_slide_back");
+slide_jump_case!(heldout_roll_during_a_standing_jump_twists, "twist_roll_heldout");
+slide_jump_case!(heldout_back_after_the_twist_window_keeps_flying, "twist_late_heldout");
+slide_jump_case!(heldout_roll_during_a_slide_back_jump_twists, "back_twist_roll_heldout");
+slide_jump_case!(heldout_hop_back_into_a_pit_fast_falls, "hop_pit_heldout");

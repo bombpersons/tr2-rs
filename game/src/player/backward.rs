@@ -3,6 +3,7 @@
 //! at the boundary; gameplay positions remain Bevy y-up metres.
 use super::*;
 use collision::Contact;
+use engine::world::Command;
 
 /// Walk-back accepts +/-384 heights; hop-back has no downward probe limit
 /// and falls when its centre is over200 above the floor (0x8003B414/0x8003AC48).
@@ -19,8 +20,7 @@ pub(super) fn step(
 ) -> bool {
     let (Some(world), Some(clips)) = (world, clips) else { return false };
     if player.mode == PlayerMode::FallingBack {
-        fall(player, motion, animation, traversal, world, clips, dt);
-        return true;
+        return fall(player, motion, animation, traversal, world, clips, pad, dt);
     }
     if !motion.grounded || !matches!(player.mode, PlayerMode::Back | PlayerMode::HopBack) {
         return false;
@@ -155,34 +155,86 @@ pub(super) fn probes(position: Vec3, yaw: f32) -> [Vec3; 3] {
     offsets.map(|[x, z]| position + Vec3::new(units(x as f32), 0.0, units(z as f32)))
 }
 
+/// Back flight: the hop-back fall (state29) and back jump (state25),
+/// whose handlers share collision0x8003C250. Hands this tick to forward
+/// flight or fast fall when the clip enters state3 or9; returns false then.
 #[allow(clippy::too_many_arguments)]
-fn fall(
+pub(super) fn fall(
     player: &mut Player,
     motion: &mut Motion,
     animation: &mut AnimationState,
     traversal: &mut Traversal,
     world: &WorldGeometry,
     clips: &PlayerAnimations,
+    pad: &ControllerState,
     dt: f32,
-) {
+) -> bool {
     traversal.animation_stepped = true;
+    let entering = traversal.enter.take();
+    if entering.is_none() && !matches!(traversal.goal, 1 | 2) {
+        // Back-jump control0x800395D4 requests twist68 on Forward or Roll
+        // (input&0x1001); both controls request fast fall9 at fall speed
+        // 132 (0x800395E8, 0x80039728). Hop-fall reach11 is not ported.
+        let fall_speed = -motion.velocity.y * 1024.0 / ORIGINAL_FPS;
+        if fall_speed >= 132.0 {
+            traversal.goal = 9;
+        } else if clips.state(animation.animation) == Some(25) && (pad.held(Button::Up) || pad.held(Button::Circle)) {
+            traversal.goal = 68;
+        }
+    }
     let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
     let mut goal = AnimationGoal { state: traversal.goal };
-    advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt));
+    let cues = if let Some((clip, frame)) = entering {
+        a = ObjectAnimation { animation: clip, frame };
+        vec![]
+    } else {
+        advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt))
+    };
     *animation = AnimationState::at_frame(a.animation, a.frame);
-    if motion.grounded && clips.state(a.animation) == Some(2) {
+    for cue in &cues {
+        if matches!(cue.command, Command::Effect { effect: 0, .. }) {
+            // Effect0 turns yaw180 degrees (twist212's last frame).
+            player.yaw = (player.yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU);
+        }
+    }
+    let state = clips.state(a.animation);
+    if matches!(state, Some(3 | 9)) {
+        // Twist213 continues as forward flight; fall83/36 as fast fall.
+        // Their handlers own this tick's move and collision.
+        player.mode = if state == Some(3) { PlayerMode::JumpingForward } else { PlayerMode::FastFalling };
+        traversal.enter = Some((a.animation, a.frame));
+        return false;
+    }
+    let facing = player.yaw + std::f32::consts::PI;
+    let back = Vec3::new(facing.sin(), 0.0, facing.cos());
+    if motion.grounded && state == Some(25) {
+        // Back-jump takeoff74 moves at its authored speed with no gravity;
+        // its end command launches75 (slide_jump_back.csv: 99, then 50/-94).
+        motion.velocity = back * clips.speed(animation).unwrap_or(0.0);
+    }
+    for cue in cues {
+        if let Command::JumpVelocity([vertical, horizontal]) = cue.command
+            && cue.at_end
+        {
+            motion.velocity =
+                back * units(horizontal as f32 * ORIGINAL_FPS) + Vec3::Y * units(-vertical as f32 * ORIGINAL_FPS);
+            motion.grounded = false;
+        }
+    }
+    if motion.grounded && state == Some(2) {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
         // The landing clip's stop collision runs on this same tick.
-        super::traversal::start_slide(player, motion, animation, traversal, world);
-        return;
+        super::traversal::stop_collision(player, motion, animation, traversal, world);
+        return true;
     }
     let old = player.position;
     let fall_speed = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round();
-    motion.velocity.y -= units(if fall_speed < 128.0 { 6.0 } else { 1.0 } * ORIGINAL_FPS) * original_frames(dt);
+    if !motion.grounded {
+        motion.velocity.y -= units(if fall_speed < 128.0 { 6.0 } else { 1.0 } * ORIGINAL_FPS) * original_frames(dt);
+    }
     // AnimateLara moves along the heading the previous collision left; the
     // velocity already points that way, so only its magnitude is needed.
-    let facing = player.yaw + std::f32::consts::PI;
     let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round();
     player.position += ground_displacement(motion.velocity, dt);
     // Hop-fall collision0x8003B9A8 faces backwards and shares forward-jump
@@ -223,4 +275,5 @@ fn fall(
     } else {
         player.position = old;
     }
+    true
 }

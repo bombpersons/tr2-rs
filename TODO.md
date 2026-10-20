@@ -90,8 +90,10 @@ it off. Record partial progress below without checking the parent item.
   ordinary running ledge falls now use authored running/standing landings.
   Unassisted fast falls, slope landings into slides, slide-edge falls and the
   back-fall wall rebound now match six routes
-  ([evidence](docs/fall-recovery-evidence.md)). Sideways jump collision,
-  walk-off ledge falls and slide jumps remain.
+  ([evidence](docs/fall-recovery-evidence.md)). Slide jumps, the back jump,
+  mid-air twists, back-flight fast falls and the shared ledge fall match
+  twelve more ([evidence](docs/slide-jump-evidence.md)). Sideways jump
+  collision, the hop fall's reach and the standing jump's twist remain.
 - [x] Ordinary grounded run-start room-wall stop and held-jump retry.
   The retained diagnostic and two fresh independent routes pass; see
   [evidence](docs/run-start-evidence.md) and [tests](game/tests/airborne.rs).
@@ -404,7 +406,7 @@ it off. Record partial progress below without checking the parent item.
   (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
   routes now match the camera on every tick (was windowed to tick 102).
   [Evidence](docs/chase-camera-evidence.md).
-- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, walk-off ledge falls and slide jumps,
+- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, sideways jumps,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
 
@@ -486,3 +488,13 @@ it off. Record partial progress below without checking the parent item.
   unrelated warnings; the standalone smoke matches 53 poses. A native-core
   stall on the mirrored ramp is documented, not fitted. No engine, format,
   editor or template change. [Evidence](docs/fall-recovery-evidence.md).
+- 2026-10-20: Slide jumps, twists and ledge falls: slide controls request
+  the forward or back jump through authored takeoffs; the back jump shares
+  the hop fall's flight handler; Back/Roll twists between forward and back
+  flight; back flight fast falls at 132; the stop collision adds the ledge
+  fall and shift; every clip-driven grounded mode uses the shared ledge
+  fall, and mid-air spawns and water exits enter forward flight. Twelve
+  controlled-spawn routes compare 1372 ticks, seven independent. All 480
+  workspace tests pass; Clippy has only existing unrelated warnings; the
+  standalone smoke matches 70 poses. No engine, format, editor or template
+  change. [Evidence](docs/slide-jump-evidence.md).

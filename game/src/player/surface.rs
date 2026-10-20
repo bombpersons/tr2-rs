@@ -74,7 +74,7 @@ pub(super) fn leave_water(
         // Otherwise fall out of the water with a quarter of the swim speed.
         _ => {
             let forward = player.forward() * from_quarters(quarters(water.speed) / 4 * 4);
-            player.mode = PlayerMode::Fall;
+            player.mode = PlayerMode::JumpingForward;
             traversal.goal = 3;
             animation.enter(FALL_CLIP, 0.0, FALL_CLIP);
             motion.velocity = forward;

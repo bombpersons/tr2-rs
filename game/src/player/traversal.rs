@@ -16,7 +16,9 @@ pub struct Traversal {
     #[reflect(ignore)]
     pub(super) animation_stepped: bool,
     #[reflect(ignore)]
-    pub(super) enter: Option<usize>,
+    /// A clip (and frame within it) the next animation pass starts at
+    /// instead of advancing.
+    pub(super) enter: Option<(usize, f32)>,
 }
 
 impl Default for Traversal {
@@ -95,7 +97,8 @@ pub(super) fn step(
     dt: f32,
 ) -> bool {
     let mut mode = player.mode;
-    let fast_fall_control = matches!(mode, PlayerMode::FastFalling);
+    // A back-flight handoff into fast fall ran back-jump control this tick.
+    let fast_fall_control = matches!(mode, PlayerMode::FastFalling) && traversal.enter.is_none();
     if !matches!(
         mode,
         PlayerMode::JumpingUp { .. }
@@ -115,21 +118,31 @@ pub(super) fn step(
     if entering.is_none() && matches!(mode, PlayerMode::JumpingForward) {
         match clips.state(animation.animation) {
             Some(15) if pad.held(Button::Up) && jump_ahead_clear(world, player) => traversal.goal = 3,
-            Some(3) if !matches!(traversal.goal, 1 | 2 | 8) => {
-                // Forward-flight control resets reach/dive requests each tick
-                // and gives Walk's dive request priority over Action's reach
-                // (0x80038B88..0x80038C48). The current clip owns acceptance;
-                // fall35 has no range for52, so flight continues unchanged.
-                traversal.goal = if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED {
-                    // A long drop overrides both requests (0x80038C4C..0x80038C60).
-                    9
-                } else if weapon.hands_free() && pad.held(Button::R1) {
-                    52
-                } else if weapon.hands_free() && pad.held(Button::Cross) {
-                    11
-                } else {
-                    3
-                };
+            Some(3) => {
+                // Forward-flight control0x80038B88 resets reach/dive requests,
+                // then (unless landing1/2/8 is pending) requests in turn,
+                // each overriding the last: Action's reach11, Back or Roll's
+                // twist68 (input&0x1002), Walk's dive52 and, at fall speed
+                // 132, fast fall9 (0x80038C4C..0x80038C60). A twist request
+                // otherwise persists. The current clip owns acceptance:
+                // fall35 has no range for52 or68.
+                if matches!(traversal.goal, 52 | 11) {
+                    traversal.goal = 3;
+                }
+                if !matches!(traversal.goal, 1 | 2 | 8) {
+                    if weapon.hands_free() && pad.held(Button::Cross) {
+                        traversal.goal = 11;
+                    }
+                    if pad.held(Button::Down) || pad.held(Button::Circle) {
+                        traversal.goal = 68;
+                    }
+                    if weapon.hands_free() && pad.held(Button::R1) {
+                        traversal.goal = 52;
+                    }
+                    if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED {
+                        traversal.goal = 9;
+                    }
+                }
             }
             _ => {}
         }
@@ -160,9 +173,9 @@ pub(super) fn step(
     let mut goal = AnimationGoal { state: traversal.goal };
     // AnimateLara advances before collision; commands can move the actor
     // before that same tick's collision (0x80042E08..0x80043248).
-    let cues = if let Some(clip) = entering {
+    let cues = if let Some((clip, frame)) = entering {
         a.animation = clip;
-        a.frame = 0.0;
+        a.frame = frame;
         vec![]
     } else {
         advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt))
@@ -173,6 +186,10 @@ pub(super) fn step(
     for cue in cues {
         match cue.command {
             Command::SetPosition(offset) if cue.at_end => apply_offset(player, offset),
+            Command::Effect { effect: 0, .. } => {
+                // Effect0 turns yaw180 degrees (twist210's last frame).
+                player.yaw = (player.yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU);
+            }
             Command::JumpVelocity([vertical, horizontal]) if cue.at_end => {
                 let lift = match mode {
                     PlayerMode::JumpingUp { launch_speed } if launch_speed > 0.0 => launch_speed,
@@ -185,6 +202,13 @@ pub(super) fn step(
         }
     }
     let state = clips.state(animation.animation).unwrap_or(2);
+    if state == 25 && matches!(mode, PlayerMode::JumpingForward) {
+        // Twist210 chains into211, whose back-jump handler0x8003B71C
+        // owns this tick's move and collision.
+        player.mode = PlayerMode::FallingBack;
+        traversal.enter = Some((animation.animation, animation.frame));
+        return super::backward::fall(player, motion, animation, traversal, world, clips, pad, dt);
+    }
     if mode == PlayerMode::FatalLanding {
         // Fatal fast-fall collision leaves the fall clip with goal8; its
         // authored dispatch enters25, whose final frame holds the body.
@@ -237,7 +261,7 @@ pub(super) fn step(
         PlayerMode::Hanging { .. } if state == 19 => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } => hang_collision(player, motion, animation, traversal, world, pad),
         PlayerMode::Recovering
-            if state == 2 && motion.grounded && start_slide(player, motion, animation, traversal, world) =>
+            if state == 2 && motion.grounded && stop_collision(player, motion, animation, traversal, world) =>
         {
             true
         }
@@ -413,21 +437,41 @@ pub(super) fn deflect(player: &mut Player, motion: &mut Motion, contact: Contact
     }
 }
 
-/// Stop collision0x8003AA20 calls TestLaraSlide0x8003DD30 on any floor
-/// tilted3 or more. Its body probe (limits+/-384, ceiling0) supplies the
-/// shift, applied before the slide clip starts with no speed. The downhill
+/// Stop collision0x8003AA20 after the clip's move: a body probe (limits
+/// +/-384, ceiling0), then the ledge-fall test0x8003A500, then
+/// TestLaraSlide0x8003DD30, else ShiftItem and settling onto the floor.
+/// True when Lara left standing for flight or a slide.
+///
+/// Ledge fall: a centre floor more than384 below enters clip34/state3 with
+/// zero fall speed and the current speed. Slide: on a floor tilted3 or
+/// more the shift applies and the slide starts with no speed. The downhill
 /// heading is cardinal, X winning a tie; Lara slides forward (70, state24)
 /// when facing within90 degrees of it, otherwise backward (104, state32).
-/// The slopes-as-walls/pits probe flags are not modelled (collision.rs).
-pub(super) fn start_slide(
+/// Not modelled: the ceiling/clamp restore0x8003C4C4 and the slopes-as-
+/// walls/pits probe flags (collision.rs).
+pub(super) fn stop_collision(
     player: &mut Player,
     motion: &mut Motion,
     animation: &mut AnimationState,
     traversal: &mut Traversal,
     world: &WorldGeometry,
 ) -> bool {
-    let [tx, tz] = world.slope_at(player.position, player.room).map(i32::from);
+    let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let limits = collision::Limits { radius: 100, bad_pos: 384, bad_neg: -384, bad_ceiling: 0 };
+    let at = collision::original(player.position);
+    let info = collision::info(world, at, at, player.room, 762, yaw as i16 as i32, &limits);
+    if info.mid.floor > 384 {
+        player.mode = PlayerMode::JumpingForward;
+        animation.enter(34, 0.0, 34);
+        traversal.goal = 3;
+        motion.grounded = false;
+        motion.velocity.y = 0.0;
+        return true;
+    }
+    player.position += collision::level(info.shift);
+    let [tx, tz] = world.slope_at(player.position - collision::level(info.shift), player.room).map(i32::from);
     if tx.abs() < 3 && tz.abs() < 3 {
+        player.position.y -= units(info.mid.floor as f32);
         return false;
     }
     let downhill = if tz.abs() > tx.abs() {
@@ -437,11 +481,6 @@ pub(super) fn start_slide(
     } else {
         16384
     };
-    let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
-    let limits = collision::Limits { radius: 100, bad_pos: 384, bad_neg: -384, bad_ceiling: 0 };
-    let at = collision::original(player.position);
-    let info = collision::info(world, at, at, player.room, 762, yaw as i16 as i32, &limits);
-    player.position += collision::level(info.shift);
     let forward = (downhill - yaw + 16384) & 0xffff <= 0x8000;
     let heading = collision::angle_radians(downhill);
     let (clip, state, facing) = if forward { (70, 24, downhill) } else { (104, 32, downhill - 32768) };

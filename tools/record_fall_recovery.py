@@ -24,6 +24,8 @@ SPAWNS = {
     'ramp_back': (31488, 0, 88576, -16384, 36),
     'pit_angled': (19712, 1024, 79200, 2500, 5),
     'ramp_back_near': (31360, 0, 88320, -16384, 36),
+    # Used by record_slide_jump.py: the raised block's pit edge behind Lara.
+    'pit_edge_back': (19968, 1024, 79700, -32768, 5),
 }
 # name: (spawn, fields, input). Cases recorded after the implementation end
 # in _heldout and were never used to refine the rule.

@@ -58,7 +58,7 @@ animation advance.
 
 - `traversal.rs`: forward-flight control requests goal 9 at
   `FAST_FALL_SPEED`. Landing recovery in state 2 runs `start_slide` (the slide
-  test with the stop collision's shift). The frontal rebound is a shared
+  test with the stop collision's shift; now `stop_collision`). The frontal rebound is a shared
   `rebound` function.
 - `backward.rs`: the back fall classifies the body with `collision::info`,
   applies the shift and uses `rebound`/`deflect`. A landing whose dispatch
@@ -117,6 +117,6 @@ blob shadow; HUD and raster parity are not claimed.
 - The stop collision's slopes-as-walls/pits probe flags (`collision.rs` notes this).
 - Its ceiling and ledge-fall branches during landing recovery.
 - The slide's same-angle no-reentry check.
-- Jumping out of a slide.
-- Walking off a ledge into the generic `Fall` mode.
+- Jumping out of a slide and walking off a ledge: since covered by the
+  [slide-jump milestone](slide-jump-evidence.md).
 - Fast-fall side contacts.
