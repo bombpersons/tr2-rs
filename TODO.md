@@ -129,8 +129,8 @@ it off. Record partial progress below without checking the parent item.
   dispatch and oxygen consumption now match700 ticks across six complete
   replays, including three independent validations. Wall, floor and ceiling
   collision (0x80045CB8) matches four further independent routes and both
-  back-hop entries to their end. Current/roll and wading branches
-  remain. [Evidence](docs/swimming-evidence.md),
+  back-hop entries to their end. Current/roll branches remain. Shallow-water stand-up and wading were
+  subsequently ported in [a separate milestone](docs/wading-evidence.md). [Evidence](docs/swimming-evidence.md),
   [tests](game/tests/swimming.rs).
 - [x] Oxygen exhaustion and authored submerged/surface death: signed damage,
   delayed animation dispatch, braking, angular recovery, buoyancy and terminal
@@ -142,8 +142,16 @@ it off. Record partial progress below without checking the parent item.
   Surfacing, surface strokes/turns/wall contact, the tread dive, climb-out,
   deep-water entry and surface air refill now match eleven complete PSX routes,
   five independent. [Evidence](docs/surface-evidence.md),
-  [tests](game/tests/surface.rs). Wading, swan-dive entry and the surface
-  air bar remain.
+  [tests](game/tests/surface.rs). Swan-dive entry and the surface air bar remain; ordinary wading was
+  subsequently verified in [a separate milestone](docs/wading-evidence.md).
+
+- [x] Ordinary shallow-water wading: authored gait/start/stops, steering/bank,
+  standing turns, backward/sidestep movement, submerged/surface stand-up,
+  shallow exit and deeper forward surface entry. Thirteen complete PSX routes
+  replay1599 observed controller ticks; six are independent. Nine complete
+  chase-camera routes also pass. Native display scheduling, static contacts,
+  exceptional collision and transition cameras remain separate.
+  [Evidence](docs/wading-evidence.md), [tests](game/tests/wading.rs).
 
 ## Combat and interactions
 
@@ -370,3 +378,13 @@ it off. Record partial progress below without checking the parent item.
 - Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
+
+- 2026-10-20: Wading milestone: thirteen complete PSX routes replay1599 native
+  controller ticks, six independent, including native input/tick watches for
+  display pauses and catch-up groups. All gameplay comparisons pass; nine
+  complete chase-camera routes pass. Required water contact is an independent
+  component and the engine exposes an optional chase elevation. Workspace tests
+  (441 including doc tests), all-target builds and Clippy pass; existing unrelated
+  lint warnings remain. Standalone pose checks, sandbox movement/rendering and
+  editor sandbox/Home saves plus Lara gait177 preview are retained. No persistent
+  format or template change. [Evidence](docs/wading-evidence.md).

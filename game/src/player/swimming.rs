@@ -34,6 +34,7 @@ pub struct SwimmingTuning {
     pub bank_drag: i32,
     pub bank_limit: i32,
     pub surface: SurfaceTuning,
+    pub wading: super::WadingTuning,
 }
 
 /// Surface swimming (0x80044264..0x80044FC4); speeds in the source's
@@ -223,6 +224,7 @@ pub(super) fn step(
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
     tuning: &SwimmingTuning,
+    wading: &mut super::Wading,
     dt: f32,
 ) {
     let Some(clips) = clips else { return };
@@ -252,6 +254,7 @@ pub(super) fn step(
         death_collision(player, motion, water, world, old, tuning, dt);
     } else if let Some(world) = world {
         collide(player, motion, water, world, old);
+        super::wading::stand_up(player, motion, water, animation, traversal, wading, world);
     }
     if let Some(world) = world {
         // UpdateLaraRoom at the feet; a dry room hands over to LaraControl's
@@ -328,8 +331,8 @@ fn collide(player: &mut Player, motion: &mut Motion, water: &mut SubmergedMotion
     player.position = collision::level(at);
     motion.pitch = radians(pitch as i16 as i32);
     player.yaw = radians(yaw as i16 as i32);
-    // GetWaterDepth finds no water here: undo the move. Shallow water (depth
-    // 512 or less) starts wading in the original, which is not ported.
+    // GetWaterDepth finds no water here: undo the move. The caller then
+    // applies the shallow-water stand-up branch with its animation components.
     if world.water_surface(player.position, player.room).is_none() {
         player.position = old;
         water.speed = 0.0;

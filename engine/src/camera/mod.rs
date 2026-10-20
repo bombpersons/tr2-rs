@@ -175,7 +175,9 @@ fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, anim
     let space = chase::Space { world, camera: geometry && hit.is_some_and(|hit| hit.height <= target.world().y) };
     let mut eye = Point::from_world(camera.position, camera.room);
     let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
-    let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, 0, chase::CHASE_DISTANCE);
+    let elevation =
+        player.camera_elevation.map_or(0, |radians| (radians * 65536.0 / std::f32::consts::TAU).round() as i32);
+    let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, elevation, chase::CHASE_DISTANCE);
     camera.chase_distance2 = Some(distance2);
     if !camera.initialized {
         eye = ideal;

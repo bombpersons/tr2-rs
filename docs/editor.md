@@ -605,3 +605,10 @@ Room policies now receive stable authored corner indices and room identity
 for optional animated vertex shading. This metadata is generated in memory
 from existing level geometry. The editor keeps static authored shades; Home
 tread preview and byte-exact untouched save/reopen still pass.
+
+Wading reuses Home Lara's baked gait/start/stop/stand-up clips176–186,190,192;
+preview placement8, clip177 to inspect the stride. The per-type `swimming.wading`
+tuning lives in the existing game JSON table. Contact and camera elevation are
+runtime components, with no new persistent level fields. The editor continues
+using ordinary rendering and animation-only previews; sandbox and Home no-op
+saves preserve the source bytes.

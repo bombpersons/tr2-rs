@@ -88,6 +88,7 @@ pub(super) fn leave_water(
 /// LaraControl's entry test (0x80042624): once the feet are 384 below the
 /// surface of water at least 475 deep, the actor starts the authored entry
 /// dive (clip112) and its fall speed becomes 3/2 of a swim speed.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn enter_water(
     player: &mut Player,
     motion: &mut Motion,
@@ -96,10 +97,8 @@ pub(super) fn enter_water(
     traversal: &mut Traversal,
     world: &WorldGeometry,
     tuning: &SwimmingTuning,
+    wading: &mut super::Wading,
 ) {
-    if world.data.rooms.get(player.room).is_none_or(|room| !room.water) {
-        return;
-    }
     let (Some(surface), Some(floor)) =
         (world.water_surface(player.position, player.room), world.floor_at(player.position, player.room))
     else {
@@ -107,7 +106,19 @@ pub(super) fn enter_water(
     };
     let below = original_y(player.position.y) - original_y(surface);
     let depth = original_y(floor.height) - original_y(surface);
-    if below < 384 || depth < 475 {
+    if below < 384 {
+        return;
+    }
+    if depth < 475 {
+        if below > 384 {
+            wading.active = true;
+            if motion.grounded {
+                traversal.goal = 2;
+            }
+        }
+        return;
+    }
+    if world.data.rooms.get(player.room).is_none_or(|room| !room.water) {
         return;
     }
     let fall_speed = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
@@ -267,6 +278,7 @@ pub(super) fn step(
     clips: Option<&PlayerAnimations>,
     action: bool,
     tuning: &SwimmingTuning,
+    wading: &mut super::Wading,
     dt: f32,
 ) {
     let Some(clips) = clips else { return };
@@ -351,6 +363,32 @@ pub(super) fn step(
         && state == FORWARD
         && climb_out(player, motion, water, animation, traversal, world, action, &front, &left, &right, &mid)
     {
+        return;
+    }
+    // LaraTestWaterStepOut0x80044BB4. A floor less than128 above the
+    // probe line keeps a side-step goal, otherwise it uses the authored190.
+    // Front contact cannot step out; the Action climb was tested above.
+    if contact != Contact::Front && mid.floor < 0 {
+        let clip = if mid.floor < -128 { 190 } else { 177 };
+        if clip == 190 {
+            traversal.goal = 2;
+        } else {
+            traversal.goal = match traversal.goal {
+                48 => 22,
+                49 => 21,
+                _ => 65,
+            };
+        }
+        animation.enter(clip, 0.0, clip);
+        player.position.y -= units((695 + front.floor) as f32);
+        player.room = super::body_room(world, player.position, player.room, 381.0);
+        player.mode = if clip == 190 { PlayerMode::PullingUp } else { PlayerMode::Wade };
+        motion.grounded = true;
+        motion.velocity = Vec3::ZERO;
+        motion.pitch = 0.0;
+        water.speed = 0.0;
+        water.bank = 0.0;
+        wading.active = true;
         return;
     }
     // The surface wrapper updates the room 100 below the feet.

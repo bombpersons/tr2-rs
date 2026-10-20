@@ -104,6 +104,8 @@ pub struct Avatar {
     /// The avatar's state asks the camera to read floors and ceilings as
     /// they are this tick, without flattening steep slopes.
     pub camera_exact_slopes: bool,
+    /// Optional chase elevation requested by gameplay this tick, radians.
+    pub camera_elevation: Option<f32>,
 }
 
 pub struct SchedulePlugin;

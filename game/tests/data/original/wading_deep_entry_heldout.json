@@ -1,0 +1,793 @@
+{
+  "source": "Supplied USA Rev3 disc via psx native",
+  "checkpoint": "validation/wading/deep_entry_start/state.bin",
+  "checkpoint_sha256": "3061aaad2f6394289693bdec0f70c77b94cb57905bd354cf08b7d1f7c95f44c6",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "validation/wading/deep_entry_start/state.bin",
+    "--frames",
+    "200",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"UP\"], \"until\": 80}]",
+    "--out",
+    "validation/wading/deep_entry_heldout",
+    "--save-state",
+    "--snapshot-every",
+    "2",
+    "--watch",
+    "8008c572:2",
+    "--watch",
+    "8008aad4:4",
+    "--sample",
+    "8017c88a:i16:state",
+    "--sample",
+    "8017c88c:i16:goal",
+    "--sample",
+    "8017c890:i16:animation",
+    "--sample",
+    "8017c892:i16:animation_frame",
+    "--sample",
+    "8017c894:i16:room",
+    "--sample",
+    "8017c89a:i16:speed",
+    "--sample",
+    "8017c89c:i16:swim_speed",
+    "--sample",
+    "8017c89e:i16:health",
+    "--sample",
+    "8017c8bc:i16:pitch",
+    "--sample",
+    "8017c8be:i16:yaw",
+    "--sample",
+    "8017c8c0:i16:roll",
+    "--sample",
+    "8017c8b0:i32:x",
+    "--sample",
+    "8017c8b4:i32:y",
+    "--sample",
+    "8017c8b8:i32:z",
+    "--sample",
+    "8008c570:i16:turn_rate",
+    "--sample",
+    "8008c4f4:i16:water_mode",
+    "--sample",
+    "8008c4fe:i16:air",
+    "--sample",
+    "8008b258:i32:camera_x",
+    "--sample",
+    "8008b25c:i32:camera_y",
+    "--sample",
+    "8008b260:i32:camera_z",
+    "--sample",
+    "8008b268:i32:target_x",
+    "--sample",
+    "8008b26c:i32:target_y",
+    "--sample",
+    "8008b270:i32:target_z",
+    "--sample",
+    "8008b264:i16:camera_room",
+    "--sample",
+    "8008b2a0:i16:camera_elevation",
+    "--summary"
+  ],
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "UP"
+      ],
+      "until": 80
+    }
+  ],
+  "independent": true,
+  "pokes": [],
+  "build": {
+    "id": "src-659f5da213e93fb5-release",
+    "profile": "release",
+    "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.2"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.2",
+    "bios": "/home/maisy/.local/share/psx/bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "validation/wading/deep_entry_start/state.bin",
+    "media": "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "logic_ticks": [
+    {
+      "field": 0,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 2,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 4,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 6,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 8,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 10,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 12,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 14,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 16,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 18,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 20,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 22,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 24,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 26,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 28,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 30,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 32,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 34,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 36,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 38,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 40,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 42,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 44,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 46,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 48,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 50,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 52,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 54,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 56,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 58,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 60,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 62,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 64,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 66,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 68,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 70,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 72,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 74,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 76,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 78,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 280812
+    },
+    {
+      "field": 80,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 82,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 84,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 86,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 88,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 90,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 92,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 94,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 96,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 98,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 100,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 102,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 104,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 106,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 108,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 110,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 112,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 114,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 116,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 118,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 120,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 122,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 124,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 126,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 128,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 130,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 132,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 134,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 136,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 138,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 140,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 142,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 144,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 146,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 148,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 150,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 152,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 154,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 156,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 158,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 160,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 162,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 164,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 166,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 168,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 170,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 172,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 174,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 176,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 178,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 180,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 182,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 184,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 186,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 188,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 190,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 192,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 194,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 196,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    },
+    {
+      "field": 198,
+      "input": 0,
+      "buttons": [],
+      "pc": 281104
+    }
+  ],
+  "logic_watch_sha256": "9e0c45648e6558ea9cf4b6077454ed03b15f5e85e408b79ce033b8277960167d",
+  "samples_sha256": "300fb2313b914c537a38c7efeec48a65bcddc18325c36c2e73335acd4c366661",
+  "verify_camera": false,
+  "camera_limitations": "Gameplay is compared throughout. Stand-up flags1 and the general surface camera remain unported; these complete transition routes do not claim camera parity."
+}

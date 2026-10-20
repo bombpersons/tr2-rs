@@ -158,6 +158,8 @@ x 30419 and keep pitching down 364 per tick past the ±15470 limit while they
 sink, through stroke, glide and tread.
 
 Not ported: static-mesh collision (`0x8001BA24`, no statics in these water
-rooms), the slope/lava pit flags (cleared underwater), wading from water 512
-or less deep (`0x80045BA4`'s other branch; wading is not ported at all),
+rooms), the slope/lava pit flags (cleared underwater),
 water currents (`0x80045EE0`) and the fly cheat's skip.
+
+The shallow-water stand-up branch of `0x80045BA4` was subsequently ported and
+verified in [the wading milestone](wading-evidence.md).

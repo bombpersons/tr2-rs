@@ -22,6 +22,7 @@
     "shot_sound": 8
    },
    "swimming": {
+    "wading": {"leave_depth":384,"surface_depth":731,"bank_push":273,"bank_limit":2002,"bank_drag":182,"camera_elevation":-4004},
     "max_speed": 50.0,
     "acceleration": 2.0,
     "drag": 1.5,

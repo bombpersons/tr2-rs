@@ -82,8 +82,9 @@ rest of the workspace tests still pass.
 - Submerged collision (`0x80045CB8`) was later ported in
   [a separate change](swimming-evidence.md#submerged-collision-0x80045cb8);
   both hop entries now run to their end.
-- Wading (water mode 4) and the shallow-water stand-up branch are not ported;
-  shallow water is now walked on as ground. Swan-dive entries (states 52/53),
+- Wading (water mode4), shallow stand-up and the ordinary forward surface
+  handoffs were subsequently ported in [a separate milestone](wading-evidence.md).
+  Swan-dive entries (states52/53),
   water currents, splash/sound effects and Look at the surface remain separate
   work. Drowning and the authored surface death were later verified in
   [a separate milestone](drowning-evidence.md).

@@ -1,0 +1,1050 @@
+{
+  "source": "Supplied USA Rev3 disc via psx native",
+  "checkpoint": "validation/wading/start/state.bin",
+  "checkpoint_sha256": "3d6abc31622b1c44eb6f319bfd11c234cb9d75f63c70e4f54f9d62e4888cf92b",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "validation/wading/start/state.bin",
+    "--frames",
+    "260",
+    "--input",
+    "[{\"frame\": 0, \"buttons\": [\"UP\", \"RIGHT\"], \"until\": 64}, {\"frame\": 64, \"buttons\": [\"UP\"], \"until\": 120}]",
+    "--out",
+    "validation/wading/turn",
+    "--save-state",
+    "--snapshot-every",
+    "2",
+    "--watch",
+    "8008c572:2",
+    "--watch",
+    "8008aad4:4",
+    "--sample",
+    "8017c88a:i16:state",
+    "--sample",
+    "8017c88c:i16:goal",
+    "--sample",
+    "8017c890:i16:animation",
+    "--sample",
+    "8017c892:i16:animation_frame",
+    "--sample",
+    "8017c894:i16:room",
+    "--sample",
+    "8017c89a:i16:speed",
+    "--sample",
+    "8017c89c:i16:swim_speed",
+    "--sample",
+    "8017c89e:i16:health",
+    "--sample",
+    "8017c8bc:i16:pitch",
+    "--sample",
+    "8017c8be:i16:yaw",
+    "--sample",
+    "8017c8c0:i16:roll",
+    "--sample",
+    "8017c8b0:i32:x",
+    "--sample",
+    "8017c8b4:i32:y",
+    "--sample",
+    "8017c8b8:i32:z",
+    "--sample",
+    "8008c570:i16:turn_rate",
+    "--sample",
+    "8008c4f4:i16:water_mode",
+    "--sample",
+    "8008c4fe:i16:air",
+    "--sample",
+    "8008b258:i32:camera_x",
+    "--sample",
+    "8008b25c:i32:camera_y",
+    "--sample",
+    "8008b260:i32:camera_z",
+    "--sample",
+    "8008b268:i32:target_x",
+    "--sample",
+    "8008b26c:i32:target_y",
+    "--sample",
+    "8008b270:i32:target_z",
+    "--sample",
+    "8008b264:i16:camera_room",
+    "--sample",
+    "8008b2a0:i16:camera_elevation",
+    "--summary"
+  ],
+  "input": [
+    {
+      "frame": 0,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "until": 64
+    },
+    {
+      "frame": 64,
+      "buttons": [
+        "UP"
+      ],
+      "until": 120
+    }
+  ],
+  "independent": false,
+  "pokes": [],
+  "build": {
+    "id": "src-659f5da213e93fb5-release",
+    "profile": "release",
+    "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.2"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.2",
+    "bios": "/home/maisy/.local/share/psx/bios/11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "validation/wading/start/state.bin",
+    "media": "/home/maisy/projects/reverse_engineering/psx/external_agent_tests/tomb_raider/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "logic_ticks": [
+    {
+      "field": 1,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 3,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 5,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 7,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 9,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 11,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 13,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 15,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 17,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 19,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 21,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 23,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 25,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 27,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 29,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 31,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 33,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 35,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 37,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 39,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 41,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 43,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 45,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 47,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 49,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 51,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 53,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 55,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 57,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 59,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 61,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 63,
+      "input": 9,
+      "buttons": [
+        "UP",
+        "RIGHT"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 65,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 67,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 69,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 71,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 73,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 75,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 77,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 79,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 81,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 83,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 85,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 87,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 89,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 91,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 93,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 95,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 97,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 99,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 101,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 103,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 105,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 107,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 109,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 111,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 113,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 115,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 118,
+      "input": 1,
+      "buttons": [
+        "UP"
+      ],
+      "pc": 245832
+    },
+    {
+      "field": 121,
+      "input": 0,
+      "buttons": [],
+      "pc": 245832
+    },
+    {
+      "field": 121,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 123,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 125,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 127,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 129,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 131,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 133,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 135,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 137,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 139,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 141,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 143,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 145,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 147,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 149,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 151,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 153,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 155,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 157,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 159,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 161,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 163,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 165,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 167,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 169,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 171,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 173,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 175,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 177,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 179,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 181,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 183,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 185,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 187,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 189,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 191,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 193,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 195,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 197,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 199,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 201,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 203,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 205,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 207,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 209,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 211,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 213,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 215,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 217,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 219,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 221,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 223,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 225,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 227,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 229,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 231,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 233,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 235,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 237,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 239,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 241,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 243,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 245,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 247,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 249,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 251,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 253,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 255,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 257,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    },
+    {
+      "field": 259,
+      "input": 0,
+      "buttons": [],
+      "pc": 240212
+    }
+  ],
+  "logic_watch_sha256": "5a7df5d1fed30c668398ff73a18248199e210a1e37e67ac5854f0c5067bae265",
+  "samples_sha256": "8c7fe0981a9c3f2de64f461e88b6ac0c7cfaecb3a7cc98243032dcea06246563",
+  "verify_camera": true
+}

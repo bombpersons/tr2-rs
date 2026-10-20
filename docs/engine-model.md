@@ -242,3 +242,8 @@ trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
 4. Floor-data trigger types and actions beyond those exercised in Wall. The
    dispatchers are known: 8 trigger types through `0x800100FC` and 12
    actions through `0x8001011C`, both in TestTriggers `0x8001EE30`.
+
+Chase framing accepts an optional per-tick elevation request on `Avatar` (radians);
+the game owns water/state selection and the engine owns camera geometry. This is
+runtime state and does not change level serialization. Wading evidence is in
+[the dedicated report](wading-evidence.md).

@@ -26,7 +26,9 @@ mod forward;
 mod rolling;
 mod surface;
 mod swimming;
+mod wading;
 pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
+pub use wading::{Wading, WadingTuning};
 pub mod arms;
 pub mod weapons;
 pub use weapons::{Arm, Gun, GunHit, GunSound, GunStatus, GunTuning, WeaponState};
@@ -65,7 +67,7 @@ const TURN_DECAY: i32 = 364;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal, SubmergedMotion)]
+#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal, SubmergedMotion, Wading)]
 pub struct Player {
     /// Feet position; rendering synchronizes this into Transform.
     pub position: Vec3,
@@ -104,6 +106,8 @@ pub enum PlayerMode {
     #[default]
     Idle,
     Walk,
+    /// Authored shallow-water forward gait (state65); contact lives in Wading.
+    Wade,
     Run,
     /// State16: authored backward walk, including its start and stop clips.
     Back,
@@ -211,6 +215,8 @@ pub struct Motion {
     /// The slide handler 0x80039598 (state 24) sets camera flags 2 when it
     /// runs, so the camera reads slopes exactly this tick.
     pub camera_exact_slopes: bool,
+    /// State camera elevation request, radians, cleared before each control tick.
+    pub camera_elevation: Option<f32>,
 }
 
 impl Default for Motion {
@@ -228,6 +234,7 @@ impl Default for Motion {
             movement_heading: None,
             guns_ready: false,
             camera_exact_slopes: false,
+            camera_elevation: None,
         }
     }
 }
@@ -296,7 +303,7 @@ pub struct PlayerRulesPlugin;
 impl Plugin for PlayerRulesPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, AvatarPlugin);
-        app.register_type::<Traversal>();
+        app.register_type::<Traversal>().register_type::<Wading>();
         app.insert_resource(crate::interactions::swimming_tuning());
         app.insert_resource(crate::interactions::pistol_tuning());
         app.add_message::<GunSound>().add_message::<GunHit>().register_type::<WeaponState>();
@@ -467,6 +474,7 @@ pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &mut A
             // (0x8004001C, 0x800401B8), looking at the target or along the aim.
             aim: weapon.aiming_camera().then(|| weapon.camera_aim()),
             camera_exact_slopes: motion.camera_exact_slopes,
+            camera_elevation: motion.camera_elevation,
             alive: player.health > 0,
         });
     }
@@ -733,13 +741,26 @@ fn control(
         &mut AnimationState,
         &mut Traversal,
         &mut SubmergedMotion,
+        &mut Wading,
     )>,
 ) {
     let dt = time.delta_secs();
     let controls = GroundControls::read(&pad);
-    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading) in &mut players {
+        motion.camera_elevation = None;
         // LaraControl's water transitions precede the tick's state handler.
         if let Some(world) = world.as_deref() {
+            wading::transitions(
+                &mut player,
+                &mut motion,
+                &mut submerged,
+                &mut animation,
+                &mut traversal,
+                &mut wading,
+                world,
+                clips.as_deref(),
+                &tuning.wading,
+            );
             match player.mode {
                 PlayerMode::Swimming => surface::leave_water(
                     &mut player,
@@ -750,7 +771,7 @@ fn control(
                     world,
                 ),
                 PlayerMode::Surface | PlayerMode::Dead => {}
-                _ => surface::enter_water(
+                _ if !wading.active => surface::enter_water(
                     &mut player,
                     &mut motion,
                     &mut submerged,
@@ -758,7 +779,9 @@ fn control(
                     &mut traversal,
                     world,
                     &tuning,
+                    &mut wading,
                 ),
+                _ => {}
             }
         }
         let animation = &*animation;
@@ -785,6 +808,19 @@ fn control(
             .map_or(motion.turn_frames >= 33.0, |state| state == 20);
         motion.guns_ready = weapon.ready();
         motion.camera_exact_slopes = clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(SLIDE_STATE);
+        if wading::control(
+            &mut player,
+            &mut motion,
+            &mut submerged,
+            animation,
+            &mut traversal,
+            &wading,
+            &pad,
+            clips.as_deref(),
+            &tuning,
+        ) {
+            continue;
+        }
         turn(
             &mut player,
             &mut motion,
@@ -1095,11 +1131,12 @@ fn integrate(
         &mut AnimationState,
         &mut Traversal,
         &mut SubmergedMotion,
+        &mut Wading,
     )>,
 ) {
     let dt = time.delta_secs();
     let geometry = world.as_deref();
-    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading) in &mut players {
         if player.mode == PlayerMode::Surface {
             surface::step(
                 &mut player,
@@ -1111,6 +1148,7 @@ fn integrate(
                 clips.as_deref(),
                 weapon.hands_free() && pad.held(Button::Cross),
                 &tuning,
+                &mut wading,
                 dt,
             );
             continue;
@@ -1125,8 +1163,22 @@ fn integrate(
                 geometry,
                 clips.as_deref(),
                 &tuning,
+                &mut wading,
                 dt,
             );
+            continue;
+        }
+        if wading::step(
+            &mut player,
+            &mut motion,
+            &mut submerged,
+            &mut animation,
+            &mut traversal,
+            &wading,
+            geometry,
+            clips.as_deref(),
+            dt,
+        ) {
             continue;
         }
         if rolling::step(&mut player, &mut motion, &mut animation, &mut traversal, geometry, clips.as_deref(), dt) {
@@ -1497,6 +1549,7 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
                 103
             }
         }
+        PlayerMode::Wade => 186,
         PlayerMode::Walk => {
             if controls.direction.y == 0.0 {
                 STANDING_CLIP
@@ -1703,12 +1756,14 @@ fn animate(
 
 /// Commit visual placement after object pushes, without stepping the animation
 /// a second time. The camera and the render hierarchy see the same final actor.
-fn sync_transform(mut players: Query<(&Player, &Motion, &SubmergedMotion, &mut Transform)>) {
-    for (player, motion, submerged, mut transform) in &mut players {
+fn sync_transform(mut players: Query<(&Player, &Motion, &SubmergedMotion, &Wading, &mut Transform)>) {
+    for (player, motion, submerged, wading, mut transform) in &mut players {
         transform.translation = player.position;
         transform.rotation = Quat::from_rotation_y(player.yaw);
         if matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
             transform.rotation *= Quat::from_rotation_x(-motion.pitch) * Quat::from_rotation_z(-submerged.bank);
+        } else if wading.active || player.mode == PlayerMode::Wade {
+            transform.rotation *= Quat::from_rotation_z(-submerged.bank);
         }
     }
 }
