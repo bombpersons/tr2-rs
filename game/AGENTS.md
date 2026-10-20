@@ -268,6 +268,26 @@ calls in screen space. It is for *checking* your rebuild, never for shipping:
 - A capture can stand in as a temporary backdrop while the real stage is not
   decoded yet. Mark it as such in code and in the README.
 
+### Keep it extensible
+
+The port is the base for authoring new levels, enemies and player models
+later (`../docs/roadmap.md`, Layer 0). Accuracy comes first; these rules only
+decide how the accurate code is organised:
+
+- Register each type's behaviour through the registry
+  (`register_object_type`, `ObjectType::on_spawn`). Shared systems never
+  `match` on type ids; they read components the type's registration added.
+- Port enemies onto shared creature components and systems (pathfinding over
+  navigation boxes, mood, senses, attack ranges) with per-type parameters,
+  rather than one controller per enemy. Factor out what the evidence shows
+  they share; keep what differs in the type's own plugin.
+- Keep tuning numbers as named constants grouped per feature, with their
+  evidence, so they can later move into tuning assets (`TuningPlugin`)
+  unchanged.
+- When a controller relies on a clip, state or animation command number,
+  name it as a constant and list it with the others for that model, so the
+  set a replacement model must provide is written down in one place.
+
 ### Verify
 
 - `cargo test --workspace --all-features` with per-tick trajectory
