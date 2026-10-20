@@ -24,7 +24,7 @@ fn main() {
             app.insert_resource(game::display::view_settings())
                 .insert_resource(game::presentation::Session { title: level.is_none(), ..Default::default() })
                 .insert_resource(game::presentation::LevelRequest { name: level.unwrap_or_else(|| "wall".into()) })
-                .add_plugins(game::GamePlugin);
+                .add_plugins(game::GamePlugins);
         },
     });
 }

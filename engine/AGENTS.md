@@ -3,8 +3,9 @@
 `engine/` is the reusable machinery this game runs on. Someone should be able
 to make a *different* game with it, without the original's content and without
 this game's rules. It builds on `psx-bevy` (re-exported as `engine::psx`,
-`engine::shell`, `engine::testing`, ...). Edit `psx-bevy` only where that is
-the right place, keeping template updates mergeable (`docs/template.md`).
+`engine::shell`, `engine::testing`, ...); build on it rather than editing it
+(`psx-bevy/AGENTS.md` says when an edit is fine, `docs/template.md` lists
+them).
 
 ## Cut it where the original cuts
 
@@ -14,15 +15,22 @@ Most PS1 games already separate:
   object placement, trigger and script tables, setup values.
 - **Code written per object type**: the player's state handlers, each enemy's
   AI, special traps and bosses.
+- **Code shared between types**: routines the original runs for a whole family
+  (every creature's AI info, mood, path search, turning and movement; one
+  firing path for every gun; one pickup routine). This is a cut too: it
+  becomes one module with per-type parameters, in `game/` when it is this
+  game's rules, here when another game would need it (`world::BoxSearch`).
 
 If the engine's formats express what the original's tables express, and
 per-object code stays as code, generalising costs no accuracy. Accuracy breaks
-when you invent abstractions the original doesn't have (a generic "enemy
-behaviour" schema, a scripting language for traps, a physics component that
-replaces hand-written movement rules): they lose update order, timing within
-a tick, integer rounding and special cases. `docs/engine-model.md` records,
-from evidence, what the original treats as data and what as code; this crate
-follows it.
+when ported code is replaced by abstractions the original doesn't have (a
+generic "enemy behaviour" schema, a scripting language for traps, a physics
+component that replaces hand-written movement rules): they lose update order,
+timing within a tick, integer rounding and special cases. Configurable layers
+like these can come after parity, built on top of the ported code, and must
+reproduce its numbers exactly when given the original's parameters.
+`docs/engine-model.md` records, from evidence, what the original treats as
+data, as shared code and as per-type code; this crate follows it.
 
 ## Placing code
 
@@ -33,10 +41,13 @@ Decide where something goes before writing it:
    this game's characters or items.
 2. **Did the original read it from a table?** Then it's data in an asset that
    engine code interprets. Don't hardcode it.
-3. **Did the original hardcode it per object type?** Then it's a controller in
+3. **Did the original run one routine for several types?** Then port it once,
+   as a shared module whose per-type parameters and hooks are the ones the
+   original has. Don't copy it into each controller.
+4. **Did the original hardcode it per object type?** Then it's a controller in
    `game/`, registered with the type registry and ported faithfully, quirks
    included. Don't generalise it into a schema.
-4. **Is it a design number inside a controller** (speed, damage, timer)? Put it
+5. **Is it a design number inside a controller** (speed, damage, timer)? Put it
    in a per-type tuning file the controller reads (`config::TuningPlugin`).
    Leave structural details (update order, rounding) in code.
 
@@ -55,14 +66,25 @@ The skeleton is a starting point; reshape it to match `docs/engine-model.md`.
   PSX evidence and existing trajectories (docs/tick-order-evidence.md).
 - `objects.rs`, **object type registry**: type id → spawn hook, plus metadata
   (name, tuning resource). Adding a type means registering it, never editing a
-  central `match`. Unknown ids are counted in `UnknownObjectTypes`.
-- `triggers.rs`, **action registry**: action id → one-shot handler system.
-  Unknown actions are logged and counted in `UnknownActions`, never ignored or
-  mapped to something else. `TriggerVolume` is a placeholder detector: replace
-  it with the original's trigger model and keep the registry.
+  central `match`. Unknown ids are counted in `ObjectDiagnostics`. Registering
+  a type twice panics; `replace_object_type` swaps a registered entry (for
+  mods).
+- `triggers.rs`, **floor triggers and action names**: the engine dispatches
+  the level's floor triggers; actions it does not handle itself are sent as
+  `TriggerAction` messages, and a game (or mod) registers each name it
+  handles with `register_trigger_action` and reads the messages. Unhandled
+  names are counted in `TriggerDiagnostics`, never ignored or mapped to
+  something else. `ObjectActivated` reports activations in action order.
 - `level.rs`, **`LevelData`**: what a level holds, in the engine's format.
   Grow it with what the original's levels actually contain.
-- `config.rs`: RON loading for tuning and tables.
+- `config.rs`: RON loading for tuning and tables, through the layered asset
+  folders (`engine::assets`), so a mod's files replace the game's.
+
+Every kind of content the original dispatches on (object types, pickups,
+weapons, trigger actions, cutscenes, cameras, sounds; follow how the original
+dispatches each) is added the same way: an entry in a registry or table plus
+per-type data or code. A new enemy or weapon of an existing kind should need
+no edit to the shared code it runs on.
 
 ## Formats
 

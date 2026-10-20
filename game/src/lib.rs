@@ -1,5 +1,5 @@
 //! Tomb Raider II on the `engine` crate, as a library: `src/main.rs` opens
-//! the window and adds [`GamePlugin`]; tests in `tests/` drive the same
+//! the window and adds [`GamePlugins`]; tests in `tests/` drive the same
 //! plugins headless (`engine::testing`).
 //!
 //! The engine draws levels, runs floor triggers, the camera and animation.
@@ -8,6 +8,9 @@
 //! ([`interactions`], `data/object_types.json`), sounds ([`audio`]), menus
 //! and HUD ([`presentation`]) and saves ([`save`]). Rules plugins stay free of
 //! rendering so they run in tests.
+//!
+//! Mods are crates built on this library (see `mods/example`): keep what a
+//! mod would reuse `pub`, and each feature plugin usable on its own.
 pub mod audio;
 pub mod braid;
 pub mod caustics;
@@ -25,6 +28,7 @@ pub mod tiger;
 pub mod water_palette;
 pub mod winston;
 
+use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 use engine::psx::Region;
 use engine::shell::TickRate;
@@ -50,21 +54,26 @@ pub fn tick_rate(region: Region) -> TickRate {
     TickRate::every_nth_field(region, FIELDS_PER_TICK)
 }
 
-/// The whole game: add each feature's plugin here.
-pub struct GamePlugin;
+/// The whole game: the engine, then each feature's plugin. A group, so a
+/// crate built on the game can drop or swap one feature:
+/// `GamePlugins.build().disable::<presentation::PresentationPlugin>()`.
+///
+/// The creature types (`tiger`, `spider`, `winston`) come with
+/// [`interactions::InteractionsPlugin`]; a mod changes one with
+/// `replace_creature` or `replace_object_type` rather than disabling it.
+pub struct GamePlugins;
 
-impl Plugin for GamePlugin {
-    fn build(&self, app: &mut App) {
-        app.add_plugins((
-            engine::EnginePlugin,
-            player::PlayerRulesPlugin,
-            interactions::InteractionsPlugin,
-            presentation::PresentationPlugin,
-            audio::GameAudioPlugin,
-            subdivision::SubdivisionPlugin,
-            sky::SkyPlugin,
-            water_palette::WaterPalettePlugin,
-        ));
+impl PluginGroup for GamePlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(engine::EnginePlugin)
+            .add(player::PlayerRulesPlugin)
+            .add(interactions::InteractionsPlugin)
+            .add(presentation::PresentationPlugin)
+            .add(audio::GameAudioPlugin)
+            .add(subdivision::SubdivisionPlugin)
+            .add(sky::SkyPlugin)
+            .add(water_palette::WaterPalettePlugin)
     }
 }
 

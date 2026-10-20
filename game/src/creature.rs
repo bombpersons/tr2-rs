@@ -877,13 +877,27 @@ pub struct CreatureControls(std::collections::BTreeMap<u16, CreatureControlFn>);
 
 /// Registering a creature type's control function.
 pub trait AppCreatures {
+    /// Panics if `kind` already has a control function.
     fn register_creature(&mut self, kind: u16, control: CreatureControlFn) -> &mut Self;
+    /// Replaces a type's control function, for a mod that changes an existing
+    /// creature. Panics if `kind` has none yet (add the game's plugins first).
+    fn replace_creature(&mut self, kind: u16, control: CreatureControlFn) -> &mut Self;
 }
 
 impl AppCreatures for App {
     fn register_creature(&mut self, kind: u16, control: CreatureControlFn) -> &mut Self {
         engine::add_once(self, CreatureRulesPlugin);
-        self.world_mut().resource_mut::<CreatureControls>().0.insert(kind, control);
+        if self.world_mut().resource_mut::<CreatureControls>().0.insert(kind, control).is_some() {
+            panic!("creature type {kind} registered twice");
+        }
+        self
+    }
+
+    fn replace_creature(&mut self, kind: u16, control: CreatureControlFn) -> &mut Self {
+        engine::add_once(self, CreatureRulesPlugin);
+        if self.world_mut().resource_mut::<CreatureControls>().0.insert(kind, control).is_none() {
+            panic!("creature type {kind} replaced before it was registered");
+        }
         self
     }
 }

@@ -166,13 +166,34 @@ pub struct ObjectDiagnostics {
 
 /// Registering object types on the app.
 pub trait AppObjectTypes {
+    /// Panics if `kind` is already registered: two plugins claiming one type
+    /// is a mistake. A mod that means to change a type uses
+    /// [`replace_object_type`](Self::replace_object_type).
     fn register_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self;
+    /// Replaces a registered type, for a mod that swaps an existing type's
+    /// hooks. Panics if `kind` is not registered yet (add the base game's
+    /// plugins first).
+    fn replace_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self;
 }
 
 impl AppObjectTypes for App {
     fn register_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self {
         self.init_resource::<ObjectTypes>();
-        self.world_mut().resource_mut::<ObjectTypes>().insert(kind, object_type);
+        let mut types = self.world_mut().resource_mut::<ObjectTypes>();
+        if let Some(old) = types.get(kind) {
+            panic!("object type {kind} registered twice (first as {:?})", old.name);
+        }
+        types.insert(kind, object_type);
+        self
+    }
+
+    fn replace_object_type(&mut self, kind: u16, object_type: ObjectType) -> &mut Self {
+        self.init_resource::<ObjectTypes>();
+        let mut types = self.world_mut().resource_mut::<ObjectTypes>();
+        if types.get(kind).is_none() {
+            panic!("object type {kind} replaced before it was registered (as {:?})", object_type.name);
+        }
+        types.insert(kind, object_type);
         self
     }
 }

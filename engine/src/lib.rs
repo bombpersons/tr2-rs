@@ -27,6 +27,8 @@
 //!   developer MCP. They live in the template's crate, [`psx_bevy`], which
 //!   `psx template update` replaces; they are re-exported here so games
 //!   depend on `engine` only (see `docs/template.md`).
+//! - [`assets`]: layered asset folders, so a mod built on a game finds the
+//!   game's files and can replace any of them (also from [`psx_bevy`]).
 pub mod animation;
 pub mod audio;
 pub mod camera;
@@ -44,7 +46,7 @@ pub use psx_bevy;
 #[cfg(feature = "dev-mcp")]
 pub use psx_bevy::dev_mcp;
 pub use psx_bevy::{
-    controller, controls, display, launcher, model_viewer, pointer, psx, settings, shell, testing, viewer,
+    assets, controller, controls, display, launcher, model_viewer, pointer, psx, settings, shell, testing, viewer,
 };
 
 use bevy::prelude::*;

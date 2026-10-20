@@ -624,7 +624,8 @@ mod tests {
         app.update();
         app.world_mut().resource_mut::<PsxScreen>().set_size(UVec2::new(426, 240));
         let target = app.world_mut().spawn((RenderTarget::Image(canvas.clone().into()), Projection::default())).id();
-        let other = app.world_mut().spawn((RenderTarget::Image(Handle::<Image>::default().into()), Projection::default())).id();
+        let other =
+            app.world_mut().spawn((RenderTarget::Image(Handle::<Image>::default().into()), Projection::default())).id();
         let display = app.world_mut().spawn((Sprite::from_image(image.clone()), DisplayQuad)).id();
         app.update();
         let screen = app.world().resource::<PsxScreen>().clone();

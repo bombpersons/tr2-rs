@@ -260,6 +260,20 @@ it off. Record partial progress below without checking the parent item.
   checks pass. Pixel raster and unusual portal clipping remain unverified.
   [Evidence](docs/sky-evidence.md), [tests](game/tests/sky.rs).
 
+## Extensibility and mods
+
+- [x] Mod machinery: `GamePlugins` group, `replace_object_type`,
+  `replace_creature`, layered asset folders (`engine::assets`) and
+  `mods/example` (hand-made level, its own type and trigger action, a
+  replaced pickup type; headless rules test and GPU/MCP render test).
+- [ ] Lara's asset contract in `docs/`: the clip, state, state-change and
+  command numbers, joints and sound ids her controller relies on.
+- [ ] A hand-made character meeting that contract, driven by Lara's
+  controller in `mods/example`.
+- [ ] An enemy added to `mods/example` through the shared creature module.
+- [ ] Object setup (`data/object_types.json`) loaded as an asset rather than
+  compiled in, so a mod can replace it by file.
+
 ## Progress
 
 - 2026-10-18: Baseline `cargo test --workspace --all-features` passed before

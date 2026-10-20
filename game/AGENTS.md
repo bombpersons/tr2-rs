@@ -44,7 +44,7 @@ The game is a library (crate `game`, `src/lib.rs`); `src/main.rs` only calls
 the engine's launcher. So tests in `tests/` can use every game module.
 
 ```
-src/lib.rs            REGION, FIELDS_PER_TICK, SCREEN, TITLE, GamePlugin (EnginePlugin + your feature plugins)
+src/lib.rs            REGION, FIELDS_PER_TICK, SCREEN, TITLE, GamePlugins (EnginePlugin + the feature plugins)
 src/main.rs           engine::launcher::run(...): window, renderer, --flags
 src/<feature>/mod.rs  one plugin per feature: player, stage, enemies, camera, hud...
 src/<feature>/...     rules (components + systems, no rendering) apart from presentation
@@ -56,7 +56,7 @@ tests/dev_mcp.rs      opt-in GPU/MCP checks of the real binary
 Evidence-recording scripts and importers live in the workspace's `tools/`.
 
 - Start a new game by deleting `src/demo/` and `assets/demo/`, removing the
-  demo from `GamePlugin` and `lib.rs`, and adding your own feature modules.
+  demo from `GamePlugins` and `lib.rs`, and adding your own feature modules.
   Migrate the demo tests in the same change: replace or remove
   `tests/player.rs`, and adapt or remove `headless_render_edit_step_and_query`
   in `tests/dev_mcp.rs` (it assumes the demo's named player, spawn position,
@@ -291,7 +291,55 @@ decide how the accurate code is organised:
   cutscene by extending the first one's machinery, not by copying it.
 - When a controller relies on a clip, state or animation command number,
   name it as a constant and list it with the others for that model, so the
-  set a replacement model must provide is written down in one place.
+  set a replacement model must provide is written down in one place. Write
+  each controller's asset contract in `docs/` (joints, clip and state
+  numbers, state-change frame ranges, animation commands, sound ids), so a
+  replacement player model or a new enemy model can reuse the ported
+  controller and the editor can check imported assets against it.
+- Keep each feature plugin usable on its own. The player must run without the
+  inventory, HUD or menus; where one feature needs another, make the
+  dependency explicit (a shared component or message) or optional, never a
+  resource that panics when the other plugin is missing.
+- Don't replace ported code with a schema or script while porting.
+  Data-defined variants come after parity, on top of the ported code, and
+  must reproduce the ported trajectories exactly when given the original's
+  parameters.
+
+### Mods are crates
+
+A mod is a crate that depends on `game` (the workspace's `game` dependency),
+adds its own plugins and builds its own binary with the same launcher call.
+It is recompiled, never loaded at runtime. `../mods/example` is one; keep
+the game convenient to build on:
+
+- Keep feature modules, shared modules, components and spawn hooks `pub`, so
+  a mod can reuse the shared creature module, call a type's own hook or query
+  the player.
+- `GamePlugins` is a `PluginGroup` of the feature plugins, so a mod can
+  `GamePlugins.build().disable::<PresentationPlugin>()` and add its own in its
+  place. List every feature plugin there, each usable on its own.
+- `register_object_type` and `register_creature` panic on duplicates to catch
+  mistakes. A mod that changes an existing type calls `replace_object_type`
+  or `replace_creature` after adding the game's plugins; it can start from
+  the game's entry (`ObjectTypes::get(id).cloned()`) to keep its hooks.
+- A mod's systems join the same sets (`WorldSystems`, `ItemSystems`,
+  `InteractionSystems`), so they run in the original's update order.
+- Assets are layered (`engine::assets`): the running crate's `assets/` first,
+  then folders added with `engine::assets::add_root` before the app is built.
+  A mod adds the game's `assets/` and can replace any game file by shipping
+  one at the same path. Load files by relative path (`load_ron`,
+  `AssetServer`) so the layers apply. `data/object_types.json` is still
+  compiled in, so a mod cannot yet replace object setup by file.
+- Mod type ids start at 300, clear of the original's 265 types.
+- Keep `mods/example` building and passing its tests (`cargo test -p
+  example-mod`; `tests/dev_mcp.rs` renders it). It is a small game made only
+  of hand-made assets: its own level, a type and a trigger action of its own,
+  a replaced game type, and the presentation, sound, sky and water palette
+  disabled. As the port grows, make it use the port's real pieces: a
+  hand-made character whose animations meet Lara's contract, driven by her
+  controller, and an enemy added through the shared creature module. It uses
+  only `game`'s public API; if it needs an edit to `game/` or anything from
+  the disc, a boundary is in the wrong place.
 
 ### Verify
 

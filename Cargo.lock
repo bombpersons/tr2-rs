@@ -2591,6 +2591,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-mod"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "engine",
+ "serde_json",
+ "tomb-raider-ii",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
