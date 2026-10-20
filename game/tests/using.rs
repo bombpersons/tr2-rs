@@ -17,7 +17,8 @@ use game::{
     creature::ItemStatus,
     interactions::{InteractionProgress, InteractionsPlugin, Inventory, UsableItem},
     player::{
-        AnimationState, GunStatus, Player, PlayerAnimations, PlayerMode, WeaponState,
+        AnimationState, GunStatus, Motion, Player, PlayerAnimations, PlayerMode, SubmergedMotion, Traversal,
+        WeaponState,
         contract::{clip, frame},
     },
 };
@@ -297,4 +298,81 @@ fn the_ladder_key_pickup_matches_the_recording() {
         assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
     }
     assert_eq!(app.world().resource::<Inventory>().items.get(&194), Some(&1));
+}
+
+/// Wall's first key (17, type 193) on the floor of a flooded corridor,
+/// against `.psx/rec_wall_underwater_pickup2`: from the checkpoint Lara treads
+/// above it holding Action, lets go for ten ticks and holds it again.
+/// Each tick she swims 16 units toward a spot above and behind the key,
+/// tilting to its nose-down 4550 (MoveLaraPosition), then picks it up from
+/// treading and treads again. Ticks are the recording's from run frame 0.
+#[test]
+fn the_underwater_key_pickup_matches_the_recording() {
+    let mut lara = Player::at(position([45211, 6838, 39505]), angle(17073), 34);
+    lara.mode = PlayerMode::Swimming;
+    let (mut app, lara) = app("wall", lara);
+    app.world_mut().entity_mut(lara).insert((
+        AnimationState::at_frame(clip::TREAD, (1765 - 1736) as f32),
+        Motion { grounded: false, pitch: binary(-3822), ..default() },
+        SubmergedMotion::default(),
+    ));
+    app.world_mut().get_mut::<Traversal>(lara).unwrap().goal = 13;
+    let key = object(&mut app, 17);
+    // Lara's position and pitch after each tick until she is there.
+    let approach = [
+        (45221, 6828, 39500, -4186),
+        (45231, 6818, 39495, -4550),
+        (45241, 6808, 39490, -4550),
+        (45251, 6798, 39485, -4550),
+        (45261, 6788, 39480, -4550),
+        (45271, 6778, 39475, -4550),
+        (45281, 6768, 39470, -4550),
+        (45291, 6758, 39465, -4550),
+        (45301, 6748, 39459, -4550),
+        (45311, 6738, 39454, -4550),
+        (45320, 6727, 39448, -4550),
+        (45330, 6716, 39442, -4550),
+        (45335, 6711, 39439, -4550),
+    ];
+    for tick in 0..=55 {
+        let action = (0..=3).contains(&tick) || (14..=47).contains(&tick);
+        app.run_tick(if action { &[Button::Cross] } else { &[] });
+        let player = app.world().get::<Player>(lara).unwrap();
+        let motion = app.world().get::<Motion>(lara).unwrap();
+        let animation = app.world().get::<AnimationState>(lara).unwrap();
+        let avatar = app.world().get::<Avatar>(lara).unwrap();
+        let (x, y, z, pitch) = approach[if tick < 4 { tick } else { (tick.max(13) - 10).min(12) }];
+        let at = original(player.position);
+        assert_eq!((at, turn(motion.pitch), turn(player.yaw)), ([x, y, z], pitch, 17073), "tick {tick}");
+        assert_eq!(app.world().get::<WeaponState>(lara).unwrap().status, GunStatus::HandsFree, "tick {tick}");
+        assert_eq!(player.mode, PlayerMode::Swimming, "tick {tick}");
+        match tick {
+            ..22 => assert_eq!(animation.animation, clip::TREAD, "tick {tick}"),
+            22..=54 => {
+                assert_eq!((animation.animation, animation.frame), (clip::UNDERWATER_PICKUP, (tick - 22) as f32))
+            }
+            _ => assert_eq!((animation.animation, animation.frame), (clip::TREAD, 21.0)),
+        }
+        assert_eq!(app.world().get::<WorldObject>(key).unwrap().consumed, tick >= 40, "tick {tick}");
+        // The key keeps the tilt and heading the test gave it.
+        let (key_yaw, key_pitch, _) = app.world().get::<Transform>(key).unwrap().rotation.to_euler(EulerRot::YXZ);
+        assert_eq!((turn(key_yaw), turn(-key_pitch)), (17073, -4550), "tick {tick}");
+        let requested = (23..=55).contains(&tick);
+        assert_eq!(avatar.camera_angle, if requested { -23660 } else { 0 }, "tick {tick}");
+        assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
+    }
+    assert_eq!(app.world().resource::<Inventory>().items.get(&193), Some(&1));
+}
+
+fn binary(angle: i32) -> f32 {
+    angle as f32 * std::f32::consts::TAU / 65536.0
+}
+
+fn turn(radians: f32) -> i32 {
+    (radians * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32
+}
+
+fn original(p: Vec3) -> [i32; 3] {
+    let v = (p * 1024.0).round();
+    [v.x as i32, -v.y as i32, v.z as i32]
 }

@@ -417,6 +417,16 @@ pub(crate) fn original_units(position: Vec3) -> IVec3 {
     IVec3::new(v.x as i32, -v.y as i32, v.z as i32)
 }
 
+/// An angle in radians as the original's (65536 per turn, signed).
+pub(crate) fn binary_angle(radians: f32) -> i16 {
+    swimming::angle(radians) as i16
+}
+
+/// The original's angle in radians, signed as the swimming angles are.
+pub(crate) fn binary_radians(angle: i16) -> f32 {
+    swimming::radians(i32::from(angle))
+}
+
 /// Active creatures as the guns see them (the creature slots at
 /// 0x8008C1C0 hold active creatures; entity order stands in for slot order).
 fn gun_targets(
@@ -1045,6 +1055,8 @@ fn control(
                 clips.as_deref(),
                 &tuning,
             );
+            // Picking up underwater runs the same state handler as on land.
+            using::control(&mut motion, clips.as_deref(), animation);
             continue;
         }
         *submerged = SubmergedMotion { air_ticks: tuning.max_air_ticks, ..default() };

@@ -137,6 +137,10 @@ pub mod clip {
     pub const USE_PUZZLE: usize = 134;
     /// The pickup lands in the hand on frame [`super::frame::PICKUP_TAKE`].
     pub const PICKUP: usize = 135;
+    /// Picking up underwater (state 39), reached through treading's range
+    /// and ending back in [`TREAD`]; taken on frame
+    /// [`super::frame::UNDERWATER_PICKUP_TAKE`].
+    pub const UNDERWATER_PICKUP: usize = 130;
     /// Type 104 and the others not named below: turning a switch off and on.
     pub const SWITCH_OFF: usize = 63;
     pub const SWITCH_ON: usize = 64;
@@ -207,6 +211,8 @@ pub mod frame {
     /// Pickup collision 0x80050580 takes the item on clip
     /// [`super::clip::PICKUP`]'s frame 42 (relative).
     pub const PICKUP_TAKE: f32 = 42.0;
+    /// Underwater it is frame 18 of [`super::clip::UNDERWATER_PICKUP`].
+    pub const UNDERWATER_PICKUP_TAKE: f32 = 18.0;
     /// Puzzle-hole collision 0x800512CC fills the hole on clip
     /// [`super::clip::USE_PUZZLE`]'s frame 80 (relative).
     pub const PUZZLE_PLACE: f32 = 80.0;
@@ -390,6 +396,7 @@ pub const CLIPS: &[ClipRule] = {
         rule(Death, clip::FATAL_LANDING, state::DEATH),
         rule(Death, clip::DEAD, state::GLIDE),
         rule(Use, clip::PICKUP, state::PICKUP),
+        rule(Use, clip::UNDERWATER_PICKUP, state::PICKUP),
         rule(Use, clip::USE_KEY, state::USE_KEY),
         rule(Use, clip::USE_PUZZLE, state::USE_PUZZLE),
         rule(Use, clip::SWITCH_OFF, state::SWITCH_OFF),

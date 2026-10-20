@@ -20,7 +20,7 @@ use engine::{
 use super::{InteractionProgress, Inventory, Keyhole, Pickup, Switch};
 use crate::creature::ItemStatus;
 use crate::player::{
-    Motion, Player, PlayerAnimations, PlayerMode, WeaponState,
+    Motion, Player, PlayerAnimations, PlayerMode, SubmergedMotion, Traversal, WeaponState,
     contract::{clip, frame, state},
     original_units, using,
 };
@@ -57,6 +57,16 @@ pub const PICKUP_BOUNDS: UseBounds = UseBounds {
 /// Where Lara stands for a pickup, in the item's frame (0x800896F0).
 pub const PICKUP_STAND: IVec3 = IVec3::new(0, 0, -100);
 
+/// Pickups underwater (0x80089720): a cube around the item, with every
+/// angle within 8190 of the item's.
+pub const UNDERWATER_PICKUP_BOUNDS: UseBounds =
+    UseBounds { min: IVec3::splat(-512), max: IVec3::splat(512), angle_min: [-8190; 3], angle_max: [8190; 3] };
+/// Where Lara swims to for an underwater pickup, in the tilted item's
+/// frame (0x80089738): above it and behind.
+pub const UNDERWATER_PICKUP_STAND: IVec3 = IVec3::new(0, -200, -350);
+/// The pitch PickUpCollision gives an item underwater, nose down.
+const UNDERWATER_PICKUP_PITCH: i16 = -4550;
+
 /// Wall switches (0x80089744): level with the switch, in front of it.
 pub const SWITCH_BOUNDS: UseBounds = UseBounds {
     min: IVec3::new(-220, 0, 292),
@@ -75,28 +85,106 @@ pub const KEYHOLE_BOUNDS: UseBounds = UseBounds {
 /// Where Lara stands at a keyhole or puzzle hole (0x800897BC, 0x800897E0).
 pub const KEYHOLE_STAND: IVec3 = IVec3::new(0, 0, 362);
 
+/// An item's or Lara's rotation: pitch, yaw, roll (65536 per turn).
+pub type Angles = [i16; 3];
+
+/// phd_RotYXZ 0x80064338 applied to a unit matrix: rows scaled by 16384,
+/// rounded after each turn as the original does, which skips a zero angle.
+fn rotation([pitch, yaw, roll]: Angles) -> [[i32; 3]; 3] {
+    let mut m = [[16384, 0, 0], [0, 16384, 0], [0, 0, 16384]];
+    // Each turn mixes two columns of every row.
+    let mut turn = |angle: i16, a: usize, b: usize, sign: i32| {
+        if angle == 0 {
+            return;
+        }
+        let (s, c) = (chase::sin(i32::from(angle)), chase::cos(i32::from(angle)));
+        for row in &mut m {
+            let (x, y) = (row[a], row[b]);
+            row[a] = (c * x - sign * s * y) >> 14;
+            row[b] = (c * y + sign * s * x) >> 14;
+        }
+    };
+    turn(yaw, 0, 2, 1);
+    turn(pitch, 1, 2, -1);
+    turn(roll, 0, 1, -1);
+    m
+}
+
 /// Lara's offset from an item, in the item's frame: TestLaraPosition's
-/// transposed rotation (0x8001CE04). On land items have no pitch or roll.
-fn local(item: IVec3, yaw: i16, lara: IVec3) -> IVec3 {
-    let d = lara - item;
-    let (s, c) = (chase::sin(i32::from(yaw)), chase::cos(i32::from(yaw)));
-    IVec3::new((c * d.x - s * d.z) >> 14, d.y, (s * d.x + c * d.z) >> 14)
+/// transposed rotation (0x8001CE04).
+fn local(item: IVec3, angles: Angles, lara: IVec3) -> IVec3 {
+    let m = rotation(angles);
+    let d = (lara - item).to_array();
+    let column = |c: usize| (m[0][c] * d[0] + m[1][c] * d[1] + m[2][c] * d[2]) >> 14;
+    IVec3::new(column(0), column(1), column(2))
 }
 
 /// A point given in an item's frame, in the world.
-fn world_point(item: IVec3, yaw: i16, offset: IVec3) -> IVec3 {
-    let (s, c) = (chase::sin(i32::from(yaw)), chase::cos(i32::from(yaw)));
-    item + IVec3::new((c * offset.x + s * offset.z) >> 14, offset.y, (-s * offset.x + c * offset.z) >> 14)
+fn world_point(item: IVec3, angles: Angles, offset: IVec3) -> IVec3 {
+    let m = rotation(angles);
+    let o = offset.to_array();
+    let row = |r: usize| (m[r][0] * o[0] + m[r][1] * o[1] + m[r][2] * o[2]) >> 14;
+    item + IVec3::new(row(0), row(1), row(2))
 }
 
-/// TestLaraPosition 0x8001CE04: angles first, then the box.
+/// TestLaraPosition 0x8001CE04 for an item turned only about y.
 pub fn in_bounds(bounds: &UseBounds, item: IVec3, item_yaw: i16, lara: IVec3, lara_yaw: i16) -> bool {
-    let yaw = lara_yaw.wrapping_sub(item_yaw);
-    if yaw < bounds.angle_min[1] || yaw > bounds.angle_max[1] {
-        return false;
+    in_bounds_turned(bounds, item, [0, item_yaw, 0], lara, [0, lara_yaw, 0])
+}
+
+/// TestLaraPosition 0x8001CE04: each angle's difference first, then the box.
+pub fn in_bounds_turned(
+    bounds: &UseBounds,
+    item: IVec3,
+    item_angles: Angles,
+    lara: IVec3,
+    lara_angles: Angles,
+) -> bool {
+    for axis in 0..3 {
+        let difference = lara_angles[axis].wrapping_sub(item_angles[axis]);
+        if difference < bounds.angle_min[axis] || difference > bounds.angle_max[axis] {
+            return false;
+        }
     }
-    let p = local(item, item_yaw, lara);
+    let p = local(item, item_angles, lara);
     p.cmpge(bounds.min).all() && p.cmple(bounds.max).all()
+}
+
+/// phd_sqrt 0x80063E84: the integer square root, rounded down.
+fn square_root(mut n: i32) -> i32 {
+    let (mut bit, mut root) = (1 << 30, 0);
+    while bit != 0 {
+        if root + bit <= n {
+            n -= root + bit;
+            root = (root >> 1) | bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    root
+}
+
+/// MoveLaraPosition 0x8001D278 for anything but a flare: one tick of Lara
+/// swimming to `offset` in the item's frame and turning to the item's
+/// angles (Move3DPosTo3DPos 0x8001D4D4: 16 units, and 364 on each angle).
+/// True once she is there.
+fn move_lara(lara: &mut IVec3, lara_angles: &mut Angles, item: IVec3, item_angles: Angles, offset: IVec3) -> bool {
+    let target = world_point(item, item_angles, offset);
+    let d = target - *lara;
+    let distance = square_root(d.length_squared());
+    *lara = if distance > 16 { *lara + d * 16 / distance } else { target };
+    for (angle, goal) in lara_angles.iter_mut().zip(item_angles) {
+        let difference = goal.wrapping_sub(*angle);
+        *angle = if difference > 364 {
+            angle.wrapping_add(364)
+        } else if difference < -364 {
+            angle.wrapping_sub(364)
+        } else {
+            goal
+        };
+    }
+    *lara == target && *lara_angles == item_angles
 }
 
 /// AlignLaraPosition 0x8001D070: face the item and stand at `offset` in its
@@ -104,7 +192,7 @@ pub fn in_bounds(bounds: &UseBounds, item: IVec3, item_yaw: i16, lara: IVec3, la
 /// or its ceiling is too low. Returns Lara's new position.
 fn align(world: Option<&WorldGeometry>, player: &mut Player, item: IVec3, item_yaw: i16, offset: IVec3) {
     player.yaw = engine::world::angle(item_yaw as u16);
-    let target = world_point(item, item_yaw, offset);
+    let target = world_point(item, [0, item_yaw, 0], offset);
     let lara = original_units(player.position);
     let Some(hit) = world.and_then(|w| w.floor_at(level(target), player.room)) else { return };
     let floor = original_units(Vec3::Y * hit.height).y;
@@ -116,6 +204,12 @@ fn align(world: Option<&WorldGeometry>, player: &mut Player, item: IVec3, item_y
 
 fn level(p: IVec3) -> Vec3 {
     engine::world::position(p.to_array())
+}
+
+/// An item's angles as its transform: the same turns as Lara's body.
+fn item_rotation([pitch, yaw, roll]: Angles) -> Quat {
+    let radians = |a: i16| crate::player::binary_radians(a);
+    Quat::from_rotation_y(radians(yaw)) * Quat::from_rotation_x(-radians(pitch)) * Quat::from_rotation_z(-radians(roll))
 }
 
 fn binary_yaw(radians: f32) -> i16 {
@@ -136,7 +230,14 @@ pub(super) fn collide(
     clips: Option<Res<PlayerAnimations>>,
     mut inventory: ResMut<Inventory>,
     mut progress: ResMut<InteractionProgress>,
-    mut players: Query<(&mut Player, &mut Motion, &mut engine::animation::AnimationState, &mut WeaponState)>,
+    mut players: Query<(
+        &mut Player,
+        &mut Motion,
+        &mut engine::animation::AnimationState,
+        &mut WeaponState,
+        &mut Traversal,
+        &mut SubmergedMotion,
+    )>,
     mut objects: Query<(
         &mut WorldObject,
         &mut Transform,
@@ -147,7 +248,10 @@ pub(super) fn collide(
         Option<&mut AnimationGoal>,
     )>,
 ) {
-    let Ok((mut player, mut motion, mut animation, mut weapon)) = players.single_mut() else { return };
+    let Ok((mut player, mut motion, mut animation, mut weapon, mut traversal, mut submerged)) = players.single_mut()
+    else {
+        return;
+    };
     let action = pad.held(Button::Cross);
     let world = world.as_deref();
     let clips = clips.as_deref();
@@ -163,8 +267,56 @@ pub(super) fn collide(
         let lara_state = clips.and_then(|c| c.state(animation.animation));
         let lara_yaw = binary_yaw(player.yaw);
         if let Some(pickup) = pickup {
-            // PickUpCollision 0x800502D4, on land and wading.
-            if matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
+            let mut take = |object: &mut WorldObject, item: &mut UsableItem| {
+                item.status = ItemStatus::Invisible;
+                object.consumed = true;
+                inventory.add(object.kind);
+                progress.pickups += 1;
+                if pickup.secret.is_some() {
+                    progress.secret_mask |= u32::from(inventory.secret_mask);
+                    progress.secrets = progress.secret_mask.count_ones();
+                }
+                progress.message = pickup.message.clone();
+            };
+            if player.mode == PlayerMode::Swimming {
+                // PickUpCollision 0x800502D4 underwater: the item is tilted
+                // nose down and turned to Lara's heading for the test. Lara
+                // swims to it a step a tick while Action is held, treading
+                // and hands free; once there she picks it up from treading
+                // and treads again after. Her hands are never marked busy.
+                let item_angles = [UNDERWATER_PICKUP_PITCH, lara_yaw, 0];
+                let mut lara_angles =
+                    [crate::player::binary_angle(motion.pitch), lara_yaw, crate::player::binary_angle(submerged.bank)];
+                if !in_bounds_turned(&UNDERWATER_PICKUP_BOUNDS, at, item_angles, lara, lara_angles) {
+                    continue;
+                }
+                if lara_state == Some(state::PICKUP) {
+                    if animation.animation == clip::UNDERWATER_PICKUP
+                        && animation.frame == frame::UNDERWATER_PICKUP_TAKE
+                    {
+                        take(&mut object, &mut item);
+                    }
+                } else if action && lara_state == Some(state::TREAD) && weapon.hands_free() {
+                    let mut at_lara = lara;
+                    let there = move_lara(&mut at_lara, &mut lara_angles, at, item_angles, UNDERWATER_PICKUP_STAND);
+                    player.position = level(at_lara);
+                    motion.pitch = crate::player::binary_radians(lara_angles[0]);
+                    player.yaw = crate::player::binary_radians(lara_angles[1]);
+                    submerged.bank = crate::player::binary_radians(lara_angles[2]);
+                    if there {
+                        // Treading's range for 39 covers its whole clip.
+                        animation.enter(clip::UNDERWATER_PICKUP, 0.0, clip::UNDERWATER_PICKUP);
+                        traversal.goal = state::TREAD;
+                    }
+                } else {
+                    continue;
+                }
+                // Only the routine's fall-through restores the item's angles.
+                transform.rotation = item_rotation(item_angles);
+                continue;
+            }
+            // On land and wading.
+            if player.mode == PlayerMode::Surface {
                 continue;
             }
             if !in_bounds(&PICKUP_BOUNDS, at, lara_yaw, lara, lara_yaw) {
@@ -172,15 +324,7 @@ pub(super) fn collide(
             }
             if lara_state == Some(state::PICKUP) {
                 if animation.animation == clip::PICKUP && animation.frame == frame::PICKUP_TAKE {
-                    item.status = ItemStatus::Invisible;
-                    object.consumed = true;
-                    inventory.add(object.kind);
-                    progress.pickups += 1;
-                    if pickup.secret.is_some() {
-                        progress.secret_mask |= u32::from(inventory.secret_mask);
-                        progress.secrets = progress.secret_mask.count_ones();
-                    }
-                    progress.message = pickup.message.clone();
+                    take(&mut object, &mut item);
                 }
             } else if action && ready(&player, &motion, &weapon, lara_state) {
                 // The routine turns the item to Lara's heading (level, no

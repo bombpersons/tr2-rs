@@ -230,10 +230,11 @@ it off. Record partial progress below without checking the parent item.
   with the doors they open, match no-poke `psx handoff` recordings tick for
   tick, camera included, and so does running into a closed door: ground
   state collision waits for object pushes, so Lara stays running pinned
-  against it. Airborne collision still runs before pushes. Still to record: a puzzle hole, a timed
-  switch and the inventory ring. Not ported: the inventory ring at
-  keyholes (the matching key is used directly), underwater pickups and
-  switch 105 (MoveLaraPosition), flares, type 92's own clip and trigger,
+  against it. Airborne collision still runs before pushes. The underwater
+  key pickup (MoveLaraPosition, clip 130) matches its recording too.
+  Still to record: a puzzle hole, a timed switch and the inventory ring.
+  Not ported: the inventory ring at keyholes (the matching key is used
+  directly), switch 105 (underwater), flares, type 92's own clip and trigger,
   Venice's door hold, the object-collision room list.
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide

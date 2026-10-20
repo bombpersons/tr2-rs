@@ -5,9 +5,9 @@ Wall RAM snapshot (`psx ghidra decompile --ram .psx/wall_game --range
 80010000-80080000`), `psx disasm --ram .psx/wall_game --text`, and RAM tables
 read from the same snapshot. No other reference was consulted.
 
-**Status:** a pickup, a switch, a keyhole, the doors they open and a door
-push are compared with PSX recordings (below, "Recordings"). Puzzle holes,
-underwater pickups and the inventory ring are not.
+**Status:** a pickup on land and one underwater, a switch, a keyhole, the
+doors they open and a door push are compared with PSX recordings (below,
+"Recordings"). Puzzle holes and the inventory ring are not.
 
 ## Object collision
 
@@ -60,9 +60,19 @@ only when that spot's floor is within 256 of her height and its ceiling more
 than 761 above it (`0x8001D1E4..0x8001D25C`). Offsets: pickup (0, 0, -100)
 `0x800896F0`; switch 93 (0, 0, 362) `0x8008975C`, 103 (0, 0, 292)
 `0x80089768`, 92 (0, 0, 212) `0x80089774`, 104 none; keyhole and puzzle hole
-(0, 0, 362) `0x800897BC`, `0x800897E0`. MoveLaraPosition `0x8001D278`
-(underwater pickups and switch 105) instead moves her 16 units and 364 yaw
-units a tick toward the spot; it is not ported.
+(0, 0, 362) `0x800897BC`, `0x800897E0`.
+
+MoveLaraPosition `0x8001D278(offset, item, lara)` (underwater pickups and
+switch 105) instead swims her there over several ticks. The spot is the
+item plus the offset turned by the item's full rotation (phd_RotYXZ
+`0x80064338`: yaw, then pitch, then roll, each skipped at 0 and rounded with
+a 14-bit shift). Move3DPosTo3DPos `0x8001D4D4(lara, spot, 16, 364)` moves her
+`d * 16 / |d|` (C division, |d| from the rounded-down square root
+`0x80063E84`) or onto the spot when within 16, and turns each of pitch, yaw
+and roll 364 toward the item's or onto it. It returns 1 once position and
+all three angles match. TestLaraPosition uses the same rotation, transposed,
+for the item frame, after checking each angle's difference against the
+table's window.
 
 ## Starting a use
 
@@ -73,6 +83,17 @@ All land uses need Action held (input `&0x40`), Lara not airborne (status
   AnimateLara `0x80042E08` in a loop until the state is 39 (standing's range
   for 39 covers its whole clip, so one call: clip 135, frame 0). Then goal 2
   and gun status 1 (hands busy). Flares (type 152) use state 67 instead.
+- **Pickup underwater** (PickUpCollision's branch for water status
+  `0x8008C4F4` 1): the item's pitch is set to -4550 (its yaw is already
+  Lara's), the bounds are the underwater table, and Lara must be treading
+  (state 13) with Action held and hands free; there is no airborne test. Each such tick
+  MoveLaraPosition swims her toward (0, -200, -350) in the tilted item's
+  frame (`0x80089738`); on the tick she arrives she is run into state 39
+  (treading's range for 39 covers its clip: clip 130, frame 0), goal 13. Her
+  hands are never marked busy. The item is taken on clip 130's frame 18
+  (`anim[130].frame_base + 0x12`). Every path but the fall-through returns
+  without restoring the item's angles, so it keeps the tilt from the first
+  in-range tick. At the surface (water status 2) neither branch runs.
 - **Switch** (`0x80050844..0x80050A70`): also needs the switch inactive
   (status `&6 == 0`). Lara's yaw becomes the switch's, then the type's
   alignment. A switch in state 1 puts Lara in state 40 with clip 63 (93: 195,
@@ -220,6 +241,20 @@ tick 42 (clip frame 42), the clip ends into clip 11 with her hands free on
 tick 66, and the camera request (-23660, -2730, 1024) runs on ticks 1..66.
 `the_ladder_key_pickup_matches_the_recording` checks these.
 
+**Wall's underwater key** (17, type 193), on the floor of the flooded
+corridor. Replaying `.psx/handoff_wall_key`'s input from `use_wall_game`
+gives a checkpoint at run frame 10380 (`.psx/rec_wall_underwater_pickup`,
+`state_f010380.bin`), with Lara treading above the key at x45211 y6838
+z39505, pitch -3822, yaw 17073, Action held. From it
+(`.psx/rec_wall_underwater_pickup2`) she swims (10, -10, -5) a tick and
+tilts to -4550 while Action is held, stops for the ten ticks it is
+released, and arrives at x45335 y6711 z39439 on tick 22, entering clip 130
+frame 0. The key turns invisible on tick 40, the clip ends into clip 108
+frame 21 (state 13) on tick 55, hands stay free throughout, and the pickup
+camera (-23660, -2730, 1024) runs on ticks 23..55, written by the same
+state-39 handler as on land (`0x8003996C..0x80039984`).
+`the_underwater_key_pickup_matches_the_recording` checks every tick.
+
 **Running into the closed front door.** From the same checkpoint, RIGHT for
 run frames 2..52 and UP from frame 120 (`.psx/rec_home_door_push`). Lara runs
 west into the door's shut sector and is pinned at x46185 while still in
@@ -236,7 +271,7 @@ all forty recorded ticks.
 
 ## Not ported
 
-- Underwater pickups and switch 105 (MoveLaraPosition), flares (state 67).
+- Switch 105 (underwater, MoveLaraPosition), flares (state 67).
 - The inventory ring at keyholes and puzzle holes.
 - Type 92's own clip and trigger test; Venice's door hold.
 - The room list of object collision.
