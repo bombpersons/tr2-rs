@@ -340,7 +340,7 @@ impl Plugin for PlayerRulesPlugin {
             .add_systems(FixedUpdate, control.in_set(PlayerSystems::Control).run_if(simulation_enabled))
             .add_systems(
                 FixedUpdate,
-                rolling::collide
+                (rolling::collide, collide_after_pushes)
                     .in_set(WorldSystems::Interaction)
                     .after(InteractionSystems::Resolve)
                     .before(InteractionSystems::Publish)
@@ -1452,25 +1452,9 @@ fn integrate(
         }
         let proposed = old + displacement;
         let horizontal = Vec3::new(proposed.x, old.y, proposed.z);
-        let ahead = horizontal + motion.velocity.with_y(0.0).normalize_or_zero() * PLAYER_RADIUS;
-        let candidate_floor = floor(geometry, ahead, player.room);
-        let walk = matches!(
-            player.mode,
-            PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. }
-        );
-        let passable = |hit: &FloorHit| {
-            hit.ceiling - hit.height >= PLAYER_HEIGHT
-                // Original jump.csv includes the last horizontal displacement
-                // on the landing tick. Test a descending sweep's upper endpoint
-                // so crossing the floor does not become a horizontal wall.
-                && (hit.height <= if motion.grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) + 0.02 })
-                && (!walk || old.y - hit.height <= STEP_HEIGHT)
-        };
-        let can_move = candidate_floor.as_ref().is_some_and(passable);
-        if can_move {
-            player.position.x = proposed.x;
-            player.position.z = proposed.z;
-        } else if weapon.hands_free()
+        let (candidate_floor, can_move) = floor_ahead(geometry, &player, &motion, old, proposed);
+        if !can_move
+            && weapon.hands_free()
             && pad.held(Button::Cross)
             && pad.direction().y > 0.1
             && candidate_floor.is_some()
@@ -1506,176 +1490,259 @@ fn integrate(
             // its following tick, after the clip has advanced.
             continue;
         }
-        if !can_move {
-            // Resolve axes independently so a diagonal approach slides along a wall.
-            // Test the collision radius in the direction of each attempted movement.
-            for axis in [0, 2] {
-                let delta = proposed[axis] - old[axis];
-                if delta.abs() < f32::EPSILON {
-                    continue;
-                }
-                let mut probe = player.position;
-                probe[axis] = proposed[axis] + delta.signum() * PLAYER_RADIUS;
-                if floor(geometry, probe, player.room).as_ref().is_some_and(passable) {
-                    player.position[axis] = proposed[axis];
-                } else if motion.grounded {
-                    player.position[axis] = wall_contact(old[axis], proposed[axis]);
-                }
-            }
-        }
-        let mut blocked_run_floor = None;
-        let forward = player.forward();
-        let facing = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
-        if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing]
-        {
-            // A front impact restores the perpendicular coordinate from the
-            // tick's start before applying the normal shift (GetCollisionInfo
-            // and LaraDeflectEdge0x8003C544; oblique-wall trace field225).
-            // Sliding along a side contact remains in the separate axis path.
-            player.position[2 - facing] = old[2 - facing];
-            // Run collision 0x8003a844: no hit-wall clip during run-start clip6
-            // (holding UP against the wall keeps standing); otherwise a wall 256
-            // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.
-            let request = mode_clip(&player, &motion, &pad);
-            let next =
-                clips.as_deref().map(|c| (c, step_animation(&animation, request, None, Some(c), original_frames(dt))));
-            let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != clip::RUN_START)
-                && wall_ahead(geometry, old, player.yaw, player.room);
-            let hit_clip = next.filter(|(_, next)| next.animation == clip::RUN).map(|(c, next)| {
-                let frame = c.clips[clip::RUN].frame_start + next.frame.floor() as usize;
-                if frame < 10 { clip::HIT_WALL_EARLY } else { clip::HIT_WALL_LATE }
+        if motion.grounded && geometry.is_some() {
+            // Object pushes come between this move and its ground collision
+            // (ItemPushLara 0x8001CA78, then the state collision 0x8003A844
+            // probes from the pushed position): `collide_after_pushes`.
+            collision.ground = Some(collision::GroundMove {
+                old,
+                origin: collision.origin,
+                pose: animation.clone(),
+                goal: traversal.goal,
+                stepped: traversal.animation_stepped,
             });
-            motion.velocity = Vec3::ZERO;
-            match hit_clip.filter(|_| hit_wall) {
-                Some(clip) => {
-                    let frames = clips
-                        .as_deref()
-                        .and_then(|c| c.clips.get(clip))
-                        .map_or(15.0, |c| (c.frame_end + 1).saturating_sub(c.frame_start) as f32);
-                    player.mode = PlayerMode::HitWall { animation: clip, frames_left: frames };
-                    // climb_two_click.csv field 187: height settles on the next tick.
-                    player.position.y = old.y;
-                    continue;
-                }
-                None => {
-                    player.mode = PlayerMode::Idle;
-                    if let Some(clips) = clips.as_deref() {
-                        // LaraColStop0x8003A56C restores a preceding stand
-                        // or turn pose and advances it toward the held turn
-                        // goal. Otherwise it enters clip11 without advancing.
-                        traversal.goal = state::STAND;
-                        if matches!(
-                            clips.state(animation.animation),
-                            Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)
-                        ) {
-                            traversal.goal = if pad.held(Button::Left) {
-                                state::TURN_LEFT
-                            } else if pad.held(Button::Right) {
-                                state::TURN_RIGHT
-                            } else {
-                                state::STAND
-                            };
-                            let request = match traversal.goal {
-                                state::TURN_LEFT => clip::TURN_LEFT,
-                                state::TURN_RIGHT => clip::TURN_RIGHT,
-                                _ => STANDING_CLIP,
-                            };
-                            *animation = step_animation(&animation, request, None, Some(clips), original_frames(dt));
-                        } else {
-                            animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
-                        }
-                        if hit_wall {
-                            // Run collision sets state12 before testing the
-                            // foot ranges (0x8003A8F0..0x8003A944). If neither
-                            // range accepts, ColStop enters11 but retains12
-                            // until that clip's natural end on the next tick.
-                            let clip = &clips.clips[animation.animation];
-                            player.mode = PlayerMode::HitWall {
-                                animation: animation.animation,
-                                frames_left: (clip.frame_end + 1 - clip.frame_start) as f32 - animation.frame,
-                            };
-                        }
-                        traversal.animation_stepped = true;
-                    }
-                    // Run collision samples the centre floor before shifting
-                    // out of the wall, then keeps that height after stopping
-                    // (0x8003C34C, 0x8003A944, 0x8003AA04). On a slope this
-                    // differs from the floor under the resolved position.
-                    // wall_stop_trace: proposed x65458 -> y4627, resolved
-                    // x65435 -> y4633; releasing UP restores the latter.
-                    blocked_run_floor = floor(geometry, horizontal, player.room);
-                }
-            }
-        }
-        let Some(hit) = blocked_run_floor.or_else(|| floor(geometry, player.position, player.room)) else {
+            player.position = proposed;
             continue;
-        };
-        player.position.y = proposed.y;
-        player.room = geometry.map_or(hit.room, |world| body_room(world, player.position, hit.room, 381.0));
-        if player.position.y <= hit.height && motion.velocity.y <= 0.0 {
-            if !motion.grounded {
-                landing_damage(&mut player, motion.velocity);
+        }
+        let previous = animation.clone();
+        collide_ground(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            geometry,
+            clips.as_deref(),
+            &pad,
+            dt,
+            old,
+            proposed,
+            &previous,
+        );
+    }
+}
+
+fn walking(mode: PlayerMode) -> bool {
+    matches!(mode, PlayerMode::Walk | PlayerMode::Back | PlayerMode::StepLeft { .. } | PlayerMode::StepRight { .. })
+}
+
+/// Whether the body fits on a floor the move reaches from `old`.
+fn passable(grounded: bool, walk: bool, old: Vec3, proposed: Vec3, hit: &FloorHit) -> bool {
+    hit.ceiling - hit.height >= PLAYER_HEIGHT
+        // Original jump.csv includes the last horizontal displacement
+        // on the landing tick. Test a descending sweep's upper endpoint
+        // so crossing the floor does not become a horizontal wall.
+        && (hit.height <= if grounded { old.y + STEP_HEIGHT } else { old.y.max(proposed.y) + 0.02 })
+        && (!walk || old.y - hit.height <= STEP_HEIGHT)
+}
+
+/// The floor one body radius ahead of the move, and whether Lara can move
+/// onto it.
+fn floor_ahead(
+    geometry: Option<&WorldGeometry>,
+    player: &Player,
+    motion: &Motion,
+    old: Vec3,
+    proposed: Vec3,
+) -> (Option<FloorHit>, bool) {
+    let horizontal = Vec3::new(proposed.x, old.y, proposed.z);
+    let ahead = horizontal + motion.velocity.with_y(0.0).normalize_or_zero() * PLAYER_RADIUS;
+    let hit = floor(geometry, ahead, player.room);
+    let clear = hit.as_ref().is_some_and(|hit| passable(motion.grounded, walking(player.mode), old, proposed, hit));
+    (hit, clear)
+}
+
+/// Ground state collision for the move AnimateLara made this tick: walls,
+/// steps, ledges, landings. `old` is the position collision may restore,
+/// `proposed` where the move (and any object push) left Lara, and
+/// `previous` the pose before this tick's animation step, from which a
+/// stop or wall hit chooses its clip.
+#[allow(clippy::too_many_arguments)]
+fn collide_ground(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    geometry: Option<&WorldGeometry>,
+    clips: Option<&PlayerAnimations>,
+    pad: &ControllerState,
+    dt: f32,
+    old: Vec3,
+    proposed: Vec3,
+    previous: &AnimationState,
+) {
+    let horizontal = Vec3::new(proposed.x, old.y, proposed.z);
+    let (grounded, walk) = (motion.grounded, walking(player.mode));
+    let passable = |hit: &FloorHit| passable(grounded, walk, old, proposed, hit);
+    let (_, can_move) = floor_ahead(geometry, player, motion, old, proposed);
+    player.position = old;
+    if can_move {
+        player.position.x = proposed.x;
+        player.position.z = proposed.z;
+    }
+    if !can_move {
+        // Resolve axes independently so a diagonal approach slides along a wall.
+        // Test the collision radius in the direction of each attempted movement.
+        for axis in [0, 2] {
+            let delta = proposed[axis] - old[axis];
+            if delta.abs() < f32::EPSILON {
+                continue;
             }
-            if !motion.grounded && player.health > 0 {
-                // Landing lock is a provisional readable substitute for animation dispatch windows.
-                let (animation, start_frame) = clips
-                    .as_deref()
-                    .and_then(|clips| freefall_landing(clips, &animation))
-                    .unwrap_or((clip::HEAVY_LANDING, 0.0));
-                player.mode = PlayerMode::Landing { seconds_left: 0.15, animation, start_frame };
+            let mut probe = player.position;
+            probe[axis] = proposed[axis] + delta.signum() * PLAYER_RADIUS;
+            if floor(geometry, probe, player.room).as_ref().is_some_and(passable) {
+                player.position[axis] = proposed[axis];
+            } else if motion.grounded {
+                player.position[axis] = wall_contact(old[axis], proposed[axis]);
             }
-            motion.grounded = true;
-            motion.air_animation = 0;
-            motion.velocity.y = 0.0;
-            player.position.y = hit.height;
-        } else if motion.grounded {
-            if let PlayerMode::Sliding { backwards, .. } = player.mode
-                && clips.is_some()
-                && old.y - hit.height > units(200.0)
-            {
-                // Slide collision0x8003C364 leaves the slope once the centre
-                // is over200 above the floor (0x8003C3B4..0x8003C41C): a
-                // forward slide enters clip34/state3, a back slide clip93/
-                // state29. Both keep the slide speed with zero fall speed.
-                let (clip, mode, goal) = if backwards {
-                    (clip::FALL_BACK, PlayerMode::FallingBack, state::FALL_BACK)
-                } else {
-                    (clip::FALL, PlayerMode::JumpingForward, state::FORWARD_JUMP)
-                };
-                motion.grounded = false;
-                motion.velocity.y = 0.0;
-                player.mode = mode;
-                traversal.goal = goal;
-                traversal.animation_stepped = true;
-                animation.enter(clip, 0.0, clip);
-            } else if old.y - hit.height <= if clips.is_some() { units(384.0) } else { STEP_HEIGHT } {
-                // Ground collisions settle any drop the ledge-fall test
-                // accepts (stop0x8003AAB8, walk0x8003A818).
-                player.position.y = hit.height;
-            } else {
-                motion.grounded = false;
-                if clips.is_some() {
-                    // Stop, walk, run, step and wade collisions share the
-                    // ledge-fall test0x8003A500: a centre drop >384 enters
-                    // clip34/state3, retains horizontal speed and starts with
-                    // zero fall speed. Forward collision owns the flight.
-                    player.mode = PlayerMode::JumpingForward;
-                    motion.velocity.y = 0.0;
-                    traversal.goal = state::FORWARD_JUMP;
+        }
+    }
+    let mut blocked_run_floor = None;
+    let forward = player.forward();
+    let facing = if forward.x.abs() > forward.z.abs() { 0 } else { 2 };
+    if !can_move && player.mode == PlayerMode::Run && motion.grounded && player.position[facing] != proposed[facing] {
+        // A front impact restores the perpendicular coordinate from the
+        // tick's start before applying the normal shift (GetCollisionInfo
+        // and LaraDeflectEdge0x8003C544; oblique-wall trace field225).
+        // Sliding along a side contact remains in the separate axis path.
+        player.position[2 - facing] = old[2 - facing];
+        // Run collision 0x8003a844: no hit-wall clip during run-start clip6
+        // (holding UP against the wall keeps standing); otherwise a wall 256
+        // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.
+        let request = mode_clip(player, motion, pad);
+        let next = clips.map(|c| (c, step_animation(previous, request, None, Some(c), original_frames(dt))));
+        let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != clip::RUN_START)
+            && wall_ahead(geometry, old, player.yaw, player.room);
+        let hit_clip = next.filter(|(_, next)| next.animation == clip::RUN).map(|(c, next)| {
+            let frame = c.clips[clip::RUN].frame_start + next.frame.floor() as usize;
+            if frame < 10 { clip::HIT_WALL_EARLY } else { clip::HIT_WALL_LATE }
+        });
+        motion.velocity = Vec3::ZERO;
+        match hit_clip.filter(|_| hit_wall) {
+            Some(clip) => {
+                let frames = clips
+                    .and_then(|c| c.clips.get(clip))
+                    .map_or(15.0, |c| (c.frame_end + 1).saturating_sub(c.frame_start) as f32);
+                player.mode = PlayerMode::HitWall { animation: clip, frames_left: frames };
+                // climb_two_click.csv field 187: height settles on the next tick.
+                player.position.y = old.y;
+                return;
+            }
+            None => {
+                player.mode = PlayerMode::Idle;
+                if let Some(clips) = clips {
+                    // LaraColStop0x8003A56C restores a preceding stand
+                    // or turn pose and advances it toward the held turn
+                    // goal. Otherwise it enters clip11 without advancing.
+                    traversal.goal = state::STAND;
+                    if matches!(
+                        clips.state(previous.animation),
+                        Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)
+                    ) {
+                        traversal.goal = if pad.held(Button::Left) {
+                            state::TURN_LEFT
+                        } else if pad.held(Button::Right) {
+                            state::TURN_RIGHT
+                        } else {
+                            state::STAND
+                        };
+                        let request = match traversal.goal {
+                            state::TURN_LEFT => clip::TURN_LEFT,
+                            state::TURN_RIGHT => clip::TURN_RIGHT,
+                            _ => STANDING_CLIP,
+                        };
+                        *animation = step_animation(previous, request, None, Some(clips), original_frames(dt));
+                    } else {
+                        animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
+                    }
+                    if hit_wall {
+                        // Run collision sets state12 before testing the
+                        // foot ranges (0x8003A8F0..0x8003A944). If neither
+                        // range accepts, ColStop enters11 but retains12
+                        // until that clip's natural end on the next tick.
+                        let clip = &clips.clips[animation.animation];
+                        player.mode = PlayerMode::HitWall {
+                            animation: animation.animation,
+                            frames_left: (clip.frame_end + 1 - clip.frame_start) as f32 - animation.frame,
+                        };
+                    }
                     traversal.animation_stepped = true;
-                    animation.enter(clip::FALL, 0.0, clip::FALL);
-                } else {
-                    player.mode = PlayerMode::Fall;
                 }
+                // Run collision samples the centre floor before shifting
+                // out of the wall, then keeps that height after stopping
+                // (0x8003C34C, 0x8003A944, 0x8003AA04). On a slope this
+                // differs from the floor under the resolved position.
+                // wall_stop_trace: proposed x65458 -> y4627, resolved
+                // x65435 -> y4633; releasing UP restores the latter.
+                blocked_run_floor = floor(geometry, horizontal, player.room);
             }
         }
-        if player.position.y + PLAYER_HEIGHT > hit.ceiling && motion.velocity.y > 0.0 {
-            player.position.y = (hit.ceiling - PLAYER_HEIGHT).max(hit.height);
+    }
+    let Some(hit) = blocked_run_floor.or_else(|| floor(geometry, player.position, player.room)) else {
+        return;
+    };
+    player.position.y = proposed.y;
+    player.room = geometry.map_or(hit.room, |world| body_room(world, player.position, hit.room, 381.0));
+    if player.position.y <= hit.height && motion.velocity.y <= 0.0 {
+        if !motion.grounded {
+            landing_damage(player, motion.velocity);
+        }
+        if !motion.grounded && player.health > 0 {
+            // Landing lock is a provisional readable substitute for animation dispatch windows.
+            let (animation, start_frame) =
+                clips.and_then(|clips| freefall_landing(clips, animation)).unwrap_or((clip::HEAVY_LANDING, 0.0));
+            player.mode = PlayerMode::Landing { seconds_left: 0.15, animation, start_frame };
+        }
+        motion.grounded = true;
+        motion.air_animation = 0;
+        motion.velocity.y = 0.0;
+        player.position.y = hit.height;
+    } else if motion.grounded {
+        if let PlayerMode::Sliding { backwards, .. } = player.mode
+            && clips.is_some()
+            && old.y - hit.height > units(200.0)
+        {
+            // Slide collision0x8003C364 leaves the slope once the centre
+            // is over200 above the floor (0x8003C3B4..0x8003C41C): a
+            // forward slide enters clip34/state3, a back slide clip93/
+            // state29. Both keep the slide speed with zero fall speed.
+            let (clip, mode, goal) = if backwards {
+                (clip::FALL_BACK, PlayerMode::FallingBack, state::FALL_BACK)
+            } else {
+                (clip::FALL, PlayerMode::JumpingForward, state::FORWARD_JUMP)
+            };
+            motion.grounded = false;
             motion.velocity.y = 0.0;
+            player.mode = mode;
+            traversal.goal = goal;
+            traversal.animation_stepped = true;
+            animation.enter(clip, 0.0, clip);
+        } else if old.y - hit.height <= if clips.is_some() { units(384.0) } else { STEP_HEIGHT } {
+            // Ground collisions settle any drop the ledge-fall test
+            // accepts (stop0x8003AAB8, walk0x8003A818).
+            player.position.y = hit.height;
+        } else {
+            motion.grounded = false;
+            if clips.is_some() {
+                // Stop, walk, run, step and wade collisions share the
+                // ledge-fall test0x8003A500: a centre drop >384 enters
+                // clip34/state3, retains horizontal speed and starts with
+                // zero fall speed. Forward collision owns the flight.
+                player.mode = PlayerMode::JumpingForward;
+                motion.velocity.y = 0.0;
+                traversal.goal = state::FORWARD_JUMP;
+                traversal.animation_stepped = true;
+                animation.enter(clip::FALL, 0.0, clip::FALL);
+            } else {
+                player.mode = PlayerMode::Fall;
+            }
         }
-        if hit.death && motion.grounded {
-            player.damage(MAX_HEALTH);
-        }
+    }
+    if player.position.y + PLAYER_HEIGHT > hit.ceiling && motion.velocity.y > 0.0 {
+        player.position.y = (hit.ceiling - PLAYER_HEIGHT).max(hit.height);
+        motion.velocity.y = 0.0;
+    }
+    if hit.death && motion.grounded {
+        player.damage(MAX_HEALTH);
     }
 }
 
@@ -1898,18 +1965,74 @@ fn animate(
     mut players: Query<(&Player, &Motion, &mut AnimationState, &mut Traversal)>,
 ) {
     for (player, motion, mut animation, mut traversal) in &mut players {
-        if std::mem::take(&mut traversal.animation_stepped) {
+        step_pose(player, motion, &mut animation, &mut traversal, clips.as_deref(), &pad, time.delta_secs());
+    }
+}
+
+/// One tick of the mode's clip, unless this tick's movement already stepped
+/// it.
+fn step_pose(
+    player: &Player,
+    motion: &Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    clips: Option<&PlayerAnimations>,
+    pad: &ControllerState,
+    dt: f32,
+) {
+    if std::mem::take(&mut traversal.animation_stepped) {
+        return;
+    }
+    let index = mode_clip(player, motion, pad);
+    if let Some(goal) = clips.and_then(|c| c.state(index)) {
+        traversal.goal = goal;
+    }
+    let start = match player.mode {
+        PlayerMode::Landing { start_frame, .. } => Some(start_frame),
+        _ => None,
+    };
+    *animation = step_animation(animation, index, start, clips, original_frames(dt));
+}
+
+/// The ground collision `integrate` held back, now that object pushes have
+/// run: from where they left Lara, restoring to the origin they advanced
+/// (run collision 0x8003A844 calls GetCollisionInfo 0x8003C34C after
+/// ItemPushLara 0x8001CA78). Object collision saw this tick's stepped pose;
+/// collision decides from the pose before it, as when it ran first, and the
+/// step runs again for the mode collision leaves.
+#[allow(clippy::type_complexity, reason = "Ground collision updates the player's independent ECS components together.")]
+fn collide_after_pushes(
+    world: Option<Res<WorldGeometry>>,
+    pad: Res<ControllerState>,
+    time: Res<Time>,
+    clips: Option<Res<PlayerAnimations>>,
+    mut players: Query<(&mut Player, &mut Motion, &mut AnimationState, &mut Traversal, &mut CollisionFrame)>,
+) {
+    let dt = time.delta_secs();
+    for (mut player, mut motion, mut animation, mut traversal, mut collision) in &mut players {
+        let Some(pending) = collision.ground.take() else { continue };
+        if matches!(player.mode, PlayerMode::Using { .. }) {
             continue;
         }
-        let index = mode_clip(player, motion, &pad);
-        if let Some(goal) = clips.as_deref().and_then(|c| c.state(index)) {
-            traversal.goal = goal;
-        }
-        let start = match player.mode {
-            PlayerMode::Landing { start_frame, .. } => Some(start_frame),
-            _ => None,
-        };
-        *animation = step_animation(&animation, index, start, clips.as_deref(), original_frames(time.delta_secs()));
+        let old = if collision.origin == pending.origin { pending.old } else { collision.origin.with_y(pending.old.y) };
+        *animation = pending.pose.clone();
+        traversal.goal = pending.goal;
+        traversal.animation_stepped = pending.stepped;
+        let proposed = player.position;
+        collide_ground(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            world.as_deref(),
+            clips.as_deref(),
+            &pad,
+            dt,
+            old,
+            proposed,
+            &pending.pose,
+        );
+        step_pose(&player, &motion, &mut animation, &mut traversal, clips.as_deref(), &pad, dt);
     }
 }
 

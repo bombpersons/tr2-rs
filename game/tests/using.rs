@@ -183,10 +183,8 @@ fn the_front_door_button_matches_the_recording() {
 /// pins Lara at x 46185 by the door's push and keeps her running, sliding 2
 /// units a tick along it: its run collision (0x8003A844) runs after object
 /// collision and probes from the pushed position, which never reaches the
-/// shut sector. The port's ground collision still runs before object pushes,
-/// so it stops her at the wall (docs/interaction-evidence.md, "Doors").
+/// shut sector (docs/interaction-evidence.md, "Recordings").
 #[test]
-#[ignore = "ground state collision still runs before object pushes"]
 fn running_into_a_closed_door_matches_the_recording() {
     let lara = Player::at(position([46556, 2560, 69988]), angle(49748), 50);
     let (mut app, lara) = app("assault", lara);

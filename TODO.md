@@ -228,10 +228,9 @@ it off. Record partial progress below without checking the parent item.
   solid while shut, and door pushes through the shared contact pass.
   A dry-land key pickup, Home's front-door button and Wall's first keyhole,
   with the doors they open, match no-poke `psx handoff` recordings tick for
-  tick, camera included. Running into a closed door is recorded but its
-  test is ignored: the original's run collision follows the door's push, so
-  Lara stays running pinned against it, and the port's ground collision
-  still runs before object pushes. Still to record: a puzzle hole, a timed
+  tick, camera included, and so does running into a closed door: ground
+  state collision waits for object pushes, so Lara stays running pinned
+  against it. Airborne collision still runs before pushes. Still to record: a puzzle hole, a timed
   switch and the inventory ring. Not ported: the inventory ring at
   keyholes (the matching key is used directly), underwater pickups and
   switch 105 (MoveLaraPosition), flares, type 92's own clip and trigger,

@@ -229,9 +229,10 @@ tick AnimateLara (`0x80043274`) moves her to about x46140, ItemPushLara
 GetCollisionInfo from `0x8003C34C`) then probes from 46185, whose front
 point (46085) is still in the open sector. The state collision follows
 object collision (see [tick-order-evidence](tick-order-evidence.md)). The
-port matches the first eleven ticks, but its ground collision still runs
-before object pushes, so on the twelfth it finds the wall and stops her; the
-test is ignored until that order is ported.
+port keeps that order on the ground: the move happens in Motion, and its
+state collision waits until object pushes have run and probes from where
+they left her, restoring to the origin a push advanced. The test matches
+all forty recorded ticks.
 
 ## Not ported
 
@@ -240,5 +241,5 @@ test is ignored until that order is ported.
 - Type 92's own clip and trigger test; Venice's door hold.
 - The room list of object collision.
 - Sounds: the "no" sound at a used keyhole.
-- Ground state collision after object pushes (only rolling has it), which
-  the door push needs.
+- Airborne state collision after object pushes: jumps and falls still
+  collide before them (ground moves and rolls wait).

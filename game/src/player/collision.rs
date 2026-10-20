@@ -8,6 +8,7 @@
 use super::units;
 use bevy::prelude::*;
 use engine::{
+    animation::AnimationState,
     camera::chase::{cos, heading, sin},
     world::WorldGeometry,
 };
@@ -18,12 +19,28 @@ use engine::{
 pub(crate) struct CollisionFrame {
     pub origin: Vec3,
     pub(super) roll_heading: Option<f32>,
+    pub(super) ground: Option<GroundMove>,
+}
+
+/// A ground move waiting for its state collision until object pushes have
+/// run.
+pub(super) struct GroundMove {
+    /// Lara's position before the move.
+    pub old: Vec3,
+    /// `CollisionFrame::origin` before the pushes; a push advances it.
+    pub origin: Vec3,
+    /// The pose, goal and step flag before this tick's animation step, which
+    /// collision may replace.
+    pub pose: AnimationState,
+    pub goal: usize,
+    pub stepped: bool,
 }
 
 pub(super) fn remember(mut players: Query<(&super::Player, &mut CollisionFrame)>) {
     for (player, mut frame) in &mut players {
         frame.origin = player.position;
         frame.roll_heading = None;
+        frame.ground = None;
     }
 }
 
