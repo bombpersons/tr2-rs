@@ -6,6 +6,7 @@ mod files;
 mod gizmo;
 mod mesh;
 mod play;
+mod preferences;
 mod rooms;
 mod theme;
 mod toolbar;
@@ -236,16 +237,19 @@ fn main() -> AppExit {
         return AppExit::error();
     }
     let headless = args.flag("--headless");
+    // Flags override the saved preferences for this run.
+    let mut preferences = preferences::Preferences::load(headless);
+    let saved = preferences.saved();
     let ui_scale = match args.value("--ui-scale").map(|v| v.parse::<f32>()) {
-        None => 1.0,
-        Some(Ok(scale)) if (0.5..=2.0).contains(&scale) => scale,
+        None => saved.ui_scale,
+        Some(Ok(scale)) if preferences::valid_scale(scale) => scale,
         Some(_) => {
             eprintln!("--ui-scale takes a number from 0.5 to 2");
             return AppExit::error();
         }
     };
     let theme = match args.value("--theme") {
-        None => theme::Theme::default(),
+        None => saved.theme,
         Some(name) => match theme::Theme::parse(&name) {
             Some(theme) => theme,
             None => {
@@ -255,6 +259,7 @@ fn main() -> AppExit {
             }
         },
     };
+    preferences.start_with(preferences::Saved { theme, ui_scale });
     let mut app = App::new();
     let mut plugins = DefaultPlugins
         .set(AssetPlugin { file_path: std::path::MAIN_SEPARATOR_STR.into(), ..default() })
@@ -324,7 +329,7 @@ fn main() -> AppExit {
         canvas: image.clone(),
         ..default()
     });
-    app.insert_resource(EditorTarget { headless, image, ui_scale }).insert_resource(theme);
+    app.insert_resource(EditorTarget { headless, image, ui_scale }).insert_resource(theme).insert_resource(preferences);
     #[cfg(feature = "dev-mcp")]
     if args.flag("--mcp") {
         app.add_plugins(engine::dev_mcp::GameMcpPlugin);

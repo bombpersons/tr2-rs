@@ -62,7 +62,7 @@ impl Plugin for UiPlugin {
         app.add_plugins(EguiPlugin::default())
             .add_systems(Startup, setup)
             .add_systems(Update, quit)
-            .add_systems(EguiPrimaryContextPass, (style, ui).chain());
+            .add_systems(EguiPrimaryContextPass, (style, ui, crate::preferences::save).chain());
         app.world_mut().resource_mut::<EguiGlobalSettings>().auto_create_primary_context = false;
     }
 }

@@ -28,8 +28,12 @@ or game crate is needed. `--level` takes a file path. The atlas is `atlas.png`
 next to the level file. `--types` optionally reads `{"types":[{"id":1,"name":"walker"}]}`
 metadata through the engine registry. Extra controller-specific fields in a
 game's type table are ignored. The editor never runs the registered controllers.
-`--ui-scale` (0.5 to 2) sets the interface's starting size and `--theme` its
-colours (Tomb Raider, Dark, Light or Orange; Dark by default).
+The interface size and theme you choose in the View menu are remembered in
+`<config dir>/level-editor/preferences.json` (`$XDG_CONFIG_HOME` or
+`~/.config`, or `%APPDATA%` on Windows). `--ui-scale` (0.5 to 2) and `--theme`
+(Tomb Raider, Dark, Light or Orange; Dark by default) override them for one
+run. A missing or unreadable file, or a bad field, falls back to the
+defaults. `--headless` runs neither read nor write it.
 
 ## Current authoring surface
 
