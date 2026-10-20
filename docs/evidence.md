@@ -90,3 +90,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Oxygen exhaustion and water death](drowning-evidence.md):3710 exact logic ticks across ten complete PSX replays, six independent; signed damage, authored dispatch, braking, angular recovery, buoyancy and surface death. A full remaining-air countdown has no counter pokes. The longer post-death pad-hold UI/timing diagnostic remains separate.
 
 - [Shallow-water wading](wading-evidence.md):1599 observed controller ticks across thirteen complete routes, six independent; authored gait/stops, turning/bank, back/sidesteps, stand-up, shallow exit and deeper surface entry. Nine complete chase-camera comparisons pass; native display timing, static contact and transition-camera gaps remain explicit.
+
+- [Bounded-height local corridor targets](navigation-height-evidence.md): native step/drop and zone filtering, runtime boxes/connectivity/zone verification, and 420 full-controller ticks across four routes. One fresh 120-tick route independently validates target X/Y/Z. Physical creature steps and general path search remain unported.

@@ -432,7 +432,10 @@
    "attendant": {
     "follow_distance": 1536,
     "max_turn": 182,
-    "path_margin": 512
+    "path_margin": 512,
+    "max_step": 256,
+    "max_drop": 512,
+    "ground_zone": 0
    }
   }
  ]

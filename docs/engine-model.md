@@ -32,6 +32,14 @@ word list. *Structural.*
 - **Visibility** is per room through portals. The port currently hides rooms
   out of view in `engine::render::room_visibility`; the original's portal
   clipping has not been examined with `psx` (*provisional*).
+- **Local ground targets** read authored boxes, overlap lists and movement
+  zones. Reverse search filters floor differences against per-creature limits
+  (`0x800151F0..0x80015224`); the directly adjacent corridor query is shared
+  engine machinery. The attendant's step256/drop512 limits and ordinary
+  zone selection live with its game tuning. Native Home data and four complete
+  roll/contact routes verify a lower-floor target (*PSX*,
+  [navigation-height evidence](navigation-height-evidence.md)). Physical
+  creature height changes and general multi-box search remain unported.
 - **Engine:** `engine::world` (`Level` asset, `WorldGeometry` queries).
   Integer world units and y-down are kept in the format and in collision
   queries, because the trajectory tests match the original's integer rounding

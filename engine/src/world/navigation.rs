@@ -4,6 +4,17 @@
 use super::WorldGeometry;
 use bevy::prelude::*;
 
+/// Clearance and permitted floor changes for a local ground corridor.
+/// Distances use the level's integer world units. `zone` selects an authored
+/// movement-zone table; absent zone filtering preserves the flat query API.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CorridorLimits {
+    pub margin: i32,
+    pub max_step: i32,
+    pub max_drop: i32,
+    pub zone: Option<usize>,
+}
+
 impl WorldGeometry {
     /// A same-box or directly overlapping, flat-floor corridor target.
     /// Outside the destination on one axis, retain the current perpendicular
@@ -18,6 +29,21 @@ impl WorldGeometry {
         goal_room: usize,
         margin: i32,
     ) -> Option<Vec3> {
+        self.adjacent_path_target_with_limits(origin, room, goal, goal_room, CorridorLimits { margin, ..default() })
+    }
+
+    /// The straight, directly connected corridor query with caller-supplied
+    /// step/drop and zone limits. This chooses a steering target, not a floor
+    /// movement response or a multi-box route. PSX0x800151F0..0x80015224
+    /// filters reverse-search edges by zone and signed floor difference.
+    pub fn adjacent_path_target_with_limits(
+        &self,
+        origin: Vec3,
+        room: usize,
+        goal: Vec3,
+        goal_room: usize,
+        limits: CorridorLimits,
+    ) -> Option<Vec3> {
         let point = |p: Vec3| [(p.x * 1024.0).round() as i32, (p.z * 1024.0).round() as i32];
         let [x, z] = point(origin);
         let [gx, gz] = point(goal);
@@ -27,11 +53,17 @@ impl WorldGeometry {
             return Some(goal);
         }
         let (a, b) = (self.data.boxes.get(start)?, self.data.boxes.get(end)?);
-        // Creature ground navigation excludes the blocked-box bit and vertical
-        // transitions in this local query. Full path search supplies its own
-        // per-actor step/drop limits instead of assuming every overlap is open.
-        if a.floor != b.floor || b.overlap & 0x4000 != 0 {
+        // Native search expands from goal toward origin. In forward movement
+        // terms the two bounds are a maximum rise and a maximum drop.
+        let drop = b.floor - a.floor;
+        if drop < -limits.max_step || drop > limits.max_drop || b.overlap & 0x4000 != 0 {
             return None;
+        }
+        if let Some(index) = limits.zone {
+            let zones = self.data.zones.get(index)?;
+            if zones.get(start)? != zones.get(end)? {
+                return None;
+            }
         }
         let mut adjacent = false;
         for &entry in self.data.overlaps.get((a.overlap & 0x3fff) as usize..)? {
@@ -51,6 +83,7 @@ impl WorldGeometry {
         }
         // Check containment geometrically, not merely by sector's box id:
         // overlapping boxes can contain the actor before that id changes.
+        let margin = limits.margin;
         let inset = |value: i32, min: i32, max: i32| {
             if value < min + margin {
                 min + margin

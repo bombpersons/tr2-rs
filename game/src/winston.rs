@@ -1,15 +1,16 @@
 //! Home's attendant: authored local follow, turn, start and stop.
 //!
 //! State decisions and free-space motion come from PSX0x800500A0 and
-//! 0x800166F8. Same-box and adjacent flat-corridor targets are verified;
-//! multi-box search, height transitions and obstacle avoidance remain pending.
+//! 0x800166F8. Same-box and directly adjacent corridor targets are verified,
+//! including a lower-floor target. Multi-box search, physical height
+//! transitions and obstacle avoidance remain pending.
 use bevy::prelude::*;
 use engine::{
     animation::{AnimationGoal, ObjectAnimation},
     camera::chase::{cos, heading, sin},
     objects::WorldObject,
     schedule::{ItemSystems, WorldSystems, simulation_enabled},
-    world::WorldGeometry,
+    world::{CorridorLimits, WorldGeometry},
 };
 
 use crate::player::Player;
@@ -27,6 +28,13 @@ pub struct WinstonTuning {
     pub max_turn: i32,
     /// Navigation target clearance0x80015DD4: half a sector.
     pub path_margin: i32,
+    /// Creature initialization0x80048F68/0x80048F48: rise256/drop512.
+    /// Reverse search tests their signed counterparts at0x80015204..0x80015224.
+    pub max_step: i32,
+    pub max_drop: i32,
+    /// The ordinary ground-zone array selected through0x8008B4A0.
+    /// Its complete Home runtime contents match baked zones[0] (and[5]).
+    pub ground_zone: usize,
 }
 
 #[derive(Component, Reflect, Debug, Clone, Default)]
@@ -93,7 +101,18 @@ fn follow(
             goal.state = 1;
         }
         actor.target = world
-            .adjacent_path_target(transform.translation, object.room, player.position, player.room, tuning.path_margin)
+            .adjacent_path_target_with_limits(
+                transform.translation,
+                object.room,
+                player.position,
+                player.room,
+                CorridorLimits {
+                    margin: tuning.path_margin,
+                    max_step: tuning.max_step,
+                    max_drop: tuning.max_drop,
+                    zone: Some(tuning.ground_zone),
+                },
+            )
             .unwrap_or(player.position);
         if actor.speed == 0 || tuning.max_turn == 0 {
             continue;

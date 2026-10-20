@@ -2,28 +2,18 @@
 //! The expanded authored box chooses a push only after posed spheres overlap.
 //! Bone transforms use ordinary Bevy math; GTE rounding is bounded by fixtures.
 use super::{Winston, yaw};
-use crate::player::{PLAYER_HEIGHT, PLAYER_RADIUS, Player};
+use crate::player::{CollisionFrame, PLAYER_RADIUS, Player, item_push_is_clear};
 use bevy::prelude::*;
 use engine::{
     animation::{AnimationState, ObjectAnimation, collision_bounds, model_spheres},
     camera::chase::{cos, sin},
     objects::WorldObject,
-    schedule::{InteractionSystems, WorldSystems, simulation_enabled},
+    schedule::{InteractionSystems, simulation_enabled},
     world::{WorldGeometry, units},
 };
 
-#[derive(Resource, Default)]
-struct ContactOrigin(Option<Vec3>);
-
 pub(super) fn install(app: &mut App) {
-    app.init_resource::<ContactOrigin>().add_systems(
-        FixedUpdate,
-        (remember.in_set(WorldSystems::Control), push.in_set(InteractionSystems::Resolve)).run_if(simulation_enabled),
-    );
-}
-
-fn remember(players: Query<&Player>, mut origin: ResMut<ContactOrigin>) {
-    origin.0 = players.single().ok().map(|p| p.position);
+    app.add_systems(FixedUpdate, push.in_set(InteractionSystems::Resolve).run_if(simulation_enabled));
 }
 
 // Products are added before the signed shift: rounding each separately
@@ -42,17 +32,16 @@ fn world_xz(local: [i32; 2], angle: i32) -> Vec3 {
 
 fn push(
     world: Option<Res<WorldGeometry>>,
-    origin: Res<ContactOrigin>,
-    mut players: Query<(&mut Player, &AnimationState)>,
+    mut players: Query<(&mut Player, &AnimationState, &mut CollisionFrame)>,
     mut attendants: Query<(&mut Winston, &WorldObject, &Transform, &ObjectAnimation), Without<Player>>,
 ) {
-    let (Some(world), Ok((mut player, pose))) = (world, players.single_mut()) else { return };
+    let (Some(world), Ok((mut player, pose, mut collision))) = (world, players.single_mut()) else { return };
     if player.health <= 0 {
         return;
     }
     let Some(avatar_model) = world.data.model(crate::player::LARA) else { return };
     let Some(avatar_bounds) = collision_bounds(&world.data, pose.animation, pose.frame) else { return };
-    let mut accepted_origin = origin.0.unwrap_or(player.position);
+    let mut accepted_origin = collision.origin;
     for (mut actor, object, transform, animation) in &mut attendants {
         if object.consumed || (player.position - transform.translation).length_squared() > 16.0 {
             continue;
@@ -96,25 +85,12 @@ fn push(
             _ => local[1] = edges[2],
         }
         let candidate = (transform.translation + world_xz(local, angle)).with_y(player.position.y);
-        // The source validates a762-unit body with at most384 units upward
-        // floor correction (0x8001CBC8..0x8001CC44). Flat open contact is
-        // runtime-verified; wall/static/step interactions need further captures.
-        let clear = [
-            Vec3::ZERO,
-            Vec3::X * PLAYER_RADIUS,
-            -Vec3::X * PLAYER_RADIUS,
-            Vec3::Z * PLAYER_RADIUS,
-            -Vec3::Z * PLAYER_RADIUS,
-        ]
-        .into_iter()
-        .all(|d| {
-            world.floor_at(candidate + d, player.room).is_some_and(|floor| {
-                floor.height <= candidate.y + units(384.0) && floor.ceiling >= candidate.y + PLAYER_HEIGHT
-            })
-        });
-        if clear {
+        // The native validator faces the push from the last accepted origin;
+        // axis-only probes miss raised geometry at a leading body corner.
+        if item_push_is_clear(&world, candidate, accepted_origin, player.room) {
             player.position = candidate;
             accepted_origin = candidate;
+            collision.origin = candidate;
             if let Some(floor) = world.floor_at(candidate + Vec3::Y * units(10.0), player.room) {
                 player.room = floor.room;
             }

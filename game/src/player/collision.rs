@@ -8,9 +8,24 @@
 use super::units;
 use bevy::prelude::*;
 use engine::{
-    camera::chase::{cos, sin},
+    camera::chase::{cos, heading, sin},
     world::WorldGeometry,
 };
+
+/// Per-tick body collision context. Object pushes can advance the accepted
+/// origin before the state-specific floor response (PSX0x8001CC48..0x8001CC6C).
+#[derive(Component, Default)]
+pub(crate) struct CollisionFrame {
+    pub origin: Vec3,
+    pub(super) roll_heading: Option<f32>,
+}
+
+pub(super) fn remember(mut players: Query<(&super::Player, &mut CollisionFrame)>) {
+    for (player, mut frame) in &mut players {
+        frame.origin = player.position;
+        frame.roll_heading = None;
+    }
+}
 
 /// GetHeight's sentinel for a solid or missing sector.
 pub(super) const NO_HEIGHT: i32 = -32512;
@@ -55,6 +70,20 @@ pub(super) struct CollisionInfo {
     pub contact: Contact,
     /// Applied to the item by ShiftItem 0x8001C09C.
     pub shift: IVec3,
+}
+
+/// Item pushes validate the body along the push direction, including its two
+/// leading corners. PSX0x8001CBC8..0x8001CC44 uses height762, radius100,
+/// floor limits+32512/-384 and ceiling0, then rejects every contact class.
+/// It restores the last accepted position rather than applying the wall shift.
+pub(crate) fn item_push_is_clear(world: &WorldGeometry, candidate: Vec3, origin: Vec3, room: usize) -> bool {
+    let at = original(candidate);
+    let old = original(origin);
+    let delta = at - old;
+    let facing = heading(delta.x, delta.z);
+    info(world, at, old, room, 762, facing, &Limits { radius: 100, bad_pos: 32512, bad_neg: -384, bad_ceiling: 0 })
+        .contact
+        == Contact::None
 }
 
 /// GetGridShift 0x8001B9EC: push `from` back into `to`'s sector, one unit inside.

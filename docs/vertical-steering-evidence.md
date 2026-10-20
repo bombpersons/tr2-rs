@@ -47,9 +47,9 @@ checkpoint/sample/write hashes, tool build, disc and BIOS identities.
 clearance milestone. Preparation commands and hashes are retained in the new
 sidecars. Reproduce each recording with `--case NAME`.
 
-## Separate diagnostic: item pushing
+## Item-pushing diagnostic and subsequent combined verification
 
-`vertical_steer_backward` is retained as diagnostic only. Its oblique runway
+`vertical_steer_backward` is retained as diagnostic for the isolated player harness. Its oblique runway
 route matches animation, signed speeds, y and all other non-position columns,
 but x first differs by5 at field40 and z by111 at88. A fresh position-write
 watch attributes these changes to `0x8001CA78/0x8001CA90`, inside the animated
@@ -60,6 +60,13 @@ checkpoint; it corresponds to Home placement9. This is a separate dynamic
 object collision gap, not a steering mismatch. No passing parity test is
 claimed for that route. Position writes, trace, listings and reports are retained
 under `validation/vertical-steering/` and `.psx/vertical_backward_*`.
+
+The combined player/attendant harness now covers this interaction with fresh
+native recordings; see [Winston's extended vertical-contact verification](winston-evidence.md#extended-vertical-contact-verification).
+The older diagnostic remains unchanged: its player-only harness deliberately
+does not spawn the obstacle. The fresh checkpoint has the same player placement
+but a different attendant animation frame, so these captures are not presented
+as a byte-identical reproduction of that older run.
 
 ## Verification
 

@@ -589,6 +589,11 @@ Navigation corridor queries read the existing `boxes` and `overlaps` fields.
 Box maxima are exclusive sector boundaries, matching the existing camera
 math. The authoring view and byte-exact save contract retain all navigation
 data; game-specific path decisions are not simulated in the editor.
+Bounded-height corridor queries additionally read the existing box floors and
+`zones` arrays. Callers supply their step/drop limits and movement-zone index;
+these are query parameters, not new level fields. The flat-only query used
+by authoring checks retains its earlier behavior. No editor/game dependency
+or persistent-format change is needed.
 
 Submerged motion uses Lara's existing authored starts, strokes, glide links
 and tread clips. Preview placement8 with clip86 or108 in the Home level.

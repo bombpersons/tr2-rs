@@ -63,6 +63,16 @@ No asset format changed. The editor's level fields, preview and save format
 continue to cover the same data, and the editor remains independent of game
 controllers and simulation scheduling.
 
+The [rolling item-contact follow-up](item-push-evidence.md#rolling-contact-before-floor-response)
+exposed the importance of state collision following object pushes: a lateral
+push onto lower floor must change the roll's height on that same tick.
+Rolling now splits animation/movement from floor/wall response, scheduling
+the latter after `InteractionSystems::Resolve` and before `Publish`. Its
+per-player collision context carries the accepted origin through item pushes.
+Other locomotion families still perform their level response in `Motion`;
+the overall port schedule alone does not establish their object-contact
+ordering parity.
+
 ## Verification and limits
 
 `game/tests/data/original/tick_order{,_heldout}.json` retain the trace caller

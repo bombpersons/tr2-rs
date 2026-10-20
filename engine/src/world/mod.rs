@@ -14,6 +14,7 @@ use bevy::{
 
 pub mod format;
 mod navigation;
+pub use navigation::CorridorLimits;
 pub use format::{
     Ambient, Animation, Command, FixedCamera, FloorInfo, Level, Light, Mesh as ObjectMesh, Model, NavBox, Placement, Pose, Room,
     Sector, Sound, StaticMesh, StaticPlacement, Texture, Trigger, TriggerKind,

@@ -1,0 +1,150 @@
+{
+  "source": "Supplied disc; native navigation RAM and GetTarget trace only",
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "/home/bombpersons/projects/tr2-rs/.psx/contact_blocked_roll_start/state.bin",
+    "--frames",
+    "26",
+    "--input",
+    "[{\"frame\": 16, \"buttons\": [\"CIRCLE\"], \"until\": 24}]",
+    "--trace",
+    "--trace-from-frame",
+    "20",
+    "--trace-frames",
+    "4",
+    "--trace-range",
+    "80015dd4-80016354",
+    "--trace-range",
+    "8001518c-80015194",
+    "--max-events",
+    "10000",
+    "--out",
+    "/home/bombpersons/projects/tr2-rs/validation/winston-height/path-target",
+    "--summary"
+  ],
+  "checkpoint": ".psx/contact_blocked_roll_start/state.bin",
+  "checkpoint_sha256": "6af674e005f1c8aa9b1f659e5199fbb57431ccbf855cb055ac7181048f26715d",
+  "build": {
+    "id": "src-659f5da213e93fb5-release",
+    "profile": "release",
+    "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.2"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.2",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_blocked_roll_start/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "trace_sha256": "b443c67e64153e12dd0a84aa624c693cd5631d2c61ec778d59713dd1ffcf3504",
+  "ram_sha256": "595b0d684cb1886d585ba43c16f02008045df6376cc6355c2743b72b9c9254d0",
+  "creature_address": "0x1826f4",
+  "lot_address": "0x182704",
+  "step": 256,
+  "drop": -512,
+  "fly": 0,
+  "boxes": [
+    {
+      "index": 24,
+      "address": "0x178070",
+      "values": {
+        "z_min": 57,
+        "z_max": 95,
+        "x_min": 21,
+        "x_max": 23,
+        "floor": 2560,
+        "overlap": 364
+      }
+    },
+    {
+      "index": 138,
+      "address": "0x178400",
+      "values": {
+        "z_min": 90,
+        "z_max": 91,
+        "x_min": 18,
+        "x_max": 21,
+        "floor": 2816,
+        "overlap": 1143
+      }
+    }
+  ],
+  "next_box_from_24": 138,
+  "neighbors_from_24": [
+    12,
+    19,
+    21,
+    23,
+    25,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    202,
+    257,
+    258,
+    259,
+    260,
+    261,
+    262,
+    263,
+    268,
+    270,
+    271,
+    272,
+    273,
+    274,
+    276,
+    277,
+    278,
+    288,
+    289,
+    290,
+    339,
+    396,
+    397,
+    399,
+    400,
+    402,
+    403,
+    487
+  ],
+  "overlaps_base": "0x179140",
+  "overlaps_sha256": "840d3566eb4fef7e1630357673a62771e075173fd8520ade29247fb2457fcbf4",
+  "zone_pointer_address": "0x8b4a0",
+  "zone_base": "0x17bd48",
+  "zone_table_sha256": "93acf20868fb612c9a1e096495fa6b0b9dcb987d1d739a119da96bfce000e3bc",
+  "matching_baked_zone_tables": [
+    0,
+    5
+  ],
+  "zones_at_boxes": {
+    "24": 3,
+    "138": 3
+  },
+  "code_sha256": {
+    "150d8-16354": "e4aec3d17576416e5fbd3d57de8f5fd121d7bf0d93ee19f562455fcee1a9f5de",
+    "48ed0-490ec": "4e58577d34c66043577763ce942816fbc05c6ebfcc2e574f6521e91ecfa50d40"
+  }
+}

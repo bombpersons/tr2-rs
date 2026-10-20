@@ -12,6 +12,7 @@ pub(super) fn step(
     traversal: &mut Traversal,
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
+    collision: &mut CollisionFrame,
     dt: f32,
 ) -> bool {
     let PlayerMode::Rolling { entering } = player.mode else { return false };
@@ -60,8 +61,48 @@ pub(super) fn step(
         return true;
     }
     player.mode = PlayerMode::Rolling { entering: false };
-    let old = player.position;
-    let Some(centre) = world.floor_at(proposed, player.room) else { return true };
+    // Native animation movement precedes object contact; state collision
+    // follows it at0x80038438. Retain only the heading for that later system.
+    player.position = proposed;
+    collision.roll_heading = Some(collision_heading);
+    true
+}
+
+pub(super) fn collide(
+    world: Option<Res<WorldGeometry>>,
+    clips: Option<Res<PlayerAnimations>>,
+    mut players: Query<(&mut Player, &mut Motion, &mut AnimationState, &mut Traversal, &mut CollisionFrame)>,
+) {
+    let (Some(world), Some(clips)) = (world.as_deref(), clips.as_deref()) else { return };
+    for (mut player, mut motion, mut animation, mut traversal, mut collision) in &mut players {
+        let Some(collision_heading) = collision.roll_heading.take() else { continue };
+        let state = clips.state(animation.animation).unwrap_or(2);
+        collide_body(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            world,
+            collision.origin,
+            collision_heading,
+            state,
+        );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collide_body(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    world: &WorldGeometry,
+    old: Vec3,
+    collision_heading: f32,
+    state: usize,
+) {
+    let proposed = player.position;
+    let Some(centre) = world.floor_at(proposed, player.room) else { return };
     let probes = probes(proposed, collision_heading);
     let blocked = |point: Vec3| {
         let Some(hit) = world.floor_at(point, player.room) else { return true };
@@ -95,9 +136,8 @@ pub(super) fn step(
         player.mode = mode;
         traversal.goal = goal;
         motion.grounded = false;
-        return true;
+        return;
     }
     player.position.y = centre.height;
     player.room = world.floor_at(player.position, player.room).map_or(player.room, |hit| hit.room);
-    true
 }

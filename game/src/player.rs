@@ -22,6 +22,7 @@ mod traversal;
 pub use traversal::Traversal;
 mod backward;
 mod collision;
+pub(crate) use collision::{CollisionFrame, item_push_is_clear};
 mod forward;
 mod rolling;
 mod surface;
@@ -67,7 +68,7 @@ const TURN_DECAY: i32 = 364;
 
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
-#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal, SubmergedMotion, Wading)]
+#[require(Motion, AnimationState, WeaponState, Transform, Avatar, Traversal, SubmergedMotion, Wading, CollisionFrame)]
 pub struct Player {
     /// Feet position; rendering synchronizes this into Transform.
     pub position: Vec3,
@@ -312,7 +313,22 @@ impl Plugin for PlayerRulesPlugin {
             .configure_sets(FixedUpdate, PlayerSystems::Motion.in_set(WorldSystems::Motion))
             .configure_sets(FixedUpdate, PlayerSystems::Animation.in_set(WorldSystems::Animation))
             .configure_sets(FixedUpdate, PlayerSystems::Weapons.in_set(InteractionSystems::Combat))
+            .add_systems(
+                FixedUpdate,
+                collision::remember
+                    .in_set(WorldSystems::Control)
+                    .before(PlayerSystems::Control)
+                    .run_if(simulation_enabled),
+            )
             .add_systems(FixedUpdate, control.in_set(PlayerSystems::Control).run_if(simulation_enabled))
+            .add_systems(
+                FixedUpdate,
+                rolling::collide
+                    .in_set(WorldSystems::Interaction)
+                    .after(InteractionSystems::Resolve)
+                    .before(InteractionSystems::Publish)
+                    .run_if(simulation_enabled),
+            )
             .add_systems(
                 FixedUpdate,
                 (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
@@ -1118,6 +1134,7 @@ fn control(
     }
 }
 
+#[allow(clippy::type_complexity, reason = "Locomotion updates the player's independent ECS components together.")]
 fn integrate(
     world: Option<Res<WorldGeometry>>,
     pad: Res<ControllerState>,
@@ -1132,11 +1149,14 @@ fn integrate(
         &mut Traversal,
         &mut SubmergedMotion,
         &mut Wading,
+        &mut CollisionFrame,
     )>,
 ) {
     let dt = time.delta_secs();
     let geometry = world.as_deref();
-    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading) in &mut players {
+    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading, mut collision) in
+        &mut players
+    {
         if player.mode == PlayerMode::Surface {
             surface::step(
                 &mut player,
@@ -1181,7 +1201,16 @@ fn integrate(
         ) {
             continue;
         }
-        if rolling::step(&mut player, &mut motion, &mut animation, &mut traversal, geometry, clips.as_deref(), dt) {
+        if rolling::step(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            geometry,
+            clips.as_deref(),
+            &mut collision,
+            dt,
+        ) {
             continue;
         }
         if backward::step(

@@ -1,0 +1,793 @@
+{
+  "source": "Supplied Tomb Raider II USA Rev 3 disc, psx native runtime; controlled initial actor placement, no replay pokes",
+  "checkpoint": ".psx/contact_blocked_roll_target_heldout_start/state.bin",
+  "checkpoint_sha256": "903affaeafe36530b190592658d00b024997426b2326eb6a5e4737cb2f49ef9f",
+  "fields": 240,
+  "input": [
+    {
+      "frame": 32,
+      "buttons": [
+        "CIRCLE"
+      ],
+      "until": 44
+    }
+  ],
+  "independent": true,
+  "pokes": [],
+  "command": [
+    "psx",
+    "run",
+    "--from-state",
+    "/home/bombpersons/projects/tr2-rs/.psx/contact_blocked_roll_target_heldout_start/state.bin",
+    "--frames",
+    "240",
+    "--input",
+    "[{\"frame\": 32, \"buttons\": [\"CIRCLE\"], \"until\": 44}]",
+    "--out",
+    "/home/bombpersons/projects/tr2-rs/validation/winston/contact_blocked_roll_target_heldout",
+    "--save-state",
+    "--summary",
+    "--snapshot-every",
+    "2",
+    "--watch",
+    "8017c8b0:4",
+    "--watch",
+    "8017c8b8:4",
+    "--trace",
+    "--trace-range",
+    "8001cbc8-8001cc70",
+    "--max-events",
+    "100000",
+    "--watch",
+    "8017c8b4:4",
+    "--trace-range",
+    "8003bc50-8003be1c",
+    "--trace-range",
+    "8003c318-8003c364",
+    "--sample",
+    "8017c8d6:i16:actor_state",
+    "--sample",
+    "8017c8d8:i16:actor_goal",
+    "--sample",
+    "8017c8dc:i16:actor_animation",
+    "--sample",
+    "8017c8de:i16:actor_animation_frame",
+    "--sample",
+    "8017c8e0:i16:actor_room",
+    "--sample",
+    "8017c8e6:i16:actor_speed",
+    "--sample",
+    "8017c8fc:i32:actor_x",
+    "--sample",
+    "8017c900:i32:actor_y",
+    "--sample",
+    "8017c904:i32:actor_z",
+    "--sample",
+    "8017c90a:i16:actor_yaw",
+    "--sample",
+    "8017c88a:i16:lara_state",
+    "--sample",
+    "8017c88c:i16:lara_goal",
+    "--sample",
+    "8017c890:i16:lara_animation",
+    "--sample",
+    "8017c892:i16:lara_animation_frame",
+    "--sample",
+    "8017c894:i16:lara_room",
+    "--sample",
+    "8017c89a:i16:lara_speed",
+    "--sample",
+    "8017c8b0:i32:lara_x",
+    "--sample",
+    "8017c8b4:i32:lara_y",
+    "--sample",
+    "8017c8b8:i32:lara_z",
+    "--sample",
+    "8017c8be:i16:lara_yaw",
+    "--sample",
+    "801826f8:i16:max_turn",
+    "--sample",
+    "80182728:i32:target_x",
+    "--sample",
+    "80182730:i32:target_z",
+    "--sample",
+    "8018272c:i32:target_y",
+    "--sample",
+    "8017c8cc:u32:actor_contact_mask",
+    "--sample",
+    "8008c572:i16:lara_movement_heading",
+    "--sample",
+    "8017c89c:i16:lara_fall_speed",
+    "--sample",
+    "8017c89e:i16:lara_health",
+    "--sample",
+    "8008c570:i16:lara_turn_rate",
+    "--sample",
+    "8017c8ec:i16:actor_box",
+    "--sample",
+    "8017c8a0:i16:lara_box",
+    "--sample",
+    "80182718:i16:goal_box",
+    "--sample",
+    "8008b258:i32:camera_x",
+    "--sample",
+    "8008b25c:i32:camera_y",
+    "--sample",
+    "8008b260:i32:camera_z",
+    "--sample",
+    "8008b268:i32:look_x",
+    "--sample",
+    "8008b26c:i32:look_y",
+    "--sample",
+    "8008b270:i32:look_z"
+  ],
+  "build": {
+    "id": "src-659f5da213e93fb5-release",
+    "profile": "release",
+    "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.2"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.2",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_blocked_roll_target_heldout_start/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9,
+    "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+  },
+  "frames": {
+    "end": 19154,
+    "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+    "reached": 240,
+    "requested": 240,
+    "start": 18914,
+    "unit": "vsync"
+  },
+  "samples_sha256": "4e83066ba6c4c4f681fcd7b4aed0b1deaef33c7967d6d1d253f812baf12add81",
+  "scope": "Animated roll/item contact beside a raised sector corner; local bounded-height corridor targets, no physical creature height transition parity",
+  "navigation_target_comparison": "exact",
+  "navigation_target_independent": true,
+  "navigation_target_note": "Post-implementation validation of bounded-height corridor targeting.",
+  "checkpoint_preparation": {
+    "controlled_initial_placement": true,
+    "command": [
+      "psx",
+      "run",
+      "--from-state",
+      ".psx/contact_runway/state.bin",
+      "--frames",
+      "2",
+      "--input",
+      "[]",
+      "--save-state",
+      "--out",
+      "/home/bombpersons/projects/tr2-rs/.psx/contact_blocked_roll_target_heldout_start",
+      "--summary",
+      "--poke",
+      "8017c8b0=21570",
+      "--poke",
+      "8017c8b8=92360",
+      "--poke",
+      "8017c8be=0:2",
+      "--poke",
+      "8017c8fc=21810",
+      "--poke",
+      "8017c904=92535"
+    ],
+    "source_checkpoint": ".psx/contact_runway/state.bin",
+    "source_sha256": "7c5206a60826a26bbd07d1ad2426d244d4a2b5c91c1a554a5ab7dcefc4750cb0",
+    "state_sha256": "903affaeafe36530b190592658d00b024997426b2326eb6a5e4737cb2f49ef9f",
+    "build": {
+      "id": "src-659f5da213e93fb5-release",
+      "profile": "release",
+      "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+      "target": "x86_64-unknown-linux-gnu",
+      "version": "0.3.2"
+    },
+    "identity": {
+      "backend": "psx-core",
+      "backend_version": "0.3.2",
+      "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+      "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+      "from_state": ".psx/contact_runway/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "media_identity": {
+        "kind": "disc",
+        "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+      },
+      "state_format": 9,
+      "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+    },
+    "pokes": [
+      {
+        "address": 2149042352,
+        "address_hex": "0x8017C8B0",
+        "applied": 1,
+        "first_run_frame": 0,
+        "last_run_frame": 0,
+        "run_frames": {
+          "from": 0,
+          "to": 0
+        },
+        "spec": "8017c8b0=21570",
+        "value": 21570,
+        "value_hex": "0x00005442",
+        "value_signed": 21570,
+        "width": 4
+      },
+      {
+        "address": 2149042360,
+        "address_hex": "0x8017C8B8",
+        "applied": 1,
+        "first_run_frame": 0,
+        "last_run_frame": 0,
+        "run_frames": {
+          "from": 0,
+          "to": 0
+        },
+        "spec": "8017c8b8=92360",
+        "value": 92360,
+        "value_hex": "0x000168C8",
+        "value_signed": 92360,
+        "width": 4
+      },
+      {
+        "address": 2149042366,
+        "address_hex": "0x8017C8BE",
+        "applied": 1,
+        "first_run_frame": 0,
+        "last_run_frame": 0,
+        "run_frames": {
+          "from": 0,
+          "to": 0
+        },
+        "spec": "8017c8be=0:2",
+        "value": 0,
+        "value_hex": "0x0000",
+        "value_signed": 0,
+        "width": 2
+      },
+      {
+        "address": 2149042428,
+        "address_hex": "0x8017C8FC",
+        "applied": 1,
+        "first_run_frame": 0,
+        "last_run_frame": 0,
+        "run_frames": {
+          "from": 0,
+          "to": 0
+        },
+        "spec": "8017c8fc=21810",
+        "value": 21810,
+        "value_hex": "0x00005532",
+        "value_signed": 21810,
+        "width": 4
+      },
+      {
+        "address": 2149042436,
+        "address_hex": "0x8017C904",
+        "applied": 1,
+        "first_run_frame": 0,
+        "last_run_frame": 0,
+        "run_frames": {
+          "from": 0,
+          "to": 0
+        },
+        "spec": "8017c904=92535",
+        "value": 92535,
+        "value_hex": "0x00016977",
+        "value_signed": 92535,
+        "width": 4
+      }
+    ],
+    "source_preparation": [
+      {
+        "report": ".psx/contact_boot/report.json",
+        "state_sha256": "76547a70b527455a65b51c5561c50dc5634ce903ff62b664ec86d313556db1d4",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": null,
+          "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 7800,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 7800,
+          "requested": 7800,
+          "start": 0,
+          "unit": "vsync"
+        },
+        "applied_inputs": []
+      },
+      {
+        "report": ".psx/contact_title/report.json",
+        "state_sha256": "f3a88203f7ef6cd5c8752fb8174456312be06d33715b35b9492ee1f13f7c83b0",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_boot/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 11640,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 3840,
+          "requested": 3840,
+          "start": 7800,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 0,
+            "frame": 7800,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 7810,
+            "run_frame": 10,
+            "scheduled_run_frame": 10,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 2,
+            "frame": 11400,
+            "run_frame": 3600,
+            "scheduled_run_frame": 3600,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 3,
+            "frame": 11410,
+            "run_frame": 3610,
+            "scheduled_run_frame": 3610,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "report": ".psx/contact_home_start/report.json",
+        "state_sha256": "48bd2ac7b1a71838dea39e803605a8fd11c30bb7822afc788aff1c3c994db24e",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_title/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 14880,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 3240,
+          "requested": 3240,
+          "start": 11640,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 0,
+            "frame": 11640,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 11650,
+            "run_frame": 10,
+            "scheduled_run_frame": 10,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 2,
+            "frame": 11760,
+            "run_frame": 120,
+            "scheduled_run_frame": 120,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 3,
+            "frame": 11770,
+            "run_frame": 130,
+            "scheduled_run_frame": 130,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "report": ".psx/contact_menu/report.json",
+        "state_sha256": "f7b2f4a7e1fb3552175d31726c5583e8d8b7acff8a0ac162774a11d66ff2688d",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_home_start/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 15180,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 300,
+          "requested": 300,
+          "start": 14880,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 0,
+            "frame": 14880,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 14890,
+            "run_frame": 10,
+            "scheduled_run_frame": 10,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "report": ".psx/contact_home/report.json",
+        "state_sha256": "2cfa6e42a9e00dd71ce18cb8416661432cfce9cf8632773b373f2ff7a48bc263",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_menu/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 18420,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 3240,
+          "requested": 3240,
+          "start": 15180,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 0,
+            "frame": 15180,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 15190,
+            "run_frame": 10,
+            "scheduled_run_frame": 10,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [
+              "CROSS"
+            ],
+            "event_index": 2,
+            "frame": 15300,
+            "run_frame": 120,
+            "scheduled_run_frame": 120,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 3,
+            "frame": 15310,
+            "run_frame": 130,
+            "scheduled_run_frame": 130,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "report": ".psx/contact_side/report.json",
+        "state_sha256": "06fd74ac5db4fb75a1b2691b6f8fa3d0d3245bca53c9156e563698efe2e75e15",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_home/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 18532,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 112,
+          "requested": 112,
+          "start": 18420,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "RIGHT"
+            ],
+            "event_index": 0,
+            "frame": 18420,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 18472,
+            "run_frame": 52,
+            "scheduled_run_frame": 52,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      },
+      {
+        "report": ".psx/contact_runway/report.json",
+        "state_sha256": "7c5206a60826a26bbd07d1ad2426d244d4a2b5c91c1a554a5ab7dcefc4750cb0",
+        "identity": {
+          "backend": "psx-core",
+          "backend_version": "0.3.2",
+          "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+          "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+          "from_state": ".psx/contact_side/state.bin",
+          "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+          "media_identity": {
+            "kind": "disc",
+            "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+          },
+          "state_format": 9,
+          "timing_model": "flat per-instruction costs (Redux-like), not cycle-accurate"
+        },
+        "build": {
+          "id": "src-659f5da213e93fb5-release",
+          "profile": "release",
+          "source_sha256": "659f5da213e93fb5337c26b3852a64d6120a4a481075a088eeaef9de5c1f5f8c",
+          "target": "x86_64-unknown-linux-gnu",
+          "version": "0.3.2"
+        },
+        "frames": {
+          "end": 18912,
+          "numbering": "run frames (--frames, --replay, --poke, --gpu-frame, --trace-from-frame, samples run_frame) count from the run start; `frame` in writes.jsonl, trace.txt, samples.csv and the other logs is absolute (vblanks since power-on) = run_frame + start",
+          "reached": 380,
+          "requested": 380,
+          "start": 18532,
+          "unit": "vsync"
+        },
+        "applied_inputs": [
+          {
+            "buttons": [
+              "DOWN",
+              "R1"
+            ],
+            "event_index": 0,
+            "frame": 18532,
+            "run_frame": 0,
+            "scheduled_run_frame": 0,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          },
+          {
+            "buttons": [],
+            "event_index": 1,
+            "frame": 18832,
+            "run_frame": 300,
+            "scheduled_run_frame": 300,
+            "sticks": [
+              128,
+              128,
+              128,
+              128
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "contact_mask_comparison": "presence",
+  "writes_sha256": "285d837e691fdadf3dd7bfc48ddb3777d38f2108b60072a6490093877eba30c7",
+  "trace_sha256": "ceea13f5c5d91a5afec258d1f0a79632fb86e7038bba80106586c8d7e223778d"
+}

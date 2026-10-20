@@ -76,6 +76,23 @@ fn compare_case(csv: &str, metadata: &str) {
         let transform = world.get::<Transform>(actor).unwrap();
         let actor_state = world.get::<Winston>(actor).unwrap();
         let aclip = &world.resource::<WorldGeometry>().data.animations[actor_pose.animation];
+        if metadata["navigation_target_comparison"] == "exact" {
+            for (axis, name) in [(0, "target_x"), (1, "target_y"), (2, "target_z")] {
+                if headers.contains(&name) {
+                    let actual = actor_state.target[axis] * if axis == 1 { -1024.0 } else { 1024.0 };
+                    assert_eq!(actual, at(row, name) as f32, "field{} {name}", at(row, "run_frame"));
+                }
+            }
+        }
+        for (name, actual) in [
+            ("lara_fall_speed", -motion.velocity.y * 1024.0 / 30.0),
+            ("lara_health", player.health as f32),
+            ("lara_turn_rate", motion.turn_rate as f32),
+        ] {
+            if headers.contains(&name) {
+                assert_eq!(actual, at(row, name) as f32, "field{} {name}", at(row, "run_frame"));
+            }
+        }
         for (name, actual) in [
             ("lara_x", player.position.x * 1024.0),
             ("lara_y", -player.position.y * 1024.0),
@@ -99,12 +116,23 @@ fn compare_case(csv: &str, metadata: &str) {
             ("actor_x", transform.translation.x * 1024.0),
             ("actor_y", -transform.translation.y * 1024.0),
             ("actor_z", transform.translation.z * 1024.0),
+            (
+                "actor_yaw",
+                (transform.rotation.to_euler(EulerRot::YXZ).0 * 65536.0 / std::f32::consts::TAU).round() as i32 as i16
+                    as f32,
+            ),
+            ("actor_speed", actor_state.speed as f32),
+            ("actor_room", world.get::<WorldObject>(actor).unwrap().room as f32),
             ("actor_animation", actor_pose.animation as f32),
             ("actor_animation_frame", aclip.frame_start as f32 + actor_pose.frame),
             ("actor_state", aclip.state as f32),
             ("actor_goal", world.get::<AnimationGoal>(actor).unwrap().state as f32),
             ("actor_contact_mask", actor_state.contact_mask as f32),
         ] {
+            if name == "actor_contact_mask" && metadata["contact_mask_comparison"] == "presence" {
+                assert_eq!(actual != 0.0, at(row, name) != 0, "field{} contact presence", at(row, "run_frame"));
+                continue;
+            }
             assert!(
                 (actual - at(row, name) as f32).abs() <= if name == "lara_y" { 0.02 } else { 0.0 },
                 "field{} {name}: port {actual}, PSX {}",
@@ -113,6 +141,38 @@ fn compare_case(csv: &str, metadata: &str) {
             );
         }
     }
+}
+
+#[test]
+fn original_corner_obstruction_rejects_the_items_push() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_corner.csv"),
+        include_str!("data/original/winston_contact_blocked_corner.json"),
+    );
+}
+
+#[test]
+fn heldout_offset_corner_rejects_the_leading_body_corner() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_offset_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_offset_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_walking_release_rechecks_the_push_from_the_accepted_origin() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_release_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_release_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_clearance_beside_the_corner_still_accepts_item_pushes() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_clear_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_clear_heldout.json"),
+    );
 }
 
 #[test]
@@ -234,5 +294,137 @@ fn heldout_oblique_start_validation_keeps_quantized_braking_and_blocked_restart_
     compare_case(
         include_str!("data/original/winston_wall_oblique_start_validation_heldout.csv"),
         include_str!("data/original/winston_wall_oblique_start_validation_heldout.json"),
+    );
+}
+#[test]
+fn original_vertical_backward_steering_includes_the_attendants_push() {
+    compare_case(
+        include_str!("data/original/winston_contact_vertical_backward.csv"),
+        include_str!("data/original/winston_contact_vertical_backward.json"),
+    );
+}
+
+#[test]
+fn heldout_vertical_steering_reversal_keeps_contact_and_landing_exact() {
+    compare_case(
+        include_str!("data/original/winston_contact_vertical_reverse_heldout.csv"),
+        include_str!("data/original/winston_contact_vertical_reverse_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_late_backward_input_preserves_vertical_contact_recovery() {
+    compare_case(
+        include_str!("data/original/winston_contact_vertical_late_heldout.csv"),
+        include_str!("data/original/winston_contact_vertical_late_heldout.json"),
+    );
+}
+
+#[test]
+fn raised_corner_sphere_outputs_bound_the_mesh_mask_diagnostic() {
+    use engine::animation::model_spheres;
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let native: serde_json::Value =
+        serde_json::from_str(include_str!("data/original/winston_corner_spheres.json")).unwrap();
+    for capture in native["captures"].as_array().unwrap() {
+        for case in capture["cases"].as_array().unwrap() {
+            let mut clouds = Vec::new();
+            for call in case["calls"].as_array().unwrap() {
+                let kind = call["kind"].as_u64().unwrap() as u16;
+                let animation = call["animation"].as_u64().unwrap() as usize;
+                let frame =
+                    call["absolute_frame"].as_u64().unwrap() as f32 - data.animations[animation].frame_start as f32;
+                let coordinates = std::array::from_fn(|i| call["position"][i].as_i64().unwrap() as i32);
+                let yaw = call["yaw"].as_i64().unwrap() as f32 * std::f32::consts::TAU / 65536.0;
+                let root = Transform::from_translation(position(coordinates)).with_rotation(Quat::from_rotation_y(yaw));
+                let spheres = model_spheres(&data, data.model(kind).unwrap(), animation, frame, &root);
+                let reference = call["spheres"].as_array().unwrap();
+                assert_eq!(spheres.len(), reference.len());
+                let mut maximum = 0.0_f32;
+                for sphere in &spheres {
+                    let expected = &reference[sphere.joint];
+                    let actual = [sphere.center.x * 1024.0, -sphere.center.y * 1024.0, sphere.center.z * 1024.0];
+                    for i in 0..3 {
+                        maximum = maximum.max((actual[i] - expected[i].as_i64().unwrap() as f32).abs());
+                    }
+                    assert_eq!(sphere.radius * 1024.0, expected[3].as_i64().unwrap() as f32);
+                }
+                println!("{} field{} kind{kind}: max error {maximum}", capture["route"], call["run_field"]);
+                // Bound ordinary Bevy pose math against these actual native
+                // stores; this does not claim intermediate GTE truncation parity.
+                assert!(maximum <= 1.1, "kind{kind}: error {maximum}");
+                clouds.push(spheres);
+            }
+            let mask = clouds[0].iter().fold(0_u32, |mask, a| {
+                if clouds[1].iter().any(|b| a.center.distance_squared(b.center) < (a.radius + b.radius).powi(2)) {
+                    mask | (1 << a.joint)
+                } else {
+                    mask
+                }
+            });
+            let expected = case["native_mask"].as_u64().unwrap() as u32;
+            println!("mask {mask:#x}, native {expected:#x}, difference {:#x}", mask ^ expected);
+            // Retain the observed limitation explicitly. The nearby held-out
+            // placement has full parity; the corner differs only on joint10.
+            let corner = capture["route"] == "contact_blocked_corner";
+            assert_eq!(mask ^ expected, if corner { 1 << 10 } else { 0 });
+            let calls = case["calls"].as_array().unwrap();
+            for joint in 0..26 {
+                if (mask ^ expected) & (1 << joint) == 0 {
+                    continue;
+                }
+                let a = &calls[0]["spheres"][joint];
+                let closest_gap = calls[1]["spheres"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|b| {
+                        let distance = (0..3)
+                            .map(|axis| (a[axis].as_f64().unwrap() - b[axis].as_f64().unwrap()).powi(2))
+                            .sum::<f64>()
+                            .sqrt();
+                        distance - a[3].as_f64().unwrap() - b[3].as_f64().unwrap()
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                println!("joint{joint} native separation {closest_gap}");
+                // Each centre has <=1.1 units of error per coordinate:
+                // the relative distance can change by <=2*sqrt(3)*1.1.
+                assert!(closest_gap.abs() <= 2.0 * 3.0_f64.sqrt() * 1.1);
+            }
+            assert_ne!(mask, 0);
+            assert_ne!(expected, 0);
+        }
+    }
+}
+
+#[test]
+fn original_rolling_contact_beside_the_raised_corner() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_roll.csv"),
+        include_str!("data/original/winston_contact_blocked_roll.json"),
+    );
+}
+
+#[test]
+fn heldout_offset_roll_settles_after_animated_item_contact() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_roll_offset_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_roll_offset_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_delayed_roll_settles_after_animated_item_contact() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_roll_late_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_roll_late_heldout.json"),
+    );
+}
+
+#[test]
+fn heldout_lower_floor_corridor_target_matches_all_three_coordinates() {
+    compare_case(
+        include_str!("data/original/winston_contact_blocked_roll_target_heldout.csv"),
+        include_str!("data/original/winston_contact_blocked_roll_target_heldout.json"),
     );
 }

@@ -46,8 +46,15 @@ def main():
             clip = int(start['actor_animation'])
             client.edit('Object260_9', 'ObjectAnimation', {'animation': clip, 'frame': int(start['actor_animation_frame']) - level['animations'][clip]['frame_start']})
             client.edit('Object260_9', 'AnimationGoal', {'state': int(start['actor_goal'])})
-            client.edit('Object260_9', 'Winston', {'speed': int(start['actor_speed'])})
+            client.edit('Object260_9', 'Winston', {'speed': int(start['actor_speed']),
+                        'contact_mask': int(start.get('actor_contact_mask', 0))})
             samples = [2,102,148,174,180,198,212,224,226,228,230,240,256,260,280] if name.startswith('wall_') else [2,8,16,36,38,40,42,78,88,90,94,96,98] if name.startswith('contact') else ([2,102,158,160,162,164,360,548,550,592,594,616,618,644,646,650] if name.startswith('nav') else [2,58,64,102,160,240,360])
+            if name.startswith('contact_vertical'):
+                samples = [2,28,40,50,60,88,98,100,102,112,114,116,118,120,128,160]
+            if name.startswith('contact_blocked'):
+                samples = [2,16,18,38,60,70,72,100,140,158,178,198,218]
+            if name.startswith('contact_blocked_roll'):
+                samples = [2,16,18,24,26,34,36,40,42,48,50,54,56,60,64,78,100,140]
             fields = sorted(set([f for f in samples if f < len(rows)] + [len(rows)-1]))
             tick = 0
             for field in fields:
@@ -72,9 +79,15 @@ def main():
                 yaw=round(math.atan2(2*(qw*qy+qx*qz),1-2*(qy*qy+qz*qz))*65536/math.tau)
                 assert (yaw-int(row['actor_yaw']))%65536==0,(name,field,yaw,row)
                 if 'target_x' in row:
-                    assert [round(c['Winston']['target'][i]*1024) for i in [0,2]]==[int(row['target_x']),int(row['target_z'])],(name,field,c,row)
+                    for i, axis in enumerate('xyz'):
+                        key = f'target_{axis}'
+                        if key in row:
+                            assert round(c['Winston']['target'][i]*(-1024 if i==1 else 1024))==int(row[key]),(name,field,key,c,row)
                 if 'actor_contact_mask' in row:
-                    assert c['Winston']['contact_mask']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
+                    if meta.get('contact_mask_comparison') == 'presence':
+                        assert bool(c['Winston']['contact_mask'])==bool(int(row['actor_contact_mask'])),(name,field,c,row)
+                    else:
+                        assert c['Winston']['contact_mask']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
                 if name.startswith(('contact','wall_','nav')):
                     player=client.query(components=['Player','AnimationState'])['entities'][0]['components']
                     pos=player['Player']['position']

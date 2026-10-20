@@ -1,5 +1,9 @@
 # Authored grounded rolling and roll departures
 
+Rolling through animated item contact beside a floor-height change is now
+verified separately: see [the contact ordering evidence](item-push-evidence.md#rolling-contact-before-floor-response).
+The roll's floor response follows the item push in the same tick.
+
 Evidence is the supplied Tomb Raider II USA Rev 3 disc through `psx` only.
 This milestone replaces the former0.7-second roll with authored animation,
 movement, turn and recovery. Verified routes cover ordinary flat/oblique motion,

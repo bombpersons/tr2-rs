@@ -11,6 +11,15 @@ it off. Record partial progress below without checking the parent item.
 
 ## Recent rendering and collision fixes
 
+- [x] Animated item pushes beside a raised room-sector corner: use the native
+  directional body probes and restore the last accepted position on contact.
+  Four controlled-initial-placement routes compare380 controller ticks,
+  including three independent validations and a nearby clearance control.
+  Positions and authored behavior match; per-mesh sphere-mask differences
+  remain explicit diagnostics. [Evidence](docs/item-push-evidence.md),
+  [tests](game/tests/winston_contact.rs). Static, slope and other collision
+  contexts remain separate work.
+
 - [x] Frontal oblique running room-wall contact: restore the tick's previous
   tangent coordinate; use verified quantized ground/braking motion. The former
   navigation diagnostic and five additional routes match2745 ticks, including
@@ -164,6 +173,15 @@ it off. Record partial progress below without checking the parent item.
   (three independent); general multi-box/zone navigation remains. Ordinary animated
   contact/pushing now matches285 additional ticks, with three independent
   routes and retained native sphere-output fixtures.
+  Extended vertical-contact routes and fresh-checkpoint provenance are in
+  [the contact follow-up](docs/winston-evidence.md#extended-vertical-contact-verification).
+  Rolling contact across the fountain's floor-height change now matches 300
+  additional ticks, including two independent routes. The roll's floor response
+  follows item pushes. The later bounded-height corridor query now also
+  matches their navigation targets plus a fresh 120-tick independent route;
+  physical creature height transitions remain open.
+  [Navigation evidence](docs/navigation-height-evidence.md).
+  [Evidence](docs/item-push-evidence.md#rolling-contact-before-floor-response).
 
 
 - [x] Pistols: draw/holster, firing cadence, targeting and shot/damage timing.
@@ -375,7 +393,7 @@ it off. Record partial progress below without checking the parent item.
   (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
   routes now match the camera on every tick (was windowed to tick 102).
   [Evidence](docs/chase-camera-evidence.md).
-- Next: dynamic item pushing, corner airborne ceiling impacts, fast-fall/slide recovery,
+- Next: remaining blocked-world/static item contacts, corner airborne ceiling impacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
 
@@ -388,3 +406,54 @@ it off. Record partial progress below without checking the parent item.
   lint warnings remain. Standalone pose checks, sandbox movement/rendering and
   editor sandbox/Home saves plus Lara gait177 preview are retained. No persistent
   format or template change. [Evidence](docs/wading-evidence.md).
+- 2026-10-20: Extended vertical item-contact verification: rebuilt a native
+  format-9 Home checkpoint from the supplied disc, retaining the preparation
+  history separately from older format-8 evidence. Three complete no-poke
+  recordings compare390 controller ticks with both actors active, including
+  two independent input routes. Existing contact rules pass without changes;
+  added coverage for vertical motion, health, turn rate and attendant yaw,
+  speed and room. Workspace tests pass444 tests; standalone MCP checks48
+  poses and paired contact views were inspected. No runtime, asset-format,
+  editor or template changes. Workspace all-target/all-feature Clippy passes
+  with existing unrelated warnings.
+  [Evidence](docs/winston-evidence.md#extended-vertical-contact-verification).
+- 2026-10-20: Raised-corner item-push validation: replaced fixed-offset
+  clearance checks with the existing directional body probes and verified
+  native rejection/rollback against a retained first-tick failure. Four
+  complete controlled-placement routes compare380 controller ticks; three
+  are independent. Raw native mesh masks are retained, with contact-presence
+  comparison explicitly separated from their bit-rounding diagnostic.
+  Workspace tests pass448 tests, all-target builds and Clippy pass with
+  existing warnings, and50 standalone poses match. Sandbox movement/rendering
+  and editor Home byte-exact save/reopen/clip282 preview checks pass. No
+  engine format or template change.
+  [Evidence](docs/item-push-evidence.md).
+- 2026-10-20: Raised-corner sphere diagnostic: eight native sphere clouds
+  directly bound the previously unmeasured mesh-mask discrepancy. Maximum
+  coordinate error is1.018 source units; the corner differs only on joint10
+  at a0.236-unit native gap, while the nearby offset has full mask parity.
+  Added a reproducible PSX recorder and regression retaining that limitation.
+  All449 workspace tests and all-target/all-feature Clippy pass with existing
+  warnings. No gameplay, presentation, format or editor change.
+  [Evidence](docs/item-push-evidence.md#raised-corner-sphere-diagnostic).
+- 2026-10-20: Rolling item-contact ordering: fixed the same-tick height response
+  after an animated lateral push onto lower floor. Three complete native
+  controlled-placement routes compare 300 ticks, two independently recorded
+  after the fix; standalone MCP checks pass 57 poses. All 452 workspace tests,
+  all-target builds and Clippy pass with existing unrelated warnings. Sandbox
+  movement/rendering and editor Home save/reopen checks pass. Cross-height
+  attendant targets are retained as an explicit diagnostic; other locomotion
+  families' object/floor ordering and static collision remain separate work.
+  No engine format or template change.
+  [Evidence](docs/item-push-evidence.md#rolling-contact-before-floor-response).
+- 2026-10-20: Bounded-height local corridor targets: the engine query now
+  takes caller-supplied step/drop limits and an authored zone index
+  (`CorridorLimits`); the flat-only query keeps its results. Winston uses the
+  native rise256/drop512 and ordinary ground zone, verified against live
+  creature, box, overlap and zone data. Four complete routes compare420
+  controller ticks with exact navigation targets; a fresh 120-tick route
+  independently validates target X/Y/Z. All 455 workspace tests and
+  all-target/all-feature Clippy pass with existing unrelated warnings;
+  standalone MCP checks pass 76 poses. Physical creature height changes and
+  multi-box search remain open. No format or editor schema change.
+  [Evidence](docs/navigation-height-evidence.md).

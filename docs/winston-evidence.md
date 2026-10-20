@@ -62,6 +62,8 @@ sounds, random sounds and creature activation scheduling remain unported.
 The current floor guard refuses movement onto a different height; it is a
 bounded fallback, not a verified reconstruction of creature navigation.
 The animated contact milestone below verifies ordinary open-space Lara pushing.
+The later [raised-corner validation](item-push-evidence.md) replaces the
+five-offset world-clearance approximation with directional body probes.
 
 Milestone checks: `cargo test --workspace --all-features` and Clippy completed;
 Clippy's existing warnings remain outside this controller. The engine sandbox
@@ -199,3 +201,65 @@ that difference at checkpoint616, after all preceding checked item positions
 match. `tools/winston_smoke.py --case nav_turn_heldout` now passes after the
 independently verified avatar correction in [oblique-wall-evidence.md](oblique-wall-evidence.md);
 no item target or movement correction was added to hide the difference.
+
+The later [bounded-height corridor verification](navigation-height-evidence.md)
+extends local targets with caller-supplied step/drop and movement-zone limits.
+The flat-only engine query remains available; physical creature steps and
+multi-box navigation remain unported.
+
+## Extended vertical-contact verification
+
+Three new no-poke captures exercise both live controllers through vertical
+jump preparation, animated item contact, landing, and return to standing.
+They extend the short `contact_back` route and revisit the interaction retained
+as a player-only [steering diagnostic](vertical-steering-evidence.md).
+No runtime controller or collision rule was changed for these recordings.
+
+| Capture | Pad input in display fields | Length |
+|---|---|---:|
+| `contact_vertical_backward` | Square[0,8), Down[28,50) | 240 |
+| `contact_vertical_reverse_heldout` | Square[16,24), Down[44,50), Up[50,60) | 280 |
+| `contact_vertical_late_heldout` | Square[12,20), Down[58,80) | 260 |
+
+The latter two routes were recorded after the existing contact and steering
+rules, without fitting. The original-style route is labelled calibration.
+The tests compare both actors throughout all390 controller ticks. New
+fixtures additionally retain and compare Lara's fall speed, health and turn
+rate; all contact fixtures now also check the attendant's yaw, speed and room.
+
+The installed toolkit (`psx`0.3.2, build `src-659f5da213e93fb5-release`) cannot
+restore the retained format-8 checkpoints. `tools/record_winston.py CASE
+--prepare-checkpoint` therefore rebuilds a format-9 runway checkpoint from
+the supplied disc and BIOS. The preparation recipes retain menu/loading
+waits and pad releases. Inspect their native screenshots if a later build
+changes timing. Existing checkpoints and fixtures are preserved.
+
+To replay the newly prepared checkpoint without booting again, use
+`tools/record_winston.py CASE --checkpoint .psx/contact_runway/state.bin`.
+Each new sidecar retains tool/disc/BIOS identities and the checkpoint hash;
+its preparation history retains state hashes and either exact commands or
+the observed input logs and run identities. Lara starts at
+[20946,2560,95577], yaw-15647, as in the older fixture. The new checkpoint is
+at absolute field18912 and Winston's frame is139 rather than119. Keep this
+provenance distinction when comparing the old diagnostic.
+
+Full-game verification uses `tools/winston_smoke.py --case CASE`, with both
+controllers active and only their initial states aligned. Camera placement
+uses the native samples for visual inspection; this is not a camera parity
+claim. Sphere rounding, blocked-world pushes, static obstacles and unusual
+player modes remain outside this milestone.
+The subsequent [item-push milestone](item-push-evidence.md) verifies the
+raised-sector corner rejection and nearby clearance subset of blocked-world
+validation; the broader exceptional contacts remain open.
+The later [rolling contact verification](item-push-evidence.md#rolling-contact-before-floor-response)
+adds 300 ticks with same-tick floor settlement after a lateral push. Its
+cross-height navigation target difference is explicitly retained as diagnostic.
+
+Verification: `cargo test --workspace --all-features` passes444 tests, including
+all14 contact tests. Workspace all-target/all-feature Clippy passes with
+existing unrelated warnings; changed Rust is formatted, Python scripts compile,
+and `git diff --check` passes. Standalone MCP replays pass48 checked poses across the
+three routes; paired native/game jump-contact screenshots were visually
+inspected. Reports and exact MCP transcripts are retained under
+`validation/winston/smoke/`. There is no runtime, asset-format, editor or
+template change in this follow-up.
