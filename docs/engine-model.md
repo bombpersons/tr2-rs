@@ -38,8 +38,11 @@ word list. *Structural.*
   engine machinery. The attendant's step256/drop512 limits and ordinary
   zone selection live with its game tuning. Native Home data and four complete
   roll/contact routes verify a lower-floor target (*PSX*,
-  [navigation-height evidence](navigation-height-evidence.md)). Physical
-  creature height changes and general multi-box search remain unported.
+  [navigation-height evidence](navigation-height-evidence.md)). The full
+  path search (the original's LOT: SearchLOT, UpdateLOT, TargetBox,
+  CalculateTarget) is now engine machinery, `engine::world::BoxSearch`.
+  Runtime blocked-box flags live in `engine::world::BoxFlags`, kept apart
+  from `WorldGeometry` (*PSX*, [creature evidence](creature-evidence.md)).
 - **Engine:** `engine::world` (`Level` asset, `WorldGeometry` queries).
   Integer world units and y-down are kept in the format and in collision
   queries, because the trajectory tests match the original's integer rounding
@@ -218,7 +221,9 @@ trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
     before the first item controller runs. Native initialization is at load /
     spawn; the port still defers hooks until the first eligible tick.
   - Creature and door controllers run in `ItemSystems::Control`, before
-    Lara's Control/Motion. They see the previous player position and cannot
+    Lara's Control/Motion. Ported creatures run in active-list order (newest
+    first) through `game::creature`; activation follows the trigger's action
+    order via `engine::triggers::ObjectActivated`. They see the previous player position and cannot
     respond to a floor trigger until the next tick's item phase.
   - Generic object animation follows those controllers. Lara's pose commit
     runs after Motion and before nearby object interaction; recorded
@@ -234,8 +239,8 @@ trace and a held-out turn ([tick-order-evidence](tick-order-evidence.md)).
     the collision result to Avatar before combat resolution and triggers.
     This fixes triggers using the position before a door's push.
   - Hair is in SecondaryMotion before Camera; sound remains after Camera.
-  - Remaining differences: no native active-item/effect lists or room-list
-    iteration order; legacy creature/scenery clip stepping remains provisional;
+  - Remaining differences: active-item order and room-list order are
+    modelled only for ported creatures; no effect lists; legacy creature/scenery clip stepping remains provisional;
     state/level collision is still in Motion before object collision;
     use and pushes remain separate passes. The new tests verify the phase
     order and its consequences, not unverified per-type AI/damage/animation.

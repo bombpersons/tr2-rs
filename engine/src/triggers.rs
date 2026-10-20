@@ -30,6 +30,15 @@ pub struct TriggerAction {
     pub trigger: TriggerKind,
 }
 
+/// An object a trigger has just activated, in the order its actions ran.
+/// The original adds each to the front of its active-item list then, so
+/// games that keep an update order follow these.
+#[derive(Message, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObjectActivated {
+    pub entity: Entity,
+    pub index: usize,
+}
+
 /// Names of the trigger actions some game handles.
 #[derive(Resource, Default, Debug)]
 pub struct TriggerActions(BTreeSet<String>);
@@ -99,9 +108,10 @@ fn dispatch_triggers(
     mut state: ResMut<TriggerState>,
     mut diagnostics: ResMut<TriggerDiagnostics>,
     avatars: Query<&Avatar>,
-    mut objects: Query<&mut WorldObject>,
+    mut objects: Query<(Entity, &mut WorldObject)>,
     mut cameras: ResMut<CameraCues>,
     mut fired: MessageWriter<TriggerAction>,
+    mut activated: MessageWriter<ObjectActivated>,
 ) {
     cameras.0.clear();
     let Some(w) = world else {
@@ -113,7 +123,7 @@ fn dispatch_triggers(
     for (index, timer) in &mut state.timers {
         *timer -= time.delta_secs();
         if *timer <= 0.0 {
-            for mut o in &mut objects {
+            for (_, mut o) in &mut objects {
                 if o.index == *index {
                     o.active = false;
                     o.flags &= !CODE_BITS;
@@ -177,14 +187,18 @@ fn dispatch_triggers(
                     }
                 }
                 ACTIVATE => {
-                    for mut o in &mut objects {
+                    for (entity, mut o) in &mut objects {
                         if o.index == usize::from(argument) {
+                            let was_active = o.active;
                             match kind {
                                 TriggerKind::Switch => o.flags ^= mask,
                                 TriggerKind::AntiPad => o.flags &= !mask,
                                 _ => o.flags |= mask,
                             }
                             o.update_active();
+                            if o.active && !was_active {
+                                activated.write(ObjectActivated { entity, index: o.index });
+                            }
                             if trigger.timer > 0 && o.active {
                                 // Timer byte: seconds, except 1 = one tick.
                                 state.timers.insert(
@@ -217,6 +231,7 @@ impl Plugin for TriggersPlugin {
             .init_resource::<TriggerDiagnostics>()
             .init_resource::<CameraCues>()
             .add_message::<TriggerAction>()
+            .add_message::<ObjectActivated>()
             .configure_sets(FixedUpdate, TriggerSystems::Dispatch.in_set(InteractionSystems::Triggers))
             .add_systems(
                 FixedUpdate,

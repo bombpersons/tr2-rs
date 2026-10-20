@@ -11,13 +11,17 @@
 pub mod audio;
 pub mod braid;
 pub mod caustics;
+mod contact;
+pub mod creature;
 pub mod display;
 pub mod interactions;
 pub mod player;
 pub mod presentation;
 pub mod save;
 pub mod sky;
+pub mod spider;
 pub mod subdivision;
+pub mod tiger;
 pub mod water_palette;
 pub mod winston;
 

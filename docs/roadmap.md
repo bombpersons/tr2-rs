@@ -24,6 +24,13 @@ custom content is later. These habits cost nothing in accuracy
 - **Tuning numbers are named and grouped** (speeds, jump velocities, reach,
   damage), each with its evidence. They can move into tuning assets later
   without changing a rule.
+- **Every kind of content shares one path per kind.** Pickups and inventory
+  items, weapons and ammo, traps, doors and switches, cutscenes, fixed cameras
+  and sound cues are each built on shared machinery (a registry entry plus
+  per-type data or a per-type plugin), not one-off code per instance. A gun is
+  the gun table's entry plus its handlers, a pickup its inventory entry, a
+  cutscene its camera, actor and clip data; adding a new one later means
+  another entry of the same kind.
 - **Clip and state numbers are a written contract.** The clips, states and
   effect commands Lara's controller relies on are listed in one place, so a
   replacement model can be checked against it.

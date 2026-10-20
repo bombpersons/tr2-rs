@@ -61,6 +61,7 @@ impl Plugin for EngineRulesPlugin {
         add_once(app, objects::ObjectsPlugin);
         add_once(app, triggers::TriggersPlugin);
         add_once(app, camera::CameraRulesPlugin);
+        add_once(app, world::BoxFlagsPlugin);
     }
 
     fn is_unique(&self) -> bool {

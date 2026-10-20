@@ -284,6 +284,11 @@ decide how the accurate code is organised:
 - Keep tuning numbers as named constants grouped per feature, with their
   evidence, so they can later move into tuning assets (`TuningPlugin`)
   unchanged.
+- Give each kind of content one shared path: pickups and inventory items,
+  weapons and ammo, traps, doors, switches, cutscenes, fixed cameras and sound
+  cues each go through a registry or table entry plus per-type data or code,
+  so new ones can be added the same way. Port the second gun, item or
+  cutscene by extending the first one's machinery, not by copying it.
 - When a controller relies on a clip, state or animation command number,
   name it as a constant and list it with the others for that model, so the
   set a replacement model must provide is written down in one place.

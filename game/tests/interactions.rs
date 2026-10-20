@@ -135,13 +135,15 @@ fn initially_open_object_closes_when_its_authored_reverse_trigger_fires() {
 }
 
 /// A floor trigger changes activation after item control has already finished.
-/// The damage amount is a fixture/prototype rule, not new PSX damage evidence.
+/// The damage amount is a fixture/prototype rule, not new PSX damage evidence:
+/// type 37 still runs the provisional creature rule (the tiger and spider
+/// have their ported controllers).
 #[test]
 fn a_triggered_creature_first_controls_on_the_following_tick() {
     let mut app = app();
     app.insert_resource(geometry(activate(4)));
     let player = app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0)).id();
-    let enemy = app.world_mut().spawn((WorldObject::new(4, 39, 0, 0), Transform::from_xyz(0.5, 0.0, 0.5))).id();
+    let enemy = app.world_mut().spawn((WorldObject::new(4, 37, 0, 0), Transform::from_xyz(0.5, 0.0, 0.5))).id();
     app.run_tick(&[]);
     assert!(app.world().get::<WorldObject>(enemy).unwrap().active);
     assert_eq!(app.world().get::<Player>(player).unwrap().health, 1000, "no second item-control pass after triggers");
@@ -165,7 +167,7 @@ fn an_active_creature_reads_the_player_before_this_ticks_movement() {
         .in_set(WorldSystems::Control),
     );
     let player = app.world_mut().spawn(Player::at(Vec3::new(0.5, 0.0, 0.5), 0.0, 0)).id();
-    app.world_mut().spawn((WorldObject::new(4, 39, 0, CODE_BITS), Transform::from_xyz(0.5, 0.0, 0.5)));
+    app.world_mut().spawn((WorldObject::new(4, 37, 0, CODE_BITS), Transform::from_xyz(0.5, 0.0, 0.5)));
     app.run_tick(&[]);
     let player = app.world().get::<Player>(player).unwrap();
     assert_eq!(player.position.x, 1.5);
@@ -236,4 +238,18 @@ fn registered_attendant_gets_its_controller_and_authored_goal_once() {
     app.world_mut().get_mut::<game::winston::Winston>(actor).unwrap().speed = 7;
     app.run_tick(&[]);
     assert_eq!(app.world().get::<game::winston::Winston>(actor).unwrap().speed, 7);
+}
+
+/// Wall's shut doors and placed blocks block exactly the boxes the original's
+/// runtime box table has blocked at the settled start (703, 705, 712; read
+/// from `.psx/wall_game/ram.bin`, box table pointer at 0x8008AAA8).
+#[cfg(feature = "baked-assets")]
+#[test]
+fn wall_doors_and_blocks_block_the_original_boxes() {
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let world = engine::world::WorldGeometry::new(data);
+    let flags = game::interactions::initial_box_flags(&world);
+    let blocked: Vec<usize> =
+        (0..world.data.boxes.len()).filter(|&b| flags.overlap(&world.data, b) & engine::world::BLOCKED != 0).collect();
+    assert_eq!(blocked, [703, 705, 712]);
 }

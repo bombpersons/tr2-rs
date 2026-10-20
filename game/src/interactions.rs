@@ -43,6 +43,8 @@ struct ObjectTypeData {
     #[serde(default)]
     spikes: Option<Spikes>,
     #[serde(default)]
+    block: Option<MovableBlock>,
+    #[serde(default)]
     creature: Option<CreatureData>,
     #[serde(default)]
     attendant: Option<crate::winston::WinstonTuning>,
@@ -84,6 +86,15 @@ pub struct Keyhole {
 #[derive(Component, serde::Deserialize, Debug, Clone, Default)]
 pub struct Door {}
 
+/// A block placed in the level, whose sector it raises and whose navigation
+/// box it blocks (pushing it is not ported).
+#[derive(Component, serde::Deserialize, Debug, Clone, Default)]
+pub struct MovableBlock {}
+
+/// The navigation boxes a door blocks while shut.
+#[derive(Component, Debug, Clone, Default)]
+pub struct DoorBoxes(pub Vec<usize>);
+
 /// Kills on a fall, hurts while running over it.
 #[derive(Component, serde::Deserialize, Debug, Clone, Default)]
 pub struct Spikes {}
@@ -94,6 +105,29 @@ struct CreatureData {
     /// World units.
     radius: f32,
     damage: i32,
+    /// Object table +0x28: how far ahead of its origin it measures from.
+    #[serde(default)]
+    pivot: i32,
+    /// The largest rise and drop its path may take (InitialiseSlot).
+    #[serde(default)]
+    step: Option<i32>,
+    #[serde(default)]
+    drop: Option<i32>,
+    /// The joint whose bone flags turn it by the head angle.
+    #[serde(default)]
+    head_joint: Option<usize>,
+}
+
+impl CreatureData {
+    fn setup(self) -> crate::creature::CreatureSetup {
+        crate::creature::CreatureSetup {
+            pivot: self.pivot,
+            radius: self.radius as i32,
+            step: self.step.unwrap_or(256),
+            drop: self.drop.unwrap_or(-512),
+            head_joint: self.head_joint,
+        }
+    }
 }
 
 #[derive(Component, Reflect, Debug, Clone)]
@@ -122,6 +156,11 @@ impl Enemy {
     /// The creature components of object type `kind`, if it is one.
     pub fn for_kind(kind: u16) -> Option<Self> {
         object_types().into_iter().find(|t| t.id == kind)?.creature.map(Self::new)
+    }
+
+    /// The shared creature routines' set-up values for type `kind`.
+    pub fn setup_for_kind(kind: u16) -> Option<crate::creature::CreatureSetup> {
+        object_types().into_iter().find(|t| t.id == kind)?.creature.map(CreatureData::setup)
     }
 }
 
@@ -160,7 +199,7 @@ fn register_object_types(app: &mut App) {
             object_type = object_type.on_spawn(crate::player::spawn_lara);
         }
         let hook = data.clone();
-        object_type = object_type.on_init(move |entity, _, world| {
+        object_type = object_type.on_init(move |entity, object, world| {
             if hook.id == crate::winston::KIND {
                 entity.insert((crate::winston::Winston::default(), AnimationGoal { state: 2 }));
             }
@@ -178,8 +217,21 @@ fn register_object_types(app: &mut App) {
             }
             if let Some(creature) = hook.creature {
                 entity.insert(Enemy::new(creature));
+                // The shared creature state; types with a ported controller
+                // take it over (crate::creature).
+                if let Some(world) = world {
+                    entity.insert(crate::creature::spawn_components(world, object, creature.setup()));
+                }
+            }
+            if let Some(block) = &hook.block {
+                entity.insert(block.clone());
             }
             if let Some(door) = &hook.door {
+                if let Some(world) = world
+                    && let Some(placement) = world.data.placements.get(object.index)
+                {
+                    entity.insert(DoorBoxes(door_boxes(world, placement)));
+                }
                 let state = world
                     .and_then(|w| w.data.model(hook.id).and_then(|m| w.data.animations.get(m.animations[0])))
                     .map_or(0, |clip| clip.state);
@@ -190,6 +242,83 @@ fn register_object_types(app: &mut App) {
             }
         });
         app.register_object_type(data.id, object_type);
+    }
+}
+
+/// The navigation boxes a door shuts (InitialiseDoor `0x8004C358`, shut by
+/// `0x8004C284`): the sector behind it (one step against its facing) and
+/// its own sector in the room through that sector's portal, each resolved
+/// through a further portal (GetDoor `0x8001FACC`) and in the flipped rooms
+/// too. Only blockable boxes count.
+pub fn door_boxes(world: &WorldGeometry, placement: &engine::world::Placement) -> Vec<usize> {
+    let level = &world.data;
+    let [x, _, z] = placement.position;
+    let (dx, dz) = match placement.rotation {
+        0 => (0, -1),
+        0x8000 => (0, 1),
+        0x4000 => (-1, 0),
+        _ => (1, 0),
+    };
+    let portal = |room: usize, x: i32, z: i32| {
+        world.sector_at(room, x, z).and_then(|s| level.floor_info(s).portal).filter(|&r| r < level.rooms.len())
+    };
+    // The box of a sector, through its portal when it has one.
+    let resolved_box = |room: usize, x: i32, z: i32| {
+        let room = portal(room, x, z).unwrap_or(room);
+        world.sector_at(room, x, z).and_then(|s| s.nav_box)
+    };
+    let (bx, bz) = (x + dx * 1024, z + dz * 1024);
+    let mut rooms = vec![placement.room];
+    rooms.extend(level.rooms.get(placement.room).and_then(|r| r.alternate));
+    let mut boxes = vec![];
+    for &room in &rooms {
+        boxes.extend(resolved_box(room, bx, bz));
+        if let Some(other) = portal(room, bx, bz) {
+            boxes.extend(resolved_box(other, x, z));
+            if let Some(flipped) = level.rooms.get(other).and_then(|r| r.alternate) {
+                boxes.extend(resolved_box(flipped, x, z));
+            }
+        }
+    }
+    boxes.retain(|&b| level.boxes.get(b).is_some_and(|b| b.overlap as u16 & engine::world::BLOCKABLE != 0));
+    boxes.dedup();
+    boxes
+}
+
+/// The box a placed block raises and blocks (InitialiseMovableBlock
+/// `0x8004A05C` calls AlterFloorHeight `0x8004AA4C` with -1024).
+pub fn block_box(world: &WorldGeometry, placement: &engine::world::Placement) -> Option<usize> {
+    let [x, y, z] = placement.position;
+    world.floor_box(x, y, z, placement.room).1
+}
+
+/// The box flags a level starts with: every door shut, every visible block
+/// in place. The original's level setup does the same before any tick.
+pub fn initial_box_flags(world: &WorldGeometry) -> engine::world::BoxFlags {
+    let mut flags = engine::world::BoxFlags::new(&world.data);
+    let types = object_types();
+    let kind = |id: u16| types.iter().find(|t| t.id == id);
+    for placement in &world.data.placements {
+        let Some(data) = kind(placement.kind) else { continue };
+        if data.door.is_some() {
+            for b in door_boxes(world, placement) {
+                flags.set_blocked(b, true);
+            }
+        }
+        if data.block.is_some()
+            && !placement.invisible
+            && let Some(b) = block_box(world, placement)
+        {
+            flags.set_blocked(b, true);
+        }
+    }
+    flags
+}
+
+/// A newly loaded level's doors and blocks block their boxes.
+fn block_level_boxes(world: Option<Res<WorldGeometry>>, mut flags: ResMut<engine::world::BoxFlags>) {
+    if let Some(world) = world.filter(|w| w.is_changed()) {
+        *flags = initial_box_flags(&world);
     }
 }
 
@@ -266,6 +395,8 @@ impl Plugin for InteractionsPlugin {
         engine::add_once(app, engine::EngineRulesPlugin);
         engine::add_once(app, crate::player::AvatarPlugin);
         engine::add_once(app, crate::winston::WinstonRulesPlugin);
+        engine::add_once(app, crate::tiger::TigerRulesPlugin);
+        engine::add_once(app, crate::spider::SpiderRulesPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
         app.add_message::<crate::player::GunHit>();
@@ -276,6 +407,7 @@ impl Plugin for InteractionsPlugin {
                 FixedUpdate,
                 (
                     reset_level.in_set(LifecycleSystems::Reset),
+                    block_level_boxes.in_set(LifecycleSystems::Initialize),
                     collect_and_use.in_set(InteractionSystems::Use),
                     trigger_actions.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
                     resolve_objects.in_set(InteractionSystems::Resolve),
@@ -410,10 +542,15 @@ fn trigger_actions(
 fn combat(
     mut hits: MessageReader<crate::player::GunHit>,
     mut progress: ResMut<InteractionProgress>,
-    mut enemies: Query<(&mut Enemy, &mut WorldObject)>,
+    mut enemies: Query<(&mut Enemy, &mut WorldObject, Option<&mut crate::creature::CreatureBody>)>,
 ) {
     for hit in hits.read() {
-        let Ok((mut enemy, mut object)) = enemies.get_mut(hit.target) else { continue };
+        let Ok((mut enemy, mut object, body)) = enemies.get_mut(hit.target) else { continue };
+        // HitTarget sets the item's hit flag, which the creature's next
+        // mood update reads (status bit 0x10).
+        if let Some(mut body) = body {
+            body.hit = true;
+        }
         if enemy.health > 0 && enemy.health <= hit.damage {
             enemy.killed = true;
             progress.kills += 1;
@@ -426,6 +563,7 @@ fn combat(
 fn creatures(
     time: Res<Time>,
     world: Option<Res<WorldGeometry>>,
+    ported: Res<crate::creature::CreatureControls>,
     mut players: Query<&mut Player>,
     mut enemies: Query<(&mut Enemy, &mut WorldObject, &mut Transform, Option<&mut ObjectAnimation>), Without<Player>>,
 ) {
@@ -434,6 +572,10 @@ fn creatures(
     };
     let dt = time.delta_secs();
     for (mut enemy, mut o, mut t, mut animation) in &mut enemies {
+        // Ported creature types run their own controllers (crate::creature).
+        if crate::creature::is_ported(&ported, o.kind) {
+            continue;
+        }
         let Some(w) = world.as_deref() else {
             continue;
         };
@@ -546,17 +688,34 @@ fn resolve_objects(
 // PSX DoorControl 0x8004CA04..0x8004CA60 only changes the goal when
 // closed+active or open+inactive. Reopening during a close cannot cancel it:
 // the close completes before the next open request (docs/door-animation-evidence.md).
+// Active, the door opens its sectors once it has left its closed state;
+// inactive, it shuts them again unless fully open (0x8004C9FC..0x8004CA80).
+// Only the navigation boxes are ported here; the sectors still read as
+// open floor, and Lara is kept out by the door's collider instead.
 fn control_doors(
     world: Option<Res<WorldGeometry>>,
-    mut doors: Query<(&WorldObject, &ObjectAnimation, &mut AnimationGoal), With<Door>>,
+    mut flags: ResMut<engine::world::BoxFlags>,
+    mut doors: Query<(&WorldObject, &ObjectAnimation, &mut AnimationGoal, Option<&DoorBoxes>), With<Door>>,
 ) {
     let Some(world) = world else { return };
-    for (object, animation, mut goal) in &mut doors {
+    for (object, animation, mut goal, boxes) in &mut doors {
         let Some(clip) = world.data.animations.get(animation.animation) else { continue };
-        match (object.active, clip.state) {
-            (true, 0) => goal.state = 1,
-            (false, 1) => goal.state = 0,
-            _ => (),
+        let shut = match (object.active, clip.state) {
+            (true, 0) => {
+                goal.state = 1;
+                None
+            }
+            (true, _) => Some(false),
+            (false, 1) => {
+                goal.state = 0;
+                None
+            }
+            (false, _) => Some(true),
+        };
+        if let (Some(shut), Some(boxes)) = (shut, boxes) {
+            for &b in &boxes.0 {
+                flags.set_blocked(b, shut);
+            }
         }
     }
 }

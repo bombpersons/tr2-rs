@@ -259,10 +259,42 @@ pub struct ObjectAnimationCue {
 /// Dispatch retains the requested goal. A natural end link resets it only
 /// if the destination's state differs from the state just being played.
 pub fn step_authored_animation(data: &Level, a: &mut ObjectAnimation, goal: &mut AnimationGoal) -> Vec<AnimationCue> {
-    let mut cues = Vec::new();
-    let Some(mut clip) = data.animations.get(a.animation) else { return cues };
+    step_animation_frame(data, a, goal).cues
+}
+
+/// What one authored frame step did, for controllers that animate their own
+/// object inside their control code (the original's AnimateItem calls).
+#[derive(Debug, Clone, Default)]
+pub struct AnimationStep {
+    pub cues: Vec<AnimationCue>,
+    /// A state range dispatched to another clip.
+    pub changed: bool,
+    /// The clip ran past its last frame and followed its end link.
+    pub ended: bool,
+}
+
+/// [`step_authored_animation`], also reporting dispatch and clip ends.
+pub fn step_animation_frame(data: &Level, a: &mut ObjectAnimation, goal: &mut AnimationGoal) -> AnimationStep {
+    let mut state = data.animations.get(a.animation).map_or(0, |clip| clip.state);
+    step_animation_frame_from(data, a, goal, &mut state)
+}
+
+/// [`step_animation_frame`] for an object that keeps its own current state
+/// (the original item's `current_anim_state`), which a controller may set
+/// apart from its clip's: dispatch runs while it differs from the goal, and
+/// an end link into a clip of another state makes that the current and goal
+/// state (AnimateItem `0x8001DD98`, GetChange `0x8001E250`).
+pub fn step_animation_frame_from(
+    data: &Level,
+    a: &mut ObjectAnimation,
+    goal: &mut AnimationGoal,
+    current: &mut usize,
+) -> AnimationStep {
+    let mut step = AnimationStep::default();
+    let cues = &mut step.cues;
+    let Some(mut clip) = data.animations.get(a.animation) else { return step };
     let mut absolute = clip.frame_start as i64 + a.frame.floor() as i64 + 1;
-    if clip.state != goal.state
+    if *current != goal.state
         && let Some(range) = clip
             .state_changes
             .iter()
@@ -272,8 +304,11 @@ pub fn step_authored_animation(data: &Level, a: &mut ObjectAnimation, goal: &mut
         a.animation = range.animation;
         absolute = range.frame as i64;
         clip = destination;
+        *current = clip.state;
+        step.changed = true;
     }
     if absolute > clip.frame_end as i64 {
+        step.ended = true;
         for command in &clip.commands {
             if !matches!(command, Command::Sound { .. } | Command::Effect { .. }) {
                 cues.push(AnimationCue {
@@ -287,7 +322,8 @@ pub fn step_authored_animation(data: &Level, a: &mut ObjectAnimation, goal: &mut
         if let Some(destination) = data.animations.get(clip.next_animation) {
             a.animation = clip.next_animation;
             absolute = clip.next_frame as i64;
-            if destination.state != clip.state {
+            if destination.state != *current {
+                *current = destination.state;
                 goal.state = destination.state;
             }
             clip = destination;
@@ -303,7 +339,7 @@ pub fn step_authored_animation(data: &Level, a: &mut ObjectAnimation, goal: &mut
             cues.push(AnimationCue { animation: a.animation, frame, at_end: false, command: command.clone() });
         }
     }
-    cues
+    step
 }
 
 /// Advance authored frames with fractional interpolation at other fixed tick
@@ -327,10 +363,18 @@ pub fn advance_authored_animation(
     cues
 }
 
+/// Marks an object whose controller steps its own animation inside its
+/// control code (with [`step_animation_frame`]), as the original's
+/// controllers that call AnimateItem themselves do. The shared animation
+/// phase leaves it alone.
+#[derive(Component, Reflect, Debug, Clone, Copy, Default)]
+#[reflect(Component)]
+pub struct ControllerAnimated;
+
 fn animate_objects(
     time: Res<Time>,
     world: Option<Res<WorldGeometry>>,
-    mut objects: Query<(Entity, &mut ObjectAnimation, Option<&mut AnimationGoal>)>,
+    mut objects: Query<(Entity, &mut ObjectAnimation, Option<&mut AnimationGoal>), Without<ControllerAnimated>>,
     mut cues: MessageWriter<ObjectAnimationCue>,
 ) {
     let Some(world) = world else { return };
@@ -534,10 +578,23 @@ pub struct PosedSphere {
 /// Uses the engine's ordinary posed bones; it does not emulate a fixed-point
 /// geometry processor or apply game-specific aiming/head rotations.
 pub fn model_spheres(data: &Level, model: &Model, animation: usize, frame: f32, root: &Transform) -> Vec<PosedSphere> {
+    model_spheres_with(data, model, animation, frame, root, &[])
+}
+
+/// [`model_spheres`] with extra joint turns (a creature's head, Lara's
+/// aim), as the original's sphere generator applies its bone-flag rotations.
+pub fn model_spheres_with(
+    data: &Level,
+    model: &Model,
+    animation: usize,
+    frame: f32,
+    root: &Transform,
+    overrides: &[JointPose],
+) -> Vec<PosedSphere> {
     let frame = collision_key(data, animation, frame)
         .and_then(|key| data.animations.get(animation).map(|clip| (key * clip.frame_rate.max(1)) as f32))
         .unwrap_or(frame);
-    model_pose(data, model, animation, frame)
+    model_pose_with(data, model, animation, frame, overrides)
         .into_iter()
         .zip(&model.meshes)
         .enumerate()

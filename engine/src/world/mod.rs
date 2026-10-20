@@ -13,7 +13,9 @@ use bevy::{
 };
 
 pub mod format;
+mod box_search;
 mod navigation;
+pub use box_search::{BLOCKABLE, BLOCKED, BoxFlags, BoxFlagsPlugin, BoxSearch, NO_BOX, SearchNode, TargetKind};
 pub use navigation::CorridorLimits;
 pub use format::{
     Ambient, Animation, Command, FixedCamera, FloorInfo, Level, Light, Mesh as ObjectMesh, Model, NavBox, Placement, Pose, Room,
@@ -118,6 +120,12 @@ impl WorldGeometry {
         self.sector(room, x, z).and_then(|s| s.nav_box)
     }
 
+    /// The sector of `room`'s own grid holding world (x, z), without
+    /// following portals.
+    pub fn sector_at(&self, room: usize, x: i32, z: i32) -> Option<&Sector> {
+        self.sector(room, x, z)
+    }
+
     fn sector(&self, room: usize, x: i32, z: i32) -> Option<&Sector> {
         let r = self.data.rooms.get(room)?;
         let sx = (x - r.origin[0]).div_euclid(1024);
@@ -128,19 +136,10 @@ impl WorldGeometry {
         r.sectors.get(sx as usize * r.z_sectors + sz as usize)
     }
 
-    /// Sector portal and height rules are documented in docs/format-notes.md.
-    pub fn floor_at(&self, pos: Vec3, room: usize) -> Option<FloorHit> {
-        self.floor_at_for(pos, room, false)
-    }
-
-    /// `camera`: the camera's view of the floor (the original's flag
-    /// 0x80087a80), under which GetHeight (0x8001ea8c) ignores floor slopes
-    /// with a tilt of 3 or more on either axis and GetCeiling (0x8001f850)
-    /// ceiling slopes beyond 2, so steep ramps read as their flat height.
-    pub fn floor_at_for(&self, pos: Vec3, room: usize, camera: bool) -> Option<FloorHit> {
-        let x = (pos.x * 1024.0).floor() as i32;
-        let y = (-pos.y * 1024.0).floor() as i32;
-        let z = (pos.z * 1024.0).floor() as i32;
+    /// The room whose sector holds (x, y, z), in world units: floor-data
+    /// portals are followed sideways, then sector stacks by height (below
+    /// from the floor down, above under the ceiling). As GetFloor's room walk.
+    pub fn floor_room(&self, x: i32, y: i32, z: i32, room: usize) -> Option<usize> {
         let mut room = room;
         let rooms = self.data.rooms.len();
         // Portals form cycles. Bound traversal, rather than recurse on bad assets.
@@ -161,6 +160,39 @@ impl WorldGeometry {
             }
             break;
         }
+        Some(room)
+    }
+
+    /// The navigation box of the sector [`Self::floor_room`] finds, with its
+    /// room: what GetFloor returns for creature movement checks.
+    pub fn floor_box(&self, x: i32, y: i32, z: i32, room: usize) -> (usize, Option<usize>) {
+        match self.floor_room(x, y, z, room) {
+            Some(found) => (found, self.sector(found, x, z).and_then(|s| s.nav_box)),
+            None => (room, None),
+        }
+    }
+
+    /// The collision floor height under (x, y, z) in world units (y down),
+    /// or `None` over solid ground.
+    pub fn floor_height(&self, x: i32, y: i32, z: i32, room: usize) -> Option<i32> {
+        let hit = self.floor_at(Vec3::new(x as f32, -y as f32, z as f32) / 1024.0, room)?;
+        Some((-hit.height * 1024.0).round() as i32)
+    }
+
+    /// Sector portal and height rules are documented in docs/format-notes.md.
+    pub fn floor_at(&self, pos: Vec3, room: usize) -> Option<FloorHit> {
+        self.floor_at_for(pos, room, false)
+    }
+
+    /// `camera`: the camera's view of the floor (the original's flag
+    /// 0x80087a80), under which GetHeight (0x8001ea8c) ignores floor slopes
+    /// with a tilt of 3 or more on either axis and GetCeiling (0x8001f850)
+    /// ceiling slopes beyond 2, so steep ramps read as their flat height.
+    pub fn floor_at_for(&self, pos: Vec3, room: usize, camera: bool) -> Option<FloorHit> {
+        let x = (pos.x * 1024.0).floor() as i32;
+        let y = (-pos.y * 1024.0).floor() as i32;
+        let z = (pos.z * 1024.0).floor() as i32;
+        let mut room = self.floor_room(x, y, z, room)?;
         let current_room = room;
         let water = self.data.rooms.get(room)?.water;
         // The collision floor is at the bottom of a room stack, even when the

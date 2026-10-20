@@ -210,11 +210,20 @@ it off. Record partial progress below without checking the parent item.
   Other guns, flares, hands-busy climbs/pickups and ricochets/smashables
   remain. The slide's camera flag (exact slopes) now keeps the tiger
   routes' camera exact through the knock-down slide.
-- [ ] Tiger and spider behavior: attack selection, contact and damage windows.
+- [x] Tiger and spider behavior: attack selection, contact and damage windows.
+  Shared creature routines (slots, AI info, mood, box search, turn, tilt,
+  head, animation, bad floor, room-ordered creature collisions, death) with a
+  control function per type. Doors and blocks block their navigation boxes.
+  Seven tiger routes (2721 ticks, four held out) and five spider routes
+  (1960 ticks, three held out) match tick by tick.
+  [Evidence](docs/creature-evidence.md), [tiger tests](game/tests/tiger.rs),
+  [spider tests](game/tests/spider.rs). The other creature types, effect
+  pieces, blood, flip zones and flying creatures remain.
 - [ ] Pickups: alignment, animation and collection timing.
 - [ ] Switches and key/puzzle use: alignment, animation and trigger timing.
 - [ ] Doors: collision and floor/portal changes during opening/closing,
-  including occupancy override.
+  including occupancy override. Navigation-box blocking is done
+  ([creature evidence](docs/creature-evidence.md)).
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
   elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,

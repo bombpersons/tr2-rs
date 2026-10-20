@@ -53,11 +53,13 @@
   },
   {
    "id": 36,
-   "name": "creature_36",
+   "name": "spider",
    "creature": {
     "health": 5,
     "radius": 102,
-    "damage": 25
+    "damage": 25,
+    "step": 512,
+    "drop": -1024
    }
   },
   {
@@ -75,13 +77,35 @@
    "creature": {
     "health": 20,
     "radius": 341,
-    "damage": 100
+    "damage": 100,
+    "pivot": 200,
+    "head_joint": 22
    }
   },
   {
    "id": 59,
    "name": "spikes",
    "spikes": {}
+  },
+  {
+   "id": 67,
+   "name": "movable_block_1",
+   "block": {}
+  },
+  {
+   "id": 68,
+   "name": "movable_block_2",
+   "block": {}
+  },
+  {
+   "id": 69,
+   "name": "movable_block_3",
+   "block": {}
+  },
+  {
+   "id": 70,
+   "name": "movable_block_4",
+   "block": {}
   },
   {
    "id": 92,
