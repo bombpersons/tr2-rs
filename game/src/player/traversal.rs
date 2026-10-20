@@ -1,6 +1,7 @@
 //! Ledge jumps, hanging, pull-ups and landing recovery. Decisions stay in the game; authored clips,
 //! bounds and end commands use the engine's existing animation machinery.
 use super::*;
+use collision::Contact;
 use engine::animation::{AnimationGoal, ObjectAnimation, advance_authored_animation, vertical_bounds};
 use engine::world::Command;
 
@@ -337,6 +338,38 @@ fn hang_collision(
     true
 }
 
+/// The non-frontal airborne deflections. Forward jump0x8003C5F4 and reach
+/// 0x8003C7F4 share them: a side contact turns910 away from the wall
+/// (tables at0x80010994 and0x80010A14). A ceiling contact (and, for reach,
+/// a front-ceiling contact) stops ascent. Forward jump's frontal rebound is
+/// handled by its caller; reach keeps only the shift for a front contact.
+fn deflect(player: &mut Player, motion: &mut Motion, contact: Contact, facing: i32, reach: bool) {
+    const SIDE_TURN: f32 = 910.0 * std::f32::consts::TAU / 65536.0;
+    let stop_ascent = |motion: &mut Motion, fall_speed: f32| {
+        // Fall speed is y-down; only a nonpositive speed is replaced.
+        if motion.velocity.y >= 0.0 {
+            motion.velocity.y = -units(fall_speed * ORIGINAL_FPS);
+        }
+    };
+    match contact {
+        Contact::Left => player.yaw += SIDE_TURN,
+        Contact::Right => player.yaw -= SIDE_TURN,
+        Contact::Top => stop_ascent(motion, 1.0),
+        Contact::TopFront if reach => stop_ascent(motion, 1.0),
+        Contact::Clamp => {
+            // Wedged between floor and ceiling: step back100 along the
+            // collision facing, lose horizontal speed and start falling at16
+            // (0x8003C760..0x8003C7D8). Not yet exercised by a recording.
+            use engine::camera::chase::{cos, sin};
+            player.position.x -= units(((sin(facing) * 100) >> 14) as f32);
+            player.position.z -= units(((cos(facing) * 100) >> 14) as f32);
+            motion.velocity = Vec3::ZERO.with_y(motion.velocity.y);
+            stop_ascent(motion, 16.0);
+        }
+        _ => {}
+    }
+}
+
 /// True completes this tick; false hands the new authored motion to ordinary collision.
 fn recover(
     player: &mut Player,
@@ -454,7 +487,36 @@ fn jump_motion(
     // horizontal speed, heading, clip and goal. See ceiling-evidence.md.
     let ceiling_contact =
         (forward_jump || reach || vertical_jump) && centre.is_some_and(|hit| proposed.y + height >= hit.ceiling);
+    // Forward-jump0x8003AB30..0x8003AB44 and reach0x8003B1B4..0x8003B1D0
+    // classify the whole body with GetCollisionInfo: any drop, 192 of
+    // front-ceiling allowance, and floors up to384 above the feet for a
+    // jump but none for reach (bad_neg0: a landing reach meets its front
+    // floor as a wall). The shift (0x8001C09C) precedes either deflection.
+    let facing = (collision_heading * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32;
+    let deflection = (forward_jump || reach).then(|| {
+        let limits = collision::Limits {
+            radius: 100,
+            bad_pos: -collision::NO_HEIGHT,
+            bad_neg: if reach { 0 } else { -384 },
+            bad_ceiling: 192,
+        };
+        collision::info(
+            world,
+            collision::original(proposed),
+            collision::original(old),
+            player.room,
+            762,
+            facing,
+            &limits,
+        )
+    });
     let mut blocked = false;
+    if let Some(info) = &deflection {
+        let shift = collision::level(info.shift);
+        player.position.x = proposed.x + shift.x;
+        player.position.z = proposed.z + shift.z;
+        blocked = matches!(info.contact, Contact::Front | Contact::TopFront);
+    }
     if let Some(hits) = hits {
         // A descending sweep can cross its floor without turning that floor
         // into a horizontal wall. This is the same upper-endpoint rule used
@@ -469,15 +531,17 @@ fn jump_motion(
         } else {
             old.y.max(proposed.y)
         };
-        let ceiling_margin = if forward_jump || reach || vertical_jump { units(192.0) } else { 0.0 };
-        blocked = hits[0].height > floor_test || hits[0].ceiling + ceiling_margin < proposed.y + height;
-        if blocked {
-            let (_, collision_forward, _) = cardinal(collision_heading);
-            let axis = if collision_forward.x != 0.0 { 0 } else { 2 };
-            player.position[axis] = wall_contact(old[axis], proposed[axis]);
-        } else {
-            player.position.x = proposed.x;
-            player.position.z = proposed.z;
+        if deflection.is_none() {
+            let ceiling_margin = if vertical_jump { units(192.0) } else { 0.0 };
+            blocked = hits[0].height > floor_test || hits[0].ceiling + ceiling_margin < proposed.y + height;
+            if blocked {
+                let (_, collision_forward, _) = cardinal(collision_heading);
+                let axis = if collision_forward.x != 0.0 { 0 } else { 2 };
+                player.position[axis] = wall_contact(old[axis], proposed[axis]);
+            } else {
+                player.position.x = proposed.x;
+                player.position.z = proposed.z;
+            }
         }
         // Edge catch0x8003D2AC compares the interpolated top bound with
         // the front floor and this tick's fall speed. It catches on either
@@ -520,7 +584,10 @@ fn jump_motion(
         }
     }
     player.position.y = proposed.y;
-    if ceiling_contact && !blocked {
+    if let Some(info) = &deflection {
+        player.position.y += collision::level(info.shift).y;
+        deflect(player, motion, info.contact, facing, reach);
+    } else if ceiling_contact && !blocked {
         player.position.y = centre.unwrap().ceiling - height;
         if vertical_jump {
             // Type8 requests standing but keeps signed speed and fall speed

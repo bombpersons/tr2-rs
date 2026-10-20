@@ -296,3 +296,23 @@ recorded_case!(heldout_run_release_uses_the_right_authored_braking_clip, "run_st
 recorded_case!(calibration_reholding_run_exposes_the_committed_braking_clip, "run_stop_rehold_heldout");
 recorded_case!(heldout_reholding_run_waits_for_the_committed_braking_clip, "run_stop_rehold_validation_heldout");
 recorded_case!(heldout_restarting_run_after_a_late_braking_request, "run_stop_restart_heldout");
+
+macro_rules! corner_case {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            compare_case(
+                include_str!(concat!("data/original/corner_", $case, ".csv")),
+                include_str!(concat!("data/original/corner_", $case, ".json")),
+            );
+        }
+    };
+}
+
+corner_case!(original_forward_jump_side_contact_under_a_low_ceiling_turns_away_from_the_wall, "low_left");
+corner_case!(original_forward_jump_side_contact_in_the_open_hall_turns_and_keeps_rising, "open_left");
+corner_case!(original_reach_side_contact_turns_without_slowing, "open_reach");
+corner_case!(heldout_forward_jump_right_contact_turns_into_a_low_frontal_impact, "open_right_heldout");
+corner_case!(heldout_delayed_right_contact_under_a_low_ceiling, "low_right_delay_heldout");
+corner_case!(heldout_reach_side_contact_release_landing_and_run, "open_reach_release_heldout");
+corner_case!(heldout_right_reach_contact_landing_run_and_release, "open_right_reach_validation_heldout");

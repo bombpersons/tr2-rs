@@ -92,3 +92,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Shallow-water wading](wading-evidence.md):1599 observed controller ticks across thirteen complete routes, six independent; authored gait/stops, turning/bank, back/sidesteps, stand-up, shallow exit and deeper surface entry. Nine complete chase-camera comparisons pass; native display timing, static contact and transition-camera gaps remain explicit.
 
 - [Bounded-height local corridor targets](navigation-height-evidence.md): native step/drop and zone filtering, runtime boxes/connectivity/zone verification, and 420 full-controller ticks across four routes. One fresh 120-tick route independently validates target X/Y/Z. Physical creature steps and general path search remain unported.
+
+- [Airborne side/corner contacts](corner-jump-evidence.md): forward-jump and reach GetCollisionInfo limits, both deflection tables, and the released run's wall-stop clip. Seven controlled-spawn routes (727 ticks), three independent, plus 69 standalone poses. Vertical-jump/fast-fall sides, clamp and static meshes remain open.

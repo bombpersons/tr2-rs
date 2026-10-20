@@ -11,6 +11,14 @@ it off. Record partial progress below without checking the parent item.
 
 ## Recent rendering and collision fixes
 
+- [x] Airborne side/corner contacts for forward jumps and reach: whole-body
+  GetCollisionInfo with per-handler limits, the side-contact 910 turn,
+  ceiling stop, and reach's front-floor landing contact. Seven controlled-spawn
+  routes compare 727 ticks, three independent. A released run's wall stop
+  now predicts its stop clip. [Evidence](docs/corner-jump-evidence.md),
+  [tests](game/tests/airborne.rs). Vertical-jump/fast-fall sides, clamp and
+  static meshes remain separate work.
+
 - [x] Animated item pushes beside a raised room-sector corner: use the native
   directional body probes and restore the last accepted position on contact.
   Four controlled-initial-placement routes compare380 controller ticks,
@@ -393,7 +401,7 @@ it off. Record partial progress below without checking the parent item.
   (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
   routes now match the camera on every tick (was windowed to tick 102).
   [Evidence](docs/chase-camera-evidence.md).
-- Next: remaining blocked-world/static item contacts, corner airborne ceiling impacts, fast-fall/slide recovery,
+- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, fast-fall/slide recovery,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
 
@@ -457,3 +465,12 @@ it off. Record partial progress below without checking the parent item.
   standalone MCP checks pass 76 poses. Physical creature height changes and
   multi-box search remain open. No format or editor schema change.
   [Evidence](docs/navigation-height-evidence.md).
+- 2026-10-20: Airborne side/corner contacts: forward-jump and reach collision
+  now classify the body with GetCollisionInfo (reach uses bad_neg 0) and
+  apply the native deflection tables: side turns of 910, ceiling stop,
+  and clamp (binary only). A released run's wall decision now predicts the
+  requested stop clip. Seven controlled-spawn routes compare 727 ticks;
+  three are independent, and one is labelled calibration for the run-stop
+  fix. All 462 workspace tests pass; Clippy has only existing unrelated
+  warnings; the standalone smoke matches 69 poses. No engine, format, editor or
+  template change. [Evidence](docs/corner-jump-evidence.md).

@@ -1441,7 +1441,9 @@ fn integrate(
             // Run collision 0x8003a844: no hit-wall clip during run-start clip6
             // (holding UP against the wall keeps standing); otherwise a wall 256
             // ahead and 640 up (0x8003c91c) selects clip53 before frame10, else 54.
-            let next = clips.as_deref().map(|c| (c, step_animation(&animation, 6, None, Some(c), original_frames(dt))));
+            let request = mode_clip(&player, &motion, &pad);
+            let next =
+                clips.as_deref().map(|c| (c, step_animation(&animation, request, None, Some(c), original_frames(dt))));
             let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != 6)
                 && wall_ahead(geometry, old, player.yaw, player.room);
             let hit_clip = next.filter(|(_, next)| next.animation == 0).map(|(c, next)| {

@@ -2,7 +2,8 @@
 
 Evidence: supplied Tomb Raider II USA Rev 3 disc through `psx`, with no outside
 implementation reference. The milestones cover forward state3, vertical state28 and reach state11
-against flat room ceilings. Side/corner contacts, forward-top obstructions
+against flat room ceilings. Forward-jump and reach side/corner contacts are
+in [corner-jump-evidence](corner-jump-evidence.md); forward-top obstructions
 and static meshes remain separate work.
 
 ## Controlled starting fixture
