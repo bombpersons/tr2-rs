@@ -7,7 +7,10 @@
 //! directly; the collision pass writes the heading the next tick moves along.
 use super::{
     AnimationState, GroundControls, Motion, ORIGINAL_FPS, Player, PlayerAnimations, PlayerMode, SubmergedMotion,
-    SwimmingTuning, Traversal, backward::grid_shift, original_frames, swimming, units,
+    SwimmingTuning, Traversal,
+    backward::grid_shift,
+    contract::{clip, state},
+    original_frames, swimming, units,
 };
 use bevy::prelude::*;
 use engine::{
@@ -18,16 +21,16 @@ use engine::{
 };
 
 /// Surface states (control table 0x80082C98).
-const TREAD: usize = 33;
-const FORWARD: usize = 34;
-const BACK: usize = 47;
-const LEFT: usize = 48;
-const RIGHT: usize = 49;
+const TREAD: usize = state::SURFACE_TREAD;
+const FORWARD: usize = state::SURFACE_FORWARD;
+const BACK: usize = state::SURFACE_BACK;
+const LEFT: usize = state::SURFACE_LEFT;
+const RIGHT: usize = state::SURFACE_RIGHT;
 /// Clips the transitions enter directly.
-const SURFACING_CLIP: usize = 114;
-const DIVE_CLIP: usize = 119;
-const ENTRY_CLIP: usize = 112;
-const FALL_CLIP: usize = 34;
+const SURFACING_CLIP: usize = clip::SURFACING;
+const DIVE_CLIP: usize = clip::DIVE;
+const ENTRY_CLIP: usize = clip::WATER_ENTRY;
+const FALL_CLIP: usize = clip::FALL;
 /// GetHeight's sentinel for a solid or missing sector.
 const NO_HEIGHT: i32 = -32512;
 
@@ -75,7 +78,7 @@ pub(super) fn leave_water(
         _ => {
             let forward = player.forward() * from_quarters(quarters(water.speed) / 4 * 4);
             player.mode = PlayerMode::JumpingForward;
-            traversal.goal = 3;
+            traversal.goal = state::FORWARD_JUMP;
             animation.enter(FALL_CLIP, 0.0, FALL_CLIP);
             motion.velocity = forward;
             motion.grounded = false;
@@ -113,7 +116,7 @@ pub(super) fn enter_water(
         if below > 384 {
             wading.active = true;
             if motion.grounded {
-                traversal.goal = 2;
+                traversal.goal = state::STAND;
             }
         }
         return;
@@ -125,7 +128,7 @@ pub(super) fn enter_water(
     player.mode = PlayerMode::Swimming;
     player.position.y -= units(100.0);
     animation.enter(ENTRY_CLIP, 0.0, ENTRY_CLIP);
-    traversal.goal = 17;
+    traversal.goal = state::SWIM;
     motion.pitch = swimming::radians(-8190);
     motion.grounded = false;
     motion.velocity = Vec3::ZERO;
@@ -157,7 +160,7 @@ pub(super) fn control(
     motion.oxygen_seconds = water.air_ticks.max(0) as f32 / ORIGINAL_FPS;
     motion.turn_rate = 0;
     let Some(state) = clips.and_then(|c| c.state(animation.animation)) else { return };
-    if state == 44 {
+    if state == state::WATER_DEATH {
         // Surface wrapper0x80044364 uses the same state44 controller as
         // submerged motion. Surface death is authored clip132, not124.
         swimming::death_control(motion, water, tuning);
@@ -185,7 +188,7 @@ pub(super) fn control(
         speed = (speed - surface.drag).max(0);
         water.speed = from_quarters(speed);
         if player.health <= 0 {
-            traversal.goal = 44;
+            traversal.goal = state::WATER_DEATH;
             return;
         }
         turn_by(surface.turn);
@@ -202,7 +205,7 @@ pub(super) fn control(
         if pad.held(Button::Square) {
             water.dive_hold += 1;
             if water.dive_hold == surface.dive_hold_ticks {
-                traversal.goal = 17;
+                traversal.goal = state::SWIM;
             }
         } else {
             water.dive_hold = 0;
@@ -210,7 +213,7 @@ pub(super) fn control(
         return;
     }
     if player.health <= 0 {
-        traversal.goal = 44;
+        traversal.goal = state::WATER_DEATH;
         return;
     }
     let keep = match state {
@@ -302,12 +305,12 @@ pub(super) fn step(
     motion.grounded = false;
     let Some(world) = world else { return };
     let state = clips.state(animation.animation).unwrap_or(TREAD);
-    if state == 44 {
+    if state == state::WATER_DEATH {
         swimming::death_collision(player, motion, water, Some(world), old, tuning, dt);
         player.room = super::body_room(world, player.position, player.room, -100.0);
         return;
     }
-    if state == TREAD && traversal.goal == 17 {
+    if state == TREAD && traversal.goal == state::SWIM {
         dive(player, motion, water, animation);
     }
     let yaw = swimming::angle(player.yaw);
@@ -369,20 +372,20 @@ pub(super) fn step(
     // probe line keeps a side-step goal, otherwise it uses the authored190.
     // Front contact cannot step out; the Action climb was tested above.
     if contact != Contact::Front && mid.floor < 0 {
-        let clip = if mid.floor < -128 { 190 } else { 177 };
-        if clip == 190 {
-            traversal.goal = 2;
+        let clip = if mid.floor < -128 { clip::STEP_OUT } else { clip::WADE_LOOP };
+        if clip == clip::STEP_OUT {
+            traversal.goal = state::STAND;
         } else {
             traversal.goal = match traversal.goal {
-                48 => 22,
-                49 => 21,
-                _ => 65,
+                LEFT => state::STEP_LEFT,
+                RIGHT => state::STEP_RIGHT,
+                _ => state::WADE,
             };
         }
         animation.enter(clip, 0.0, clip);
         player.position.y -= units((695 + front.floor) as f32);
         player.room = super::body_room(world, player.position, player.room, 381.0);
-        player.mode = if clip == 190 { PlayerMode::PullingUp } else { PlayerMode::Wade };
+        player.mode = if clip == clip::STEP_OUT { PlayerMode::PullingUp } else { PlayerMode::Wade };
         motion.grounded = true;
         motion.velocity = Vec3::ZERO;
         motion.pitch = 0.0;
@@ -449,14 +452,14 @@ fn climb_out(
     }
     player.room = super::body_room(world, player.position, player.room, 381.0);
     let clip = if lift < -128 {
-        111
+        clip::CLIMB_OUT_HIGH
     } else if lift < 128 {
-        191
+        clip::CLIMB_OUT_MID
     } else {
-        193
+        clip::CLIMB_OUT_LOW
     };
     animation.enter(clip, 0.0, clip);
-    traversal.goal = 2;
+    traversal.goal = state::STAND;
     player.yaw = swimming::radians(cardinal);
     player.mode = PlayerMode::PullingUp;
     motion.pitch = 0.0;

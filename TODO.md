@@ -266,10 +266,21 @@ it off. Record partial progress below without checking the parent item.
   `replace_creature`, layered asset folders (`engine::assets`) and
   `mods/example` (hand-made level, its own type and trigger action, a
   replaced pickup type; headless rules test and GPU/MCP render test).
-- [ ] Lara's asset contract in `docs/`: the clip, state, state-change and
-  command numbers, joints and sound ids her controller relies on.
-- [ ] A hand-made character meeting that contract, driven by Lara's
-  controller in `mods/example`.
+- [x] Lara's asset contract in `docs/lara-contract.md`: the clip, state,
+  state-change and command numbers, frame windows, joints and sound ids her
+  controller relies on, named in `game::player::contract` and checked by
+  `contract::check` (Wall and every playable level pass; tests in
+  `game/tests/lara_contract.rs`).
+- [x] A hand-made character meeting the ground-locomotion part of that
+  contract (stand, walk, run, turn, stop, wall hits), driven by Lara's
+  controller in `mods/example` (`tools/make_character.py`; headless and
+  GPU tests).
+- [ ] Give the mod's character more of the contract (jumps, backward,
+  sidesteps, roll); its other clip numbers are standing fillers today.
+- [ ] Let a character's table start anywhere: the controller's clip numbers
+  are absolute (a model's clips must start at 0), and walk collision reads
+  absolute frame windows (`contract::frame`), so a character's walk loop must
+  sit at frames 22..=57.
 - [ ] An enemy added to `mods/example` through the shared creature module.
 - [ ] Object setup (`data/object_types.json`) loaded as an asset rather than
   compiled in, so a mod can replace it by file.

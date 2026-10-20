@@ -14,6 +14,7 @@ use engine::objects::SpawnContext;
 use engine::render::{InRoom, LevelEntity};
 use engine::world::{Level, WorldGeometry, position};
 
+use crate::player::contract::joint;
 use crate::player::{AnimationState, Player, SimulationEnabled};
 
 /// Object id of the braid model (6 meshes, no animation).
@@ -122,8 +123,17 @@ fn body(data: &Level, player: &Player, animation: &AnimationState) -> Option<(Ve
         let m = mesh(mesh_index)?;
         Some((at(joint, m.center)?, m.radius as f32 * scale))
     };
-    let attach = at(14, ROOT_OFFSET)?;
-    Some((attach, [sphere(0, 0, 1.0)?, sphere(7, 7, 1.0)?, sphere(14, 14, 1.0)?, sphere(8, 8, 1.5)?, sphere(11, 8, 1.5)?]))
+    let attach = at(joint::HEAD, ROOT_OFFSET)?;
+    Some((
+        attach,
+        [
+            sphere(joint::HIPS, joint::HIPS, 1.0)?,
+            sphere(joint::TORSO, joint::TORSO, 1.0)?,
+            sphere(joint::HEAD, joint::HEAD, 1.0)?,
+            sphere(joint::RIGHT_UPPER_ARM, joint::RIGHT_UPPER_ARM, 1.5)?,
+            sphere(joint::LEFT_UPPER_ARM, joint::RIGHT_UPPER_ARM, 1.5)?,
+        ],
+    ))
 }
 
 fn rand(seed: &mut u32) -> i32 {

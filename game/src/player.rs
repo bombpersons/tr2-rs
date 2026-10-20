@@ -24,6 +24,8 @@ pub use traversal::Traversal;
 mod backward;
 mod collision;
 pub(crate) use collision::{CollisionFrame, item_push_is_clear};
+pub mod contract;
+use contract::{clip, state};
 mod forward;
 mod rolling;
 mod surface;
@@ -55,7 +57,7 @@ pub const RUN_JUMP_SPEED: f32 = units(75.0 * ORIGINAL_FPS);
 pub const GRAVITY: f32 = units(6.0 * ORIGINAL_FPS * ORIGINAL_FPS);
 /// PSX object-push world validation0x8001CC00 passes a762-unit body height.
 /// Lara's forward slide state.
-const SLIDE_STATE: usize = 24;
+const SLIDE_STATE: usize = state::SLIDE;
 pub const PLAYER_HEIGHT: f32 = units(762.0);
 /// PSX Lara collision context0x800381E8..0x800381EC starts with radius100.
 pub const PLAYER_RADIUS: f32 = units(100.0);
@@ -260,10 +262,10 @@ fn landing_damage(player: &mut Player, velocity: Vec3) {
 /// Lara's freefall clips belong to state 3; landing asks for goal state 2
 /// (standing) through their authored ranges.
 fn freefall_landing(clips: &PlayerAnimations, animation: &AnimationState) -> Option<(usize, f32)> {
-    if clips.state(animation.animation)? != 3 {
+    if clips.state(animation.animation)? != state::FORWARD_JUMP {
         return None;
     }
-    clips.dispatch(animation, 2)
+    clips.dispatch(animation, state::STAND)
 }
 
 /// Lara's systems, inside the engine's tick order.
@@ -449,7 +451,7 @@ fn gun_targets(
 /// Lara's object type id: her placement is where the level starts.
 pub const LARA: u16 = 0;
 /// Lara's standing clip (state 2).
-pub const STANDING_CLIP: usize = 11;
+pub const STANDING_CLIP: usize = clip::STAND;
 
 /// Build Lara from her placement (the object registry's spawn hook). A
 /// spawn in mid-air starts falling: native Wall initializes clip34/frame492
@@ -467,14 +469,14 @@ pub fn spawn_lara(entity: &mut bevy::ecs::system::EntityCommands, ctx: &engine::
     if !grounded {
         player.mode = PlayerMode::JumpingForward;
     }
-    let animation = if grounded { AnimationState::default() } else { AnimationState::at_frame(34, 0.0) };
+    let animation = if grounded { AnimationState::default() } else { AnimationState::at_frame(clip::FALL, 0.0) };
     let gun = if weapons::UNARMED_LEVELS.contains(&ctx.world.data.name.as_str()) { Gun::Unarmed } else { Gun::Pistols };
     entity.insert((
         player,
         Motion { grounded, ..default() },
         animation,
         WeaponState::holding(gun),
-        Traversal { goal: if grounded { 2 } else { 3 }, ..default() },
+        Traversal { goal: if grounded { state::STAND } else { state::FORWARD_JUMP }, ..default() },
         Name::new("Player"),
     ));
     crate::braid::spawn(entity, ctx);
@@ -489,7 +491,7 @@ pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &Anima
             room: player.room,
             grounded: motion.grounded,
             // A mid-air spawn plays forward flight's fall clip34.
-            falling: player.mode == PlayerMode::Fall || (!motion.grounded && animation.animation == 34),
+            falling: player.mode == PlayerMode::Fall || (!motion.grounded && animation.animation == clip::FALL),
             armed: weapon.ready(),
             // LaraGun asks for the combat camera while drawing or ready
             // (0x8004001C, 0x800401B8), looking at the target or along the aim.
@@ -543,11 +545,13 @@ fn vault(world: Option<&WorldGeometry>, position: Vec3, yaw: f32, room: usize) -
         return None;
     }
     let (animation, climb, jump_speed) = match front {
-        -640..=-384 => (50, 512, None),
-        -896..=-641 => (42, 768, None),
+        -640..=-384 => (clip::VAULT_TWO, 512, None),
+        -896..=-641 => (clip::VAULT_THREE, 768, None),
         // Vault test 0x8003DBB0: a higher flat ledge requests the
         // authored vertical jump, overriding its end command's lift.
-        -1920..=-897 => (26, 0, Some(units((((front + 800) * -12) as f32).sqrt().floor() + 3.0) * ORIGINAL_FPS)),
+        -1920..=-897 => {
+            (clip::JUMP_UP_PREPARE, 0, Some(units((((front + 800) * -12) as f32).sqrt().floor() + 3.0) * ORIGINAL_FPS))
+        }
         _ => return None,
     };
     Some(Vault {
@@ -624,13 +628,13 @@ fn jump_animation(forward: Vec3, velocity: Vec3) -> usize {
     let horizontal = velocity.with_y(0.0);
     let right = Vec3::new(forward.z, 0.0, -forward.x);
     if horizontal.length_squared() < 0.01 {
-        28
+        clip::JUMP_UP
     } else if horizontal.dot(right).abs() > horizontal.dot(forward).abs() {
-        if horizontal.dot(right) > 0.0 { 81 } else { 79 }
+        if horizontal.dot(right) > 0.0 { clip::JUMP_RIGHT } else { clip::JUMP_LEFT }
     } else if horizontal.dot(forward) < 0.0 {
-        75
+        clip::JUMP_BACK
     } else {
-        77
+        clip::JUMP_FORWARD
     }
 }
 
@@ -712,7 +716,7 @@ fn turn(
         }
         // Stop requests compression on Jump before reading Up, Left or Right
         // (0x80038B00); compression itself does not turn.
-        PlayerMode::Idle if alive && animation_state == Some(2) && pad.held(Button::Square) => {}
+        PlayerMode::Idle if alive && animation_state == Some(state::STAND) && pad.held(Button::Square) => {}
         // Stop delegates to the walk/run handler on the tick UP is pressed.
         PlayerMode::Idle if alive && direction.y > 0.1 => push(&mut motion.turn_rate, if walk { 728 } else { 1456 }),
         // Stop delegates DOWN+walk to state16 (0x80038B44..0x80038B5C).
@@ -729,7 +733,9 @@ fn turn(
         // Hop-back handler 0x80038D00: cap1092, or 728 after shared decay.
         PlayerMode::HopBack if alive => push(&mut motion.turn_rate, 1092),
         PlayerMode::Jump | PlayerMode::Fall if alive => push(&mut motion.turn_rate, 546),
-        PlayerMode::JumpingForward if alive && animation_state == Some(3) => push(&mut motion.turn_rate, 546),
+        PlayerMode::JumpingForward if alive && animation_state == Some(state::FORWARD_JUMP) => {
+            push(&mut motion.turn_rate, 546)
+        }
         _ => {}
     }
     if motion.turn_rate.abs() <= TURN_DECAY {
@@ -811,14 +817,14 @@ fn control(
         let animation = &*animation;
         let was_running = player.mode == PlayerMode::Run;
         let was_walking = player.mode == PlayerMode::Walk;
-        let was_standing =
-            player.mode == PlayerMode::Idle && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(2);
+        let was_standing = player.mode == PlayerMode::Idle
+            && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(state::STAND);
         if was_running {
             // Run handler0x800388D4..0x80038944 persists a jump-enable
             // latch. Clip6 clears it; clip0 frame4 or any other clip sets it.
-            if animation.animation == 6 {
+            if animation.animation == clip::RUN_START {
                 traversal.run_jump_ready = false;
-            } else if animation.animation != 0 || animation.frame == 4.0 {
+            } else if animation.animation != clip::RUN || animation.frame == 4.0 {
                 traversal.run_jump_ready = true;
             }
         }
@@ -829,7 +835,7 @@ fn control(
         let fast_turn = clips
             .as_deref()
             .and_then(|c| c.state(animation.animation))
-            .map_or(motion.turn_frames >= 33.0, |state| state == 20);
+            .map_or(motion.turn_frames >= 33.0, |s| s == state::FAST_TURN);
         motion.guns_ready = weapon.ready();
         motion.camera_exact_slopes = clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(SLIDE_STATE);
         if wading::control(
@@ -872,7 +878,7 @@ fn control(
             && pad.held(Button::Circle)
             && (player.mode == PlayerMode::WalkStopping
                 || (player.mode == PlayerMode::Recovering
-                    && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(2)))
+                    && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(state::STAND)))
         {
             player.mode = PlayerMode::Rolling { entering: true };
         }
@@ -900,12 +906,12 @@ fn control(
             // AnimateLara uses the preceding collision heading. The side
             // collision writes yaw +/-90 degrees at 0x8003B5FC.
             let heading = match clips.state(animation.animation) {
-                Some(21) => right,
-                Some(22) => -right,
+                Some(state::STEP_RIGHT) => right,
+                Some(state::STEP_LEFT) => -right,
                 _ => -forward,
             };
             motion.velocity = heading * clip_speed(clips, &next).unwrap_or(0.0);
-            if clips.state(next.animation) == Some(2) {
+            if clips.state(next.animation) == Some(state::STAND) {
                 player.mode = PlayerMode::Idle;
             }
             continue;
@@ -922,10 +928,10 @@ fn control(
                     // The slide clip's authored range enters the takeoff.
                     let away = if backwards { pad.held(Button::Up) } else { pad.held(Button::Down) };
                     traversal.goal = match (pad.held(Button::Square) && !away, backwards) {
-                        (true, false) => 3,
-                        (true, true) => 25,
-                        (false, false) => 24,
-                        (false, true) => 32,
+                        (true, false) => state::FORWARD_JUMP,
+                        (true, true) => state::JUMP_BACK,
+                        (false, false) => state::SLIDE,
+                        (false, true) => state::BACK_SLIDE,
                     };
                 } else if pad.pressed(Button::Square) {
                     player.mode = PlayerMode::Jump;
@@ -940,7 +946,10 @@ fn control(
                 // Clip71 then 72: 15 frames at 30, then 9 at 0 (wall_initial
                 // settles at z26090). Speed follows the clip being shown.
                 let speed = clips.as_deref().and_then(|clips| {
-                    clip_speed(clips, &step_animation(animation, 71, None, Some(clips), original_frames(dt)))
+                    clip_speed(
+                        clips,
+                        &step_animation(animation, clip::SLIDE_STOP, None, Some(clips), original_frames(dt)),
+                    )
                 });
                 let fallback = if seconds_left > 0.3 { units(30.0 * ORIGINAL_FPS) } else { 0.0 };
                 motion.velocity = direction * speed.unwrap_or(fallback);
@@ -1019,7 +1028,7 @@ fn control(
         // Standing and run controllers force roll146 at+2 on held Roll
         // (0x800389D4 and0x800387CC); walking control has no roll request.
         if pad.held(Button::Circle)
-            && clips.as_deref().is_none_or(|c| matches!(c.state(animation.animation), Some(1 | 2)))
+            && clips.as_deref().is_none_or(|c| matches!(c.state(animation.animation), Some(state::RUN | state::STAND)))
         {
             player.mode = PlayerMode::Rolling { entering: true };
             motion.velocity = forward * units(50.0 * ORIGINAL_FPS);
@@ -1043,11 +1052,11 @@ fn control(
             // Stop handler 0x80038B44: DOWN alone requests state5; with
             // walk it delegates to state16. Both moves use the level clips.
             (if walk { PlayerMode::Back } else { PlayerMode::HopBack }, forward * direction.y * BACK_SPEED)
-        } else if was_running && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(1) {
+        } else if was_running && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(state::RUN) {
             // Run control requests goal2 on release (0x8003898C), but the
             // running state and authored speed persist until its stop range.
             (PlayerMode::Run, forward * RUN_SPEED)
-        } else if was_walking && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(0) {
+        } else if was_walking && clips.as_deref().and_then(|c| c.state(animation.animation)) == Some(state::WALK) {
             // Walk control requests goal2 on release (0x800387A0).
             // Finish the stride and its authored stop before standing.
             (PlayerMode::Walk, forward * WALK_SPEED)
@@ -1104,7 +1113,8 @@ fn control(
         };
         if matches!(mode, PlayerMode::Run | PlayerMode::Walk)
             && direction.y == 0.0
-            && clips.as_deref().zip(next.as_ref()).and_then(|(clips, next)| clips.state(next.animation)) == Some(2)
+            && clips.as_deref().zip(next.as_ref()).and_then(|(clips, next)| clips.state(next.animation))
+                == Some(state::STAND)
         {
             player.mode = PlayerMode::Idle;
         }
@@ -1121,8 +1131,8 @@ fn control(
                 // foot-dependent ranges; these select16 or18
                 // (0x8003899C/0x800387B0).
                 if was_standing || was_running {
-                    traversal.enter = if was_running { None } else { Some((73, 0.0)) };
-                    traversal.goal = if was_running { 3 } else { 15 };
+                    traversal.enter = if was_running { None } else { Some((clip::JUMP_PREPARE, 0.0)) };
+                    traversal.goal = if was_running { state::FORWARD_JUMP } else { state::JUMP_PREPARE };
                     player.mode = PlayerMode::JumpingForward;
                     motion.velocity = Vec3::ZERO;
                 }
@@ -1239,7 +1249,7 @@ fn integrate(
         }
         if let PlayerMode::Sliding { backwards, .. } = player.mode
             && let (Some(world), Some(clips)) = (geometry, clips.as_deref())
-            && matches!(traversal.goal, 3 | 25)
+            && matches!(traversal.goal, state::FORWARD_JUMP | state::JUMP_BACK)
         {
             // A slide-jump request leaves through the slide clip's authored
             // range into takeoff76 (state3) or74 (state25), at the frame
@@ -1277,13 +1287,13 @@ fn integrate(
             && let Some(state) = clips.as_deref().and_then(|c| c.state(animation.animation))
         {
             match state {
-                28 => {
+                state::JUMP_UP => {
                     player.mode = PlayerMode::JumpingUp { launch_speed: 0.0 };
-                    traversal.goal = 28;
+                    traversal.goal = state::JUMP_UP;
                 }
-                3 => {
+                state::FORWARD_JUMP => {
                     player.mode = PlayerMode::JumpingForward;
-                    traversal.goal = 11;
+                    traversal.goal = state::REACH;
                 }
                 _ => {}
             }
@@ -1363,13 +1373,14 @@ fn integrate(
                     player.mode = PlayerMode::Sliding { direction, backwards };
                     motion.velocity = direction * units(50.0 * ORIGINAL_FPS);
                     if let (Some(world), Some(clips)) = (geometry, clips.as_deref())
-                        && matches!(clips.state(animation.animation), Some(24 | 32))
+                        && matches!(clips.state(animation.animation), Some(state::SLIDE | state::BACK_SLIDE))
                     {
                         // Slide control keeps its own state; AnimateLara then
                         // moves along the downhill heading at the authored
                         // speed. Back-slide104 accelerates before looping105.
                         let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
-                        let mut goal = AnimationGoal { state: if backwards { 32 } else { 24 } };
+                        let mut goal =
+                            AnimationGoal { state: if backwards { state::BACK_SLIDE } else { state::SLIDE } };
                         advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt));
                         *animation = AnimationState::at_frame(a.animation, a.frame);
                         traversal.animation_stepped = true;
@@ -1447,15 +1458,14 @@ fn integrate(
             if let Some(launch_speed) = vault.jump_speed {
                 player.mode = PlayerMode::JumpingUp { launch_speed };
                 motion.velocity = Vec3::ZERO;
-                traversal.goal = 28;
+                traversal.goal = state::JUMP_UP;
                 traversal.animation_stepped = true;
                 animation.enter(vault.animation, 0.0, vault.animation);
                 continue;
             }
-            let (frames, offset) = clips
-                .as_ref()
-                .and_then(|c| c.climb(vault.animation))
-                .unwrap_or(if vault.animation == 50 { (28.0, [0, -512, 128]) } else { (66.0, [0, -768, 128]) });
+            let (frames, offset) = clips.as_ref().and_then(|c| c.climb(vault.animation)).unwrap_or(
+                if vault.animation == clip::VAULT_TWO { (28.0, [0, -512, 128]) } else { (66.0, [0, -768, 128]) },
+            );
             let (sin, cos) = vault.yaw.sin_cos();
             let forward = offset[2] as f32;
             let offset = Vec3::new(sin * forward, -offset[1] as f32, cos * forward) / 1024.0;
@@ -1498,11 +1508,11 @@ fn integrate(
             let request = mode_clip(&player, &motion, &pad);
             let next =
                 clips.as_deref().map(|c| (c, step_animation(&animation, request, None, Some(c), original_frames(dt))));
-            let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != 6)
+            let hit_wall = next.as_ref().is_some_and(|(_, next)| next.animation != clip::RUN_START)
                 && wall_ahead(geometry, old, player.yaw, player.room);
-            let hit_clip = next.filter(|(_, next)| next.animation == 0).map(|(c, next)| {
-                let frame = c.clips[0].frame_start + next.frame.floor() as usize;
-                if frame < 10 { 53 } else { 54 }
+            let hit_clip = next.filter(|(_, next)| next.animation == clip::RUN).map(|(c, next)| {
+                let frame = c.clips[clip::RUN].frame_start + next.frame.floor() as usize;
+                if frame < 10 { clip::HIT_WALL_EARLY } else { clip::HIT_WALL_LATE }
             });
             motion.velocity = Vec3::ZERO;
             match hit_clip.filter(|_| hit_wall) {
@@ -1522,18 +1532,21 @@ fn integrate(
                         // LaraColStop0x8003A56C restores a preceding stand
                         // or turn pose and advances it toward the held turn
                         // goal. Otherwise it enters clip11 without advancing.
-                        traversal.goal = 2;
-                        if matches!(clips.state(animation.animation), Some(2 | 6 | 7 | 20)) {
+                        traversal.goal = state::STAND;
+                        if matches!(
+                            clips.state(animation.animation),
+                            Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)
+                        ) {
                             traversal.goal = if pad.held(Button::Left) {
-                                7
+                                state::TURN_LEFT
                             } else if pad.held(Button::Right) {
-                                6
+                                state::TURN_RIGHT
                             } else {
-                                2
+                                state::STAND
                             };
                             let request = match traversal.goal {
-                                7 => 13,
-                                6 => 12,
+                                state::TURN_LEFT => clip::TURN_LEFT,
+                                state::TURN_RIGHT => clip::TURN_RIGHT,
                                 _ => STANDING_CLIP,
                             };
                             *animation = step_animation(&animation, request, None, Some(clips), original_frames(dt));
@@ -1574,8 +1587,10 @@ fn integrate(
             }
             if !motion.grounded && player.health > 0 {
                 // Landing lock is a provisional readable substitute for animation dispatch windows.
-                let (animation, start_frame) =
-                    clips.as_deref().and_then(|clips| freefall_landing(clips, &animation)).unwrap_or((24, 0.0));
+                let (animation, start_frame) = clips
+                    .as_deref()
+                    .and_then(|clips| freefall_landing(clips, &animation))
+                    .unwrap_or((clip::HEAVY_LANDING, 0.0));
                 player.mode = PlayerMode::Landing { seconds_left: 0.15, animation, start_frame };
             }
             motion.grounded = true;
@@ -1591,8 +1606,11 @@ fn integrate(
                 // is over200 above the floor (0x8003C3B4..0x8003C41C): a
                 // forward slide enters clip34/state3, a back slide clip93/
                 // state29. Both keep the slide speed with zero fall speed.
-                let (clip, mode, goal) =
-                    if backwards { (93, PlayerMode::FallingBack, 29) } else { (34, PlayerMode::JumpingForward, 3) };
+                let (clip, mode, goal) = if backwards {
+                    (clip::FALL_BACK, PlayerMode::FallingBack, state::FALL_BACK)
+                } else {
+                    (clip::FALL, PlayerMode::JumpingForward, state::FORWARD_JUMP)
+                };
                 motion.grounded = false;
                 motion.velocity.y = 0.0;
                 player.mode = mode;
@@ -1612,9 +1630,9 @@ fn integrate(
                     // zero fall speed. Forward collision owns the flight.
                     player.mode = PlayerMode::JumpingForward;
                     motion.velocity.y = 0.0;
-                    traversal.goal = 3;
+                    traversal.goal = state::FORWARD_JUMP;
                     traversal.animation_stepped = true;
-                    animation.enter(34, 0.0, 34);
+                    animation.enter(clip::FALL, 0.0, clip::FALL);
                 } else {
                     player.mode = PlayerMode::Fall;
                 }
@@ -1643,70 +1661,70 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
             // asks for state 6/7 (pistols_turn_ready).
             let ready_turn = motion.guns_ready && motion.turn_frames > 1.0;
             if motion.turning != 0 && (ready_turn || (motion.turn_rate.abs() > TURN_DECAY && !controls.walk)) {
-                44
+                clip::FAST_TURN_RIGHT
             } else if motion.turning < 0 {
-                13
+                clip::TURN_LEFT
             } else if motion.turning > 0 {
-                12
+                clip::TURN_RIGHT
             } else {
-                103
+                clip::STAND_IDLE
             }
         }
-        PlayerMode::Wade => 186,
+        PlayerMode::Wade => clip::WADE,
         PlayerMode::Walk => {
             if controls.direction.y == 0.0 {
                 STANDING_CLIP
             } else {
-                20
+                clip::WALK_START
             }
         }
         PlayerMode::Run => {
             if controls.direction.y == 0.0 {
                 STANDING_CLIP
             } else {
-                6
+                clip::RUN_START
             }
         }
         PlayerMode::Back => {
             if controls.direction.y < -0.1 && controls.walk {
-                40
+                clip::WALK_BACK
             } else {
-                103
+                clip::STAND_IDLE
             }
         }
-        PlayerMode::HopBack => 88,
-        PlayerMode::FallingBack => 93,
+        PlayerMode::HopBack => clip::HOP_BACK,
+        PlayerMode::FallingBack => clip::FALL_BACK,
         PlayerMode::StepLeft { stopping } => {
             if stopping {
-                103
+                clip::STAND_IDLE
             } else {
-                65
+                clip::STEP_LEFT
             }
         }
         PlayerMode::StepRight { stopping } => {
             if stopping {
-                103
+                clip::STAND_IDLE
             } else {
-                67
+                clip::STEP_RIGHT
             }
         }
         PlayerMode::Sliding { backwards, .. } => {
             if backwards {
-                105
+                clip::BACK_SLIDE_LOOP
             } else {
-                70
+                clip::SLIDE
             }
         }
-        PlayerMode::SlideStopping { .. } => 71,
+        PlayerMode::SlideStopping { .. } => clip::SLIDE_STOP,
         PlayerMode::PreparingJump { frames_left, standing, running, .. } => {
             if running {
-                16
+                clip::RUN_JUMP
             } else if frames_left > 3.0 {
-                73
+                clip::JUMP_PREPARE
             } else if standing {
-                91
+                clip::STANDING_TAKEOFF
             } else {
-                76
+                clip::JUMP_FORWARD_TAKEOFF
             }
         }
         PlayerMode::Jump => {
@@ -1720,30 +1738,30 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
             if motion.air_animation != 0 {
                 motion.air_animation
             } else {
-                34
+                clip::FALL
             }
         }
         PlayerMode::Landing { animation, .. } => animation,
-        PlayerMode::Hanging { .. } => 96,
-        PlayerMode::JumpingUp { .. } => 26,
-        PlayerMode::JumpingForward => 76,
-        PlayerMode::FastFalling => 23,
-        PlayerMode::FatalLanding => 25,
-        PlayerMode::JumpImpact => 31,
-        PlayerMode::PullingUp => 97,
-        PlayerMode::Recovering => 31,
+        PlayerMode::Hanging { .. } => clip::HANG,
+        PlayerMode::JumpingUp { .. } => clip::JUMP_UP_PREPARE,
+        PlayerMode::JumpingForward => clip::JUMP_FORWARD_TAKEOFF,
+        PlayerMode::FastFalling => clip::FAST_FALL,
+        PlayerMode::FatalLanding => clip::FATAL_LANDING,
+        PlayerMode::JumpImpact => clip::JUMP_IMPACT,
+        PlayerMode::PullingUp => clip::PULL_UP,
+        PlayerMode::Recovering => clip::JUMP_IMPACT,
         PlayerMode::WalkStopping => STANDING_CLIP,
         PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
-        PlayerMode::Rolling { .. } => 146,
-        PlayerMode::Surface => 110,
+        PlayerMode::Rolling { .. } => clip::ROLL,
+        PlayerMode::Surface => clip::SURFACE_TREAD,
         PlayerMode::Swimming => {
             if pad.held(Button::Square) {
-                86
+                clip::SWIM
             } else {
-                108
+                clip::TREAD
             }
         }
-        PlayerMode::Dead => 87,
+        PlayerMode::Dead => clip::DEAD,
     }
 }
 
@@ -1759,12 +1777,12 @@ pub fn step_animation(
 ) -> AnimationState {
     let mut animation = current.clone();
     if let Some(clips) = clips
-        && matches!(clips.state(current.animation), Some(6 | 7))
-        && clips.state(index) == Some(20)
+        && matches!(clips.state(current.animation), Some(state::TURN_RIGHT | state::TURN_LEFT))
+        && clips.state(index) == Some(state::FAST_TURN)
     {
         // Slow-turn goal20 can precede its dispatch window by many ticks.
         // The authored range also chooses44 on the right and69 on the left.
-        if let Some((clip, frame)) = clips.dispatch(current, 20) {
+        if let Some((clip, frame)) = clips.dispatch(current, state::FAST_TURN) {
             animation.enter(clip, frame, index);
         } else {
             animation.acknowledge(index);
@@ -1774,18 +1792,19 @@ pub fn step_animation(
     }
     if let Some(clips) = clips
         && let (Some(state), Some(target)) = (clips.state(current.animation), clips.state(index))
-        && (matches!(state, 5 | 16 | 21 | 22)
-            || (state == 0 && matches!(index, 11 | 20 | 103))
-            || (state == 1 && matches!(index, 6 | 11 | 103))
-            || (state == 2 && matches!(index, 6 | 20))
-            || (state == 2 && matches!(target, 5 | 16 | 21 | 22)))
+        && (matches!(state, state::HOP_BACK | state::WALK_BACK | state::STEP_RIGHT | state::STEP_LEFT)
+            || (state == state::WALK && matches!(index, clip::STAND | clip::WALK_START | clip::STAND_IDLE))
+            || (state == state::RUN && matches!(index, clip::RUN_START | clip::STAND | clip::STAND_IDLE))
+            || (state == state::STAND && matches!(index, clip::RUN_START | clip::WALK_START))
+            || (state == state::STAND
+                && matches!(target, state::HOP_BACK | state::WALK_BACK | state::STEP_RIGHT | state::STEP_LEFT)))
     {
         // AnimateLara 0x80042E30..0x80042FD8 advances, tries the goal
         // every tick, then follows end links. A walk, run or sidestep
         // stop request must wait for a foot's authored dispatch window.
         // Run applies only to ordinary run/stand requests: collision-forced
         // clips (e.g. vault50, whose declared state is also2) enter directly.
-        let goal = if state == 5 { 2 } else { target };
+        let goal = if state == state::HOP_BACK { state::STAND } else { target };
         if state != goal
             && let Some((clip, frame)) = clips.dispatch(current, goal)
         {
@@ -1806,17 +1825,21 @@ pub fn step_animation(
         // Authored entries verified in climb_two_click.csv: turn clips12/13/44
         // stop through clip11, and clip51 starts running through clip52.
         let entry = match (state, target) {
-            (Some(from), Some(to)) if matches!(from, 6 | 7 | 20) && to == 2 => {
-                clips.and_then(|c| c.dispatch(&animation, 2))
+            (Some(from), Some(to))
+                if matches!(from, state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN) && to == state::STAND =>
+            {
+                clips.and_then(|c| c.dispatch(&animation, state::STAND))
             }
-            (Some(2), Some(to)) if matches!(to, 0 | 1) => clips.and_then(|c| c.dispatch(&animation, to)),
+            (Some(state::STAND), Some(to)) if matches!(to, state::WALK | state::RUN) => {
+                clips.and_then(|c| c.dispatch(&animation, to))
+            }
             _ => None,
         };
         if let Some((clip, frame)) = entry {
             animation.enter(clip, frame, index);
             return animation;
         }
-        if start_frame.is_none() && target == Some(2) && (state == target || ending == target) {
+        if start_frame.is_none() && target == Some(state::STAND) && (state == target || ending == target) {
             // Already standing (or finishing into a standing clip): keep playing,
             // e.g. clip50's climb hands over to clip51, which chains to clip11.
             animation.acknowledge(index);

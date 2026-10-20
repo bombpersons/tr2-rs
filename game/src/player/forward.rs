@@ -21,8 +21,16 @@ pub(super) fn step(
     let previous = animation.clone();
     let stopping = player.mode == PlayerMode::WalkStopping;
     let controls = GroundControls::read(pad);
-    let request = if controls.direction.y > 0.0 { if controls.walk { 20 } else { 6 } } else { STANDING_CLIP };
-    traversal.goal = if stopping && pad.held(Button::Square) { 15 } else { clips.state(request).unwrap_or(2) };
+    let request = if controls.direction.y > 0.0 {
+        if controls.walk { clip::WALK_START } else { clip::RUN_START }
+    } else {
+        STANDING_CLIP
+    };
+    traversal.goal = if stopping && pad.held(Button::Square) {
+        state::JUMP_PREPARE
+    } else {
+        clips.state(request).unwrap_or(state::STAND)
+    };
     *animation = step_animation(animation, request, None, Some(clips), original_frames(dt));
     traversal.animation_stepped = true;
     if stopping {
@@ -30,7 +38,7 @@ pub(super) fn step(
         // Collision changed state to standing before selecting a foot-stop
         // clip, whose authored state is still walking. Retain the override
         // until its natural link into11 (0x8003A6AC..0x8003A730).
-        if !matches!(animation.animation, 2 | 3) {
+        if !matches!(animation.animation, clip::WALK_STOP_RIGHT | clip::WALK_STOP_LEFT) {
             player.mode = PlayerMode::Idle;
         }
         return true;
@@ -65,12 +73,12 @@ pub(super) fn step(
         player.position = old;
         player.position[axis] = proposed[axis] + grid_shift(probes[0][axis], proposed[axis]);
         motion.velocity = Vec3::ZERO;
-        traversal.goal = 2;
+        traversal.goal = state::STAND;
         let absolute = clips.clips[animation.animation].frame_start as f32 + animation.frame;
-        let stop = if (29.0..48.0).contains(&absolute) {
-            Some(3)
-        } else if (22.0..29.0).contains(&absolute) || (48.0..58.0).contains(&absolute) {
-            Some(2)
+        let stop = if contract::frame::WALL_STOP_LEFT.contains(&absolute) {
+            Some(clip::WALK_STOP_LEFT)
+        } else if contract::frame::WALL_STOP_RIGHT.iter().any(|window| window.contains(&absolute)) {
+            Some(clip::WALK_STOP_RIGHT)
         } else {
             None
         };
@@ -79,7 +87,10 @@ pub(super) fn step(
             player.mode = PlayerMode::WalkStopping;
         } else {
             player.mode = PlayerMode::Idle;
-            if matches!(clips.state(previous.animation), Some(2 | 6 | 7 | 20)) {
+            if matches!(
+                clips.state(previous.animation),
+                Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)
+            ) {
                 *animation = step_animation(&previous, STANDING_CLIP, None, Some(clips), original_frames(dt));
             } else {
                 animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
@@ -99,14 +110,22 @@ pub(super) fn step(
         // Foot ranges read after this tick's animation move, before snapping
         // to the centre floor (0x8003A740..0x8003A800).
         let step = if drop >= 129.0 {
-            Some(if (28.0..46.0).contains(&absolute) { 59 } else { 60 })
+            Some(if contract::frame::STEP_DOWN_LEFT.contains(&absolute) {
+                clip::STEP_DOWN_LEFT
+            } else {
+                clip::STEP_DOWN_RIGHT
+            })
         } else if (-384.0..-128.0).contains(&drop) {
-            Some(if (27.0..45.0).contains(&absolute) { 58 } else { 57 })
+            Some(if contract::frame::STEP_UP_RIGHT.contains(&absolute) {
+                clip::STEP_UP_RIGHT
+            } else {
+                clip::STEP_UP_LEFT
+            })
         } else {
             None
         };
         if let Some(clip) = step {
-            animation.enter(clip, 0.0, 20);
+            animation.enter(clip, 0.0, clip::WALK_START);
         }
     }
     player.position.y = centre.height;

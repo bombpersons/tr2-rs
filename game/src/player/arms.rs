@@ -44,14 +44,18 @@ pub const PISTOL_MODEL: u16 = 1;
 /// The gun flash object DrawGunFlash 0x80028454 draws (object 240).
 pub const FLASH_MODEL: u16 = 240;
 
-const TORSO: usize = 7;
-const HEAD: usize = 14;
+use super::contract::joint;
+const TORSO: usize = joint::TORSO;
+const HEAD: usize = joint::HEAD;
 /// Upper arm, forearm and hand, left then right (the order of
 /// [`WeaponState::in_hand`]): DrawLara draws 8-10 for the right arm and
 /// 11-13 for the left.
-const ARMS: [[usize; 3]; 2] = [[11, 12, 13], [8, 9, 10]];
+const ARMS: [[usize; 3]; 2] = [
+    [joint::LEFT_UPPER_ARM, joint::LEFT_UPPER_ARM + 1, joint::LEFT_HAND],
+    [joint::RIGHT_UPPER_ARM, joint::RIGHT_UPPER_ARM + 1, joint::RIGHT_HAND],
+];
 /// Thigh joints that carry the holsters, left then right.
-const THIGHS: [usize; 2] = [1, 4];
+const THIGHS: [usize; 2] = [joint::LEFT_THIGH, joint::RIGHT_THIGH];
 
 /// DrawGunFlash's default branch, used by the pistols: from the hand,
 /// translate (0, 185, 40), pitch -16380, roll a random draw * 2.
@@ -71,7 +75,7 @@ const GUNFIRE_FALLOFF: u32 = 11;
 /// The joint overrides and mesh swaps that draw `weapon` on Lara's
 /// skeleton (15 joints).
 pub fn gun_look(level: &Level, weapon: &WeaponState) -> (PoseOverrides, JointMeshes) {
-    let joints = level.model(super::LARA).map_or(15, |m| m.joints.len());
+    let joints = level.model(super::LARA).map_or(joint::COUNT, |m| m.joints.len());
     let mut pose = vec![JointPose::default(); joints];
     let mut meshes = vec![None; joints];
     // [x, y, z] turns: the gun code's angles are [yaw, pitch].

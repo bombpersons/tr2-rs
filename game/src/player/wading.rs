@@ -53,10 +53,10 @@ pub(super) fn transitions(
         Some(depth) if depth >= tuning.surface_depth => {
             let state = clips.and_then(|c| c.state(animation.animation));
             let (clip, goal) = match state {
-                Some(16) => (140, 47),
-                Some(21) => (144, 49),
-                Some(22) => (143, 48),
-                _ => (116, 34),
+                Some(state::WALK_BACK) => (clip::SURFACE_BACK, state::SURFACE_BACK),
+                Some(state::STEP_RIGHT) => (clip::SURFACE_RIGHT, state::SURFACE_RIGHT),
+                Some(state::STEP_LEFT) => (clip::SURFACE_LEFT, state::SURFACE_LEFT),
+                _ => (clip::SURFACE_FORWARD, state::SURFACE_FORWARD),
             };
             player.position.y += units((depth - 1) as f32);
             player.mode = PlayerMode::Surface;
@@ -95,8 +95,8 @@ pub(super) fn stand_up(
     }
     player.position.y = floor.height;
     player.mode = PlayerMode::PullingUp;
-    animation.enter(192, 0.0, 192);
-    traversal.goal = 2;
+    animation.enter(clip::STAND_UP, 0.0, clip::STAND_UP);
+    traversal.goal = state::STAND;
     wading.active = true;
     motion.grounded = true;
     motion.pitch = 0.0;
@@ -123,14 +123,27 @@ pub(super) fn control(
         return false;
     };
     if !(wading.active || player.mode == PlayerMode::Wade)
-        || !matches!(state, 0 | 1 | 2 | 6 | 7 | 16 | 20 | 21 | 22 | 55 | 65)
+        || !matches!(
+            state,
+            state::WALK
+                | state::RUN
+                | state::STAND
+                | state::TURN_RIGHT
+                | state::TURN_LEFT
+                | state::WALK_BACK
+                | state::FAST_TURN
+                | state::STEP_RIGHT
+                | state::STEP_LEFT
+                | state::CLIMB_OUT
+                | state::WADE
+        )
     {
         return false;
     }
     if player.health <= 0 || matches!(player.mode, PlayerMode::Climbing { .. } | PlayerMode::Dead) {
         return false;
     }
-    if state == 2 && pad.held(Button::Square) {
+    if state == state::STAND && pad.held(Button::Square) {
         return false;
     }
     let controls = GroundControls::read(pad);
@@ -144,11 +157,11 @@ pub(super) fn control(
     };
     let walking = controls.walk;
     let gait = if wading.active {
-        65
+        state::WADE
     } else if walking {
-        0
+        state::WALK
     } else {
-        1
+        state::RUN
     };
     let push = |motion: &mut Motion, cap: i32| {
         if turn != 0 {
@@ -156,7 +169,7 @@ pub(super) fn control(
         }
     };
     match state {
-        65 => {
+        state::WADE => {
             motion.camera_elevation = Some(swimming::radians(tuning.wading.camera_elevation));
             if player.health > 0 {
                 push(motion, 1456);
@@ -164,23 +177,27 @@ pub(super) fn control(
                     .clamp(-tuning.wading.bank_limit, tuning.wading.bank_limit);
                 water.bank = swimming::radians(bank);
             }
-            traversal.goal = if player.health > 0 && forward > 0.0 { if wading.active { 65 } else { 1 } } else { 2 };
-        }
-        0 | 1 => {
-            push(motion, if state == 0 { 728 } else { 1456 });
-            traversal.goal = if forward > 0.0 { gait } else { 2 };
-        }
-        2 => {
-            traversal.goal = if controls.side < 0.0 {
-                22
-            } else if controls.side > 0.0 {
-                21
-            } else if turn < 0 {
-                7
-            } else if turn > 0 {
-                6
+            traversal.goal = if player.health > 0 && forward > 0.0 {
+                if wading.active { state::WADE } else { state::RUN }
             } else {
-                2
+                state::STAND
+            };
+        }
+        state::WALK | state::RUN => {
+            push(motion, if state == state::WALK { 728 } else { 1456 });
+            traversal.goal = if forward > 0.0 { gait } else { state::STAND };
+        }
+        state::STAND => {
+            traversal.goal = if controls.side < 0.0 {
+                state::STEP_LEFT
+            } else if controls.side > 0.0 {
+                state::STEP_RIGHT
+            } else if turn < 0 {
+                state::TURN_LEFT
+            } else if turn > 0 {
+                state::TURN_RIGHT
+            } else {
+                state::STAND
             };
             if forward > 0.0 {
                 traversal.goal = gait;
@@ -194,38 +211,41 @@ pub(super) fn control(
                     );
                 }
             } else if forward < 0.0 {
-                traversal.goal = 16;
+                traversal.goal = state::WALK_BACK;
                 push(motion, 728);
             }
         }
-        6 | 7 | 20 => {
-            let sign = if state == 7 || (state == 20 && motion.turn_rate < 0) { -1 } else { 1 };
-            if state == 20 {
+        state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN => {
+            let sign =
+                if state == state::TURN_LEFT || (state == state::FAST_TURN && motion.turn_rate < 0) { -1 } else { 1 };
+            if state == state::FAST_TURN {
                 motion.turn_rate = if motion.turn_rate < 0 { -1456 } else { 1456 };
             } else {
                 motion.turn_rate += sign * TURN_PUSH;
                 if walking && !motion.guns_ready {
                     motion.turn_rate = motion.turn_rate.clamp(-728, 728);
                 } else if motion.guns_ready || motion.turn_rate.abs() > 728 {
-                    traversal.goal = 20;
+                    traversal.goal = state::FAST_TURN;
                 }
             }
-            if state != 20 && forward > 0.0 {
+            if state != state::FAST_TURN && forward > 0.0 {
                 traversal.goal = gait;
             } else if turn != sign {
-                traversal.goal = 2;
+                traversal.goal = state::STAND;
             }
         }
-        16 => {
+        state::WALK_BACK => {
             push(motion, 728);
             if forward >= 0.0 || (!wading.active && !walking) {
-                traversal.goal = 2;
+                traversal.goal = state::STAND;
             }
         }
-        21 | 22 => {
+        state::STEP_RIGHT | state::STEP_LEFT => {
             push(motion, 728);
-            if (state == 21 && controls.side <= 0.0) || (state == 22 && controls.side >= 0.0) {
-                traversal.goal = 2;
+            if (state == state::STEP_RIGHT && controls.side <= 0.0)
+                || (state == state::STEP_LEFT && controls.side >= 0.0)
+            {
+                traversal.goal = state::STAND;
             }
         }
         _ => {}
@@ -259,7 +279,22 @@ pub(super) fn step(
     }
     let prior = clips.state(animation.animation);
     if !(wading.active || player.mode == PlayerMode::Wade)
-        || !matches!(prior, Some(0 | 1 | 2 | 6 | 7 | 16 | 20 | 21 | 22 | 55 | 65))
+        || !matches!(
+            prior,
+            Some(
+                state::WALK
+                    | state::RUN
+                    | state::STAND
+                    | state::TURN_RIGHT
+                    | state::TURN_LEFT
+                    | state::WALK_BACK
+                    | state::FAST_TURN
+                    | state::STEP_RIGHT
+                    | state::STEP_LEFT
+                    | state::CLIMB_OUT
+                    | state::WADE
+            )
+        )
     {
         return false;
     }
@@ -272,7 +307,7 @@ pub(super) fn step(
         advance(animation, Some(clips), original_frames(dt));
     }
     traversal.animation_stepped = true;
-    let state = clips.state(animation.animation).unwrap_or(2);
+    let state = clips.state(animation.animation).unwrap_or(state::STAND);
     let speed = clips.speed(animation).unwrap_or(0.0);
     let heading = swimming::angle(motion.movement_heading.unwrap_or(player.yaw));
     let n = (speed * 1024.0 / ORIGINAL_FPS).round() as i32;
@@ -281,15 +316,15 @@ pub(super) fn step(
     let yaw = swimming::angle(player.yaw) + motion.turn_rate;
     let facing = (yaw
         + match state {
-            16 => 32768,
-            21 => 16384,
-            22 => -16384,
+            state::WALK_BACK => 32768,
+            state::STEP_RIGHT => 16384,
+            state::STEP_LEFT => -16384,
             _ => 0,
         }) as i16 as i32;
     motion.movement_heading = Some(swimming::radians(facing));
     // State55's collision0x8003BFF0/3C208 only queries the body. It
     // neither shifts nor snaps to the floor during the stand-up clip.
-    if state == 55 {
+    if state == state::CLIMB_OUT {
         player.position = collision::level(at);
         player.room = body_room(world, player.position, player.room, 381.0);
         motion.velocity = Vec3::ZERO;
@@ -299,26 +334,32 @@ pub(super) fn step(
     }
     let limits = Limits {
         radius: 100,
-        bad_pos: if state == 65 || (wading.active && matches!(state, 16 | 21 | 22)) { 32512 } else { 384 },
-        bad_neg: if matches!(state, 21 | 22) { -128 } else { -384 },
+        bad_pos: if state == state::WADE
+            || (wading.active && matches!(state, state::WALK_BACK | state::STEP_RIGHT | state::STEP_LEFT))
+        {
+            32512
+        } else {
+            384
+        },
+        bad_neg: if matches!(state, state::STEP_RIGHT | state::STEP_LEFT) { -128 } else { -384 },
         bad_ceiling: 0,
     };
     let info = collision::info(world, at, old, player.room, 762, facing, &limits);
     at += info.shift;
     motion.velocity = Vec3::new(swimming::radians(heading).sin(), 0.0, swimming::radians(heading).cos()) * speed;
     match info.contact {
-        Contact::Front | Contact::TopFront if state == 65 => {
+        Contact::Front | Contact::TopFront if state == state::WADE => {
             water.bank = 0.0;
             motion.velocity = Vec3::ZERO;
-            traversal.goal = 2;
-            if matches!(prior, Some(2 | 6 | 7 | 20)) {
+            traversal.goal = state::STAND;
+            if matches!(prior, Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)) {
                 *animation = step_animation(&previous, STANDING_CLIP, None, Some(clips), original_frames(dt));
             } else {
                 animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
             }
         }
-        Contact::Left if state == 65 => player.yaw += swimming::radians(910),
-        Contact::Right if state == 65 => player.yaw -= swimming::radians(910),
+        Contact::Left if state == state::WADE => player.yaw += swimming::radians(910),
+        Contact::Right if state == state::WADE => player.yaw -= swimming::radians(910),
         Contact::Clamp | Contact::Top | Contact::TopFront => {
             at = old;
             motion.velocity = Vec3::ZERO;
@@ -326,19 +367,19 @@ pub(super) fn step(
         _ => {}
     }
     if info.mid.floor != collision::NO_HEIGHT {
-        at.y += if state == 65 { info.mid.floor.min(50) } else { info.mid.floor };
+        at.y += if state == state::WADE { info.mid.floor.min(50) } else { info.mid.floor };
     }
     player.position = collision::level(at);
     player.room = body_room(world, player.position, player.room, 381.0);
     motion.grounded = true;
     player.mode = match clips.state(animation.animation) {
-        Some(65) => PlayerMode::Wade,
-        Some(0) => PlayerMode::Walk,
-        Some(1) => PlayerMode::Run,
-        Some(16) => PlayerMode::Back,
-        Some(21) => PlayerMode::StepRight { stopping: traversal.goal == 2 },
-        Some(22) => PlayerMode::StepLeft { stopping: traversal.goal == 2 },
-        Some(55) => PlayerMode::PullingUp,
+        Some(state::WADE) => PlayerMode::Wade,
+        Some(state::WALK) => PlayerMode::Walk,
+        Some(state::RUN) => PlayerMode::Run,
+        Some(state::WALK_BACK) => PlayerMode::Back,
+        Some(state::STEP_RIGHT) => PlayerMode::StepRight { stopping: traversal.goal == state::STAND },
+        Some(state::STEP_LEFT) => PlayerMode::StepLeft { stopping: traversal.goal == state::STAND },
+        Some(state::CLIMB_OUT) => PlayerMode::PullingUp,
         _ => PlayerMode::Idle,
     };
     true

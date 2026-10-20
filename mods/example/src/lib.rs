@@ -7,25 +7,25 @@
 //!   (`GamePlugins.build().disable::<...>()`, see `src/main.rs`).
 //! - It brings its own level (`assets/levels/example_mod/`), found through
 //!   the layered asset folders ahead of the game's.
-//! - It adds an object type, a wanderer the player steers ([`WANDERER`]),
-//!   and its own trigger action (`chime`).
+//! - Its character is a placement of the game's player type (0), so Lara's
+//!   ported controller drives it. The model and its clips are hand-made
+//!   (`tools/make_character.py`) and meet the ground-locomotion part of her
+//!   asset contract (`docs/lara-contract.md`): stand, walk, run, turn and
+//!   stop. [`character_contract`] checks it.
+//! - It adds its own trigger action (`chime`).
 //! - It replaces one of the game's types: pickup [`PICKUP`] keeps the
 //!   game's own hook and also spins ([`replace_object_type`]).
-//!
-//! Not yet: the game's player controller driving a hand-made character. That
-//! needs Lara's asset contract written down first (her clip, state and
-//! command numbers); see `TODO.md`.
 //!
 //! [`replace_object_type`]: engine::objects::AppObjectTypes::replace_object_type
 use bevy::prelude::*;
 use engine::{
-    controller::ControllerState,
-    objects::{AppObjectTypes, ObjectType, ObjectTypes, SpawnContext},
+    objects::{AppObjectTypes, ObjectTypes},
     prelude::*,
     schedule::ItemSystems,
     triggers::{AppTriggerActions, TriggerAction, TriggerSystems},
-    world::{WorldGeometry, angle, position},
+    world::Level,
 };
+use game::player::contract::{self, ContractReport, Feature};
 
 /// The game's asset folder, relative to this crate (see
 /// `engine::assets::add_root`). A shipped build points at wherever the
@@ -35,27 +35,14 @@ pub const GAME_ASSETS: &str = "../../game/assets";
 /// The mod's level, `assets/levels/example_mod/level.json`.
 pub const LEVEL: &str = "example_mod";
 
-/// The mod's own type: a wanderer the player steers. Mod type ids start at
-/// 300, clear of the original's 265.
-pub const WANDERER: u16 = 300;
-
 /// The game's pickup type the mod changes.
 pub const PICKUP: u16 = 135;
 
-/// Metres per second and radians per second.
-const WALK_SPEED: f32 = 2.0;
-const TURN_SPEED: f32 = 2.5;
-/// Highest step the wanderer climbs, metres.
-const STEP: f32 = 0.3;
+/// The parts of Lara's contract the mod's character provides.
+pub const CHARACTER_FEATURES: &[Feature] = &[Feature::Ground, Feature::Skeleton];
+
 /// Radians per second.
 const SPIN_SPEED: f32 = 1.5;
-
-/// The player's character: an avatar that walks on the level's floor, so the
-/// engine's camera, triggers and room visibility follow it.
-#[derive(Component, Reflect, Default)]
-#[reflect(Component)]
-#[require(Avatar, Transform)]
-pub struct Wanderer;
 
 /// Added to the replaced pickup: it turns in place.
 #[derive(Component, Reflect, Default)]
@@ -67,9 +54,9 @@ pub struct Spin;
 #[reflect(Resource)]
 pub struct Chimes(pub u32);
 
-/// The mod's rules: a new type, a new action and a replaced type. No
-/// rendering, so it runs in headless tests (`tests/rules.rs`). Add it after
-/// the game's plugins.
+/// The mod's rules: a new action and a replaced type. No rendering, so it
+/// runs in headless tests (`tests/rules.rs`). Add it after the game's
+/// plugins; the character is the game's own player type.
 pub struct ModPlugin;
 
 impl Plugin for ModPlugin {
@@ -80,65 +67,31 @@ impl Plugin for ModPlugin {
             .get_resource::<ObjectTypes>()
             .and_then(|types| types.get(PICKUP).cloned())
             .unwrap_or_else(|| panic!("pickup {PICKUP} is not registered: add the game's plugins first"));
-        app.register_object_type(WANDERER, ObjectType::new("wanderer").on_spawn(spawn_wanderer))
-            .replace_object_type(
-                PICKUP,
-                pickup.on_init(|entity, _, _| {
-                    entity.insert(Spin);
-                }),
+        app.replace_object_type(
+            PICKUP,
+            pickup.on_init(|entity, _, _| {
+                entity.insert(Spin);
+            }),
+        )
+        .register_trigger_action("chime")
+        .init_resource::<Chimes>()
+        .add_systems(
+            FixedUpdate,
+            (
+                spin.in_set(ItemSystems::Control),
+                chime.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
             )
-            .register_trigger_action("chime")
-            .init_resource::<Chimes>()
-            .add_systems(
-                FixedUpdate,
-                (
-                    wander.in_set(WorldSystems::Control),
-                    spin.in_set(ItemSystems::Control),
-                    chime.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
-                )
-                    .run_if(simulation_enabled),
-            );
+                .run_if(simulation_enabled),
+        );
     }
 }
 
-/// The wanderer's spawn hook.
-pub fn spawn_wanderer(entity: &mut bevy::ecs::system::EntityCommands, ctx: &SpawnContext) {
-    let p = ctx.placement;
-    let avatar = Avatar {
-        position: position(p.position),
-        yaw: angle(p.rotation),
-        room: p.room,
-        grounded: true,
-        alive: true,
-        ..default()
-    };
-    entity.insert((Wanderer, avatar, Transform::from_translation(position(p.position)), Name::new("Wanderer")));
-}
-
-/// Turn with left/right, walk with up/down; stay on the floor, climb small
-/// steps, stop at walls and solid sectors.
-fn wander(
-    time: Res<Time>,
-    pad: Res<ControllerState>,
-    world: Option<Res<WorldGeometry>>,
-    mut wanderers: Query<(&mut Avatar, &mut Transform), With<Wanderer>>,
-) {
-    let dt = time.delta_secs();
-    let direction = pad.direction();
-    for (mut avatar, mut transform) in &mut wanderers {
-        avatar.yaw = (avatar.yaw + direction.x * TURN_SPEED * dt).rem_euclid(std::f32::consts::TAU);
-        let forward = Vec3::new(avatar.yaw.sin(), 0.0, avatar.yaw.cos());
-        let proposed = avatar.position + forward * direction.y * WALK_SPEED * dt;
-        if let Some(hit) = world.as_deref().and_then(|world| world.floor_at(proposed, avatar.room))
-            && hit.height - avatar.position.y <= STEP
-            && hit.ceiling - hit.height >= 0.5
-        {
-            avatar.position = proposed.with_y(hit.height);
-            avatar.room = hit.room;
-        }
-        transform.translation = avatar.position;
-        transform.rotation = Quat::from_rotation_y(avatar.yaw);
-    }
+/// How the mod's level meets Lara's asset contract. The character provides
+/// [`CHARACTER_FEATURES`]; the controller's other moves (jumps, climbing,
+/// water...) show the standing pose instead, their clip numbers being filled
+/// with standing clips.
+pub fn character_contract(level: &Level) -> ContractReport {
+    contract::check(level)
 }
 
 fn spin(time: Res<Time>, mut spinners: Query<&mut Transform, With<Spin>>) {

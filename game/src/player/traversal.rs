@@ -23,7 +23,7 @@ pub struct Traversal {
 
 impl Default for Traversal {
     fn default() -> Self {
-        Self { goal: 2, run_jump_ready: false, animation_stepped: false, enter: None }
+        Self { goal: state::STAND, run_jump_ready: false, animation_stepped: false, enter: None }
     }
 }
 
@@ -117,17 +117,17 @@ pub(super) fn step(
     let entering = traversal.enter.take();
     if entering.is_none() && matches!(mode, PlayerMode::JumpingForward) {
         match clips.state(animation.animation) {
-            Some(15) => {
+            Some(state::JUMP_PREPARE) => {
                 // Compression tries Forward, Left, Right then Back, taking
                 // the first clear one: goal3, 27, 26 or25, with the movement
                 // heading turned that way (0x800390F0..0x8003923C). With
                 // none, the request stays and compression ends in jump28.
                 use std::f32::consts::{FRAC_PI_2, PI};
                 let requests = [
-                    (Button::Up, 0.0, 3),
-                    (Button::Left, -FRAC_PI_2, 27),
-                    (Button::Right, FRAC_PI_2, 26),
-                    (Button::Down, PI, 25),
+                    (Button::Up, 0.0, state::FORWARD_JUMP),
+                    (Button::Left, -FRAC_PI_2, state::JUMP_LEFT),
+                    (Button::Right, FRAC_PI_2, state::JUMP_RIGHT),
+                    (Button::Down, PI, state::JUMP_BACK),
                 ];
                 if let Some(&(_, turn, goal)) = requests
                     .iter()
@@ -138,8 +138,10 @@ pub(super) fn step(
                 }
             }
             // Reach control0x80039070 requests fast fall9 at fall speed132.
-            Some(11) if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED => traversal.goal = 9,
-            Some(3) => {
+            Some(state::REACH) if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED => {
+                traversal.goal = state::FAST_FALL
+            }
+            Some(state::FORWARD_JUMP) => {
                 // Forward-flight control0x80038B88 resets reach/dive requests,
                 // then (unless landing1/2/8 is pending) requests in turn,
                 // each overriding the last: Action's reach11, Back or Roll's
@@ -147,21 +149,21 @@ pub(super) fn step(
                 // 132, fast fall9 (0x80038C4C..0x80038C60). A twist request
                 // otherwise persists. The current clip owns acceptance:
                 // fall35 has no range for52 or68.
-                if matches!(traversal.goal, 52 | 11) {
-                    traversal.goal = 3;
+                if matches!(traversal.goal, state::SWAN_DIVE | state::REACH) {
+                    traversal.goal = state::FORWARD_JUMP;
                 }
-                if !matches!(traversal.goal, 1 | 2 | 8) {
+                if !matches!(traversal.goal, state::RUN | state::STAND | state::DEATH) {
                     if weapon.hands_free() && pad.held(Button::Cross) {
-                        traversal.goal = 11;
+                        traversal.goal = state::REACH;
                     }
                     if pad.held(Button::Down) || pad.held(Button::Circle) {
-                        traversal.goal = 68;
+                        traversal.goal = state::TWIST;
                     }
                     if weapon.hands_free() && pad.held(Button::R1) {
-                        traversal.goal = 52;
+                        traversal.goal = state::SWAN_DIVE;
                     }
                     if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED {
-                        traversal.goal = 9;
+                        traversal.goal = state::FAST_FALL;
                     }
                 }
             }
@@ -173,21 +175,21 @@ pub(super) fn step(
         // its authored ranges decide when that request can take effect.
         let controls = GroundControls::read(pad);
         traversal.goal = if pad.held(Button::Square) {
-            15
+            state::JUMP_PREPARE
         } else if controls.side < 0.0 {
-            22
+            state::STEP_LEFT
         } else if controls.side > 0.0 {
-            21
+            state::STEP_RIGHT
         } else if controls.direction.y > 0.0 {
-            if controls.walk { 0 } else { 1 }
+            if controls.walk { state::WALK } else { state::RUN }
         } else if controls.direction.y < 0.0 {
-            if controls.walk { 16 } else { 5 }
+            if controls.walk { state::WALK_BACK } else { state::HOP_BACK }
         } else if controls.direction.x < 0.0 {
-            7
+            state::TURN_LEFT
         } else if controls.direction.x > 0.0 {
-            6
+            state::TURN_RIGHT
         } else {
-            2
+            state::STAND
         };
     }
     let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
@@ -222,8 +224,8 @@ pub(super) fn step(
             _ => {}
         }
     }
-    let state = clips.state(animation.animation).unwrap_or(2);
-    if matches!(state, 25..=27) && matches!(mode, PlayerMode::JumpingForward) {
+    let state = clips.state(animation.animation).unwrap_or(state::STAND);
+    if matches!(state, state::JUMP_BACK..=state::JUMP_LEFT) && matches!(mode, PlayerMode::JumpingForward) {
         // Twist210 chains into211, and compression into takeoff74, 80 or
         // 78; the back- and side-jump handlers (0x8003B71C..0x8003B7B8)
         // own this tick's move and collision.
@@ -243,7 +245,7 @@ pub(super) fn step(
         mode = PlayerMode::Recovering;
         player.mode = mode;
     }
-    if state == 9 && matches!(mode, PlayerMode::JumpingForward) {
+    if state == state::FAST_FALL && matches!(mode, PlayerMode::JumpingForward) {
         mode = PlayerMode::FastFalling;
         player.mode = mode;
     }
@@ -265,13 +267,13 @@ pub(super) fn step(
         }
         motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     }
-    if matches!(mode, PlayerMode::JumpingForward) && state == 28 {
+    if matches!(mode, PlayerMode::JumpingForward) && state == state::JUMP_UP {
         // Compression can finish into a vertical jump when no direction is
         // clear; the destination clip's command owns the launch velocity.
         mode = PlayerMode::JumpingUp { launch_speed: 0.0 };
         player.mode = mode;
     }
-    if matches!(mode, PlayerMode::JumpingUp { .. }) && state == 2 && !motion.grounded {
+    if matches!(mode, PlayerMode::JumpingUp { .. }) && state == state::STAND && !motion.grounded {
         // A ceiling contact requests stop without cancelling ascent
         // (0x8003B864..0x8003B888). On the next authored dispatch to31,
         // standing collision settles the feet after one final airborne move.
@@ -280,10 +282,12 @@ pub(super) fn step(
     }
     match mode {
         PlayerMode::PullingUp => pull_up(player, motion, world, state),
-        PlayerMode::Hanging { .. } if state == 19 => pull_up(player, motion, world, state),
+        PlayerMode::Hanging { .. } if state == state::PULL_UP => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } => hang_collision(player, motion, animation, traversal, world, pad),
         PlayerMode::Recovering
-            if state == 2 && motion.grounded && stop_collision(player, motion, animation, traversal, world) =>
+            if state == state::STAND
+                && motion.grounded
+                && stop_collision(player, motion, animation, traversal, world) =>
         {
             true
         }
@@ -335,7 +339,7 @@ fn pull_up(player: &mut Player, motion: &mut Motion, world: &WorldGeometry, stat
     player.mode = PlayerMode::PullingUp;
     // Clip97 raises by its authored735, then102 moves forward200.
     // Only after102 chains into standing does collision settle the feet.
-    if state == 2 {
+    if state == state::STAND {
         player.mode = PlayerMode::Idle;
         motion.grounded = true;
         if let Some(hit) = world.floor_at(player.position, player.room) {
@@ -366,13 +370,13 @@ fn hang_collision(
         // Hang release (0x8003CF80..0x8003D0EC): switch to the
         // vertical-jump loop at+9, lower by its bottom bound and seed
         // speed2/fall1. Gravity begins on the following tick.
-        *animation = AnimationState::at_frame(28, 9.0);
+        *animation = AnimationState::at_frame(clip::JUMP_UP, 9.0);
         let (_, bottom) = vertical_bounds(&world.data, animation).unwrap_or((0, 0));
         player.position.y -= units(bottom as f32);
         motion.velocity = player.forward() * units(2.0 * ORIGINAL_FPS) - Vec3::Y * units(ORIGINAL_FPS);
         motion.grounded = false;
         player.mode = PlayerMode::JumpingUp { launch_speed: 0.0 };
-        traversal.goal = 28;
+        traversal.goal = state::JUMP_UP;
     } else {
         let (top, _) = vertical_bounds(&world.data, animation).unwrap_or((-726, 0));
         if !settling {
@@ -389,7 +393,7 @@ fn hang_collision(
         {
             let relative = ((player.position.y - hits[0].height) * 1024.0).round() as i32;
             if (-849..=-651).contains(&relative) && hits.iter().all(|h| h.ceiling - h.height >= PLAYER_HEIGHT) {
-                traversal.goal = 19;
+                traversal.goal = state::PULL_UP;
             }
         }
     }
@@ -413,12 +417,12 @@ pub(super) fn rebound(
     speed: i32,
 ) {
     if clearance > 512 {
-        *animation = AnimationState::at_frame(32, 1.0);
-        traversal.goal = 9;
+        *animation = AnimationState::at_frame(clip::REBOUND_FALL, 1.0);
+        traversal.goal = state::FAST_FALL;
         player.mode = PlayerMode::FastFalling;
     } else if clearance < 129 {
-        *animation = AnimationState::at_frame(31, 0.0);
-        traversal.goal = 14;
+        *animation = AnimationState::at_frame(clip::JUMP_IMPACT, 0.0);
+        traversal.goal = state::JUMP_IMPACT;
         player.mode = PlayerMode::JumpImpact;
     }
     let heading = collision_heading + std::f32::consts::PI;
@@ -484,8 +488,8 @@ pub(super) fn stop_collision(
     let info = collision::info(world, at, at, player.room, 762, yaw as i16 as i32, &limits);
     if info.mid.floor > 384 {
         player.mode = PlayerMode::JumpingForward;
-        animation.enter(34, 0.0, 34);
-        traversal.goal = 3;
+        animation.enter(clip::FALL, 0.0, clip::FALL);
+        traversal.goal = state::FORWARD_JUMP;
         motion.grounded = false;
         motion.velocity.y = 0.0;
         return true;
@@ -505,7 +509,11 @@ pub(super) fn stop_collision(
     };
     let forward = (downhill - yaw + 16384) & 0xffff <= 0x8000;
     let heading = collision::angle_radians(downhill);
-    let (clip, state, facing) = if forward { (70, 24, downhill) } else { (104, 32, downhill - 32768) };
+    let (clip, state, facing) = if forward {
+        (clip::SLIDE, state::SLIDE, downhill)
+    } else {
+        (clip::BACK_SLIDE, state::BACK_SLIDE, downhill - 32768)
+    };
     animation.enter(clip, 0.0, clip);
     traversal.goal = state;
     player.yaw = collision::angle_radians(facing);
@@ -525,12 +533,12 @@ fn recover(
 ) -> bool {
     motion.velocity = Vec3::ZERO;
     let handoff = match state {
-        0 => Some((PlayerMode::Walk, 20)),
-        1 => Some((PlayerMode::Run, 6)),
-        5 => Some((PlayerMode::HopBack, 88)),
-        16 => Some((PlayerMode::Back, 40)),
-        21 => Some((PlayerMode::StepRight { stopping: false }, 67)),
-        22 => Some((PlayerMode::StepLeft { stopping: false }, 65)),
+        state::WALK => Some((PlayerMode::Walk, clip::WALK_START)),
+        state::RUN => Some((PlayerMode::Run, clip::RUN_START)),
+        state::HOP_BACK => Some((PlayerMode::HopBack, clip::HOP_BACK)),
+        state::WALK_BACK => Some((PlayerMode::Back, clip::WALK_BACK)),
+        state::STEP_RIGHT => Some((PlayerMode::StepRight { stopping: false }, clip::STEP_RIGHT)),
+        state::STEP_LEFT => Some((PlayerMode::StepLeft { stopping: false }, clip::STEP_LEFT)),
         _ => None,
     };
     if let Some((next, request)) = handoff {
@@ -541,14 +549,14 @@ fn recover(
         // The ordinary collision system consumes this newly authored
         // movement; the animation pass knows it was already advanced.
         return false;
-    } else if state == 15 {
+    } else if state == state::JUMP_PREPARE {
         player.mode = PlayerMode::JumpingForward;
-    } else if state == 6 || state == 7 {
+    } else if state == state::TURN_RIGHT || state == state::TURN_LEFT {
         player.mode = PlayerMode::Idle;
-        motion.turning = if state == 6 { 1 } else { -1 };
+        motion.turning = if state == state::TURN_RIGHT { 1 } else { -1 };
         motion.turn_frames = 0.0;
-        animation.acknowledge(if state == 6 { 12 } else { 13 });
-    } else if animation.animation == STANDING_CLIP || animation.animation == 103 {
+        animation.acknowledge(if state == state::TURN_RIGHT { clip::TURN_RIGHT } else { clip::TURN_LEFT });
+    } else if animation.animation == STANDING_CLIP || animation.animation == clip::STAND_IDLE {
         player.mode = PlayerMode::Idle;
     }
     true
@@ -567,10 +575,10 @@ fn jump_motion(
     dt: f32,
 ) -> bool {
     let mode = player.mode;
-    let state = clips.state(animation.animation).unwrap_or(2);
+    let state = clips.state(animation.animation).unwrap_or(state::STAND);
     // Preparation26 is motionless. Its end jump command launches27; the
     // authored data owns the preparation duration and takeoff frame.
-    if motion.grounded && state == 2 {
+    if motion.grounded && state == state::STAND {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
         return true;
@@ -619,8 +627,8 @@ fn jump_motion(
     motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     let (quadrant, forward, delta) = cardinal(player.yaw);
     let hits = front(world, proposed, collision_heading, player.room);
-    let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == 3;
-    let reach = matches!(mode, PlayerMode::JumpingForward) && state == 11;
+    let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == state::FORWARD_JUMP;
+    let reach = matches!(mode, PlayerMode::JumpingForward) && state == state::REACH;
     // Jump-up collision uses870 rather than the ordinary762-unit body
     // probe (0x8003B828). Jump/reach handlers allow192 at the front ceiling
     // (reach0x8003B1C4..0x8003B1D0).
@@ -699,7 +707,8 @@ fn jump_motion(
         let ceiling = world.floor_at(proposed, player.room).is_some_and(|h| h.ceiling >= proposed.y + units(384.0));
         let reaching = matches!(mode, PlayerMode::JumpingForward);
         let can_grab = if reaching {
-            state == 11 && world.floor_at(proposed, player.room).is_some_and(|h| proposed.y - h.height >= units(200.0))
+            state == state::REACH
+                && world.floor_at(proposed, player.room).is_some_and(|h| proposed.y - h.height >= units(200.0))
         } else {
             matches!(mode, PlayerMode::JumpingUp { .. }) && !motion.grounded
         };
@@ -714,7 +723,7 @@ fn jump_motion(
         {
             // Vertical-jump grab0x8003D3C0 starts96 at+12. Reach grab
             // 0x8003D5BC starts96 at0, retaining speed2/fall1 for that tick.
-            *animation = AnimationState::at_frame(96, if reaching { 0.0 } else { 12.0 });
+            *animation = AnimationState::at_frame(clip::HANG, if reaching { 0.0 } else { 12.0 });
             let (top, _) = vertical_bounds(&world.data, animation).unwrap();
             let ledge = Vec3::new(player.position.x, hits[0].height, player.position.z);
             player.position.y = ledge.y + units(top as f32);
@@ -724,7 +733,7 @@ fn jump_motion(
                 if reaching { forward * units(2.0 * ORIGINAL_FPS) - Vec3::Y * units(ORIGINAL_FPS) } else { Vec3::ZERO };
             motion.grounded = !reaching;
             motion.turn_rate = 0;
-            traversal.goal = 10;
+            traversal.goal = state::HANG;
             return true;
         }
     }
@@ -737,7 +746,7 @@ fn jump_motion(
         if vertical_jump {
             // Type8 requests standing but keeps signed speed and fall speed
             // (0x8003B884..0x8003B8B4); clip28's dispatch owns recovery.
-            traversal.goal = 2;
+            traversal.goal = state::STAND;
         } else {
             // Reach type8 shares the stop-ascent rule, retaining its clip,
             // goal and horizontal speed (0x8003C870..0x8003C884).
@@ -788,24 +797,28 @@ fn jump_motion(
                 if matches!(mode, PlayerMode::FastFalling) {
                     //0x8003AF54..0x8003AF60 requests death without replacing
                     // the current fast-fall clip on the contact tick.
-                    traversal.goal = 8;
+                    traversal.goal = state::DEATH;
                     player.mode = PlayerMode::FatalLanding;
                 } else {
                     motion.velocity = Vec3::ZERO;
                 }
                 return true;
             }
-            traversal.goal = if state == 3 && pad.held(Button::Up) && !pad.held(Button::R1) { 1 } else { 2 };
+            traversal.goal = if state == state::FORWARD_JUMP && pad.held(Button::Up) && !pad.held(Button::R1) {
+                state::RUN
+            } else {
+                state::STAND
+            };
             if matches!(mode, PlayerMode::FastFalling) {
                 // Fast-fall collision0x8003AF64 forces heavy landing24
                 // on this tick, retaining horizontal speed until control
                 // runs next tick. Its40 authored frames own recovery.
-                *animation = AnimationState::at_frame(24, 0.0);
+                *animation = AnimationState::at_frame(clip::HEAVY_LANDING, 0.0);
                 player.mode = PlayerMode::Recovering;
             }
             // The landing collision sets a goal; the next authored step
             // dispatches to31, which holds control through its landing pose.
-            if matches!(mode, PlayerMode::JumpingForward) && state == 3 {
+            if matches!(mode, PlayerMode::JumpingForward) && state == state::FORWARD_JUMP {
                 // Forward-jump collision0x8003ABEC calls AnimateLara again
                 // on landing. Vertical-jump collision deliberately waits for
                 // the next tick. forward_landing.csv distinguishes them.
@@ -819,9 +832,9 @@ fn jump_motion(
                     // AnimateLara writes grounded clip speed, but its state14
                     // override survives until an authored dispatch/end link.
                     motion.velocity = player.forward() * clips.speed(animation).unwrap_or(0.0);
-                } else if clips.state(a.animation) == Some(1) {
+                } else if clips.state(a.animation) == Some(state::RUN) {
                     player.mode = PlayerMode::Run;
-                    animation.acknowledge(6);
+                    animation.acknowledge(clip::RUN_START);
                     let speed = clips.speed(animation).unwrap_or(0.0);
                     motion.velocity = player.forward() * speed;
                     let speed = (speed * 1024.0 / ORIGINAL_FPS).round() as i32;
@@ -834,7 +847,7 @@ fn jump_motion(
             }
         }
     }
-    if motion.grounded && state == 2 {
+    if motion.grounded && state == state::STAND {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
     }

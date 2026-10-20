@@ -20,8 +20,8 @@ pub(super) fn step(
     let mut authored = if entering {
         // Standing control0x800389F0..0x80038A1C enters146 at+2;
         // this same tick's animation step advances it to+3.
-        traversal.goal = 2;
-        ObjectAnimation { animation: 146, frame: 2.0 }
+        traversal.goal = state::STAND;
+        ObjectAnimation { animation: clip::ROLL, frame: 2.0 }
     } else {
         ObjectAnimation { animation: animation.animation, frame: animation.frame }
     };
@@ -38,7 +38,7 @@ pub(super) fn step(
             motion.pitch = -motion.pitch; // Same effect0x8002A03C..0x8002A050.
         }
     }
-    let state = clips.state(animation.animation).unwrap_or(2);
+    let state = clips.state(animation.animation).unwrap_or(state::STAND);
     let speed = clips.speed(animation).unwrap_or(0.0);
     let speed_units = (speed * 1024.0 / ORIGINAL_FPS).round() as i32;
     let angle = (heading * 65536.0 / std::f32::consts::TAU).round() as i32;
@@ -50,12 +50,12 @@ pub(super) fn step(
         ) * original_frames(dt);
     let collision_heading = player.yaw
         + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0
-        + if state == 23 { std::f32::consts::PI } else { 0.0 };
+        + if state == state::ROLL_BACK { std::f32::consts::PI } else { 0.0 };
     // Roll first-half collision0x8003BC50 follows yaw; second-half
     // 0x8003BD14 follows yaw+180, continuing the same physical direction.
     motion.movement_heading = Some(collision_heading);
     motion.velocity = Vec3::new(collision_heading.sin(), 0.0, collision_heading.cos()) * speed;
-    if state == 2 {
+    if state == state::STAND {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
         return true;
@@ -76,7 +76,7 @@ pub(super) fn collide(
     let (Some(world), Some(clips)) = (world.as_deref(), clips.as_deref()) else { return };
     for (mut player, mut motion, mut animation, mut traversal, mut collision) in &mut players {
         let Some(collision_heading) = collision.roll_heading.take() else { continue };
-        let state = clips.state(animation.animation).unwrap_or(2);
+        let state = clips.state(animation.animation).unwrap_or(state::STAND);
         collide_body(
             &mut player,
             &mut motion,
@@ -127,11 +127,14 @@ fn collide_body(
         }
     }
     let drop = (old.y - centre.height) * 1024.0;
-    if (state == 45 && drop > 384.0) || (state == 23 && drop > 200.0) {
+    if (state == state::ROLL && drop > 384.0) || (state == state::ROLL_BACK && drop > 200.0) {
         // The two collision handlers enter their existing forward/backward
         // fall controllers, seeding gravity without adding it on this tick.
-        let (clip, mode, goal) =
-            if state == 45 { (34, PlayerMode::JumpingForward, 3) } else { (93, PlayerMode::FallingBack, 29) };
+        let (clip, mode, goal) = if state == state::ROLL {
+            (clip::FALL, PlayerMode::JumpingForward, state::FORWARD_JUMP)
+        } else {
+            (clip::FALL_BACK, PlayerMode::FallingBack, state::FALL_BACK)
+        };
         animation.enter(clip, 0.0, clip);
         player.mode = mode;
         traversal.goal = goal;

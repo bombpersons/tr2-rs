@@ -295,7 +295,9 @@ decide how the accurate code is organised:
   each controller's asset contract in `docs/` (joints, clip and state
   numbers, state-change frame ranges, animation commands, sound ids), so a
   replacement player model or a new enemy model can reuse the ported
-  controller and the editor can check imported assets against it.
+  controller and the editor can check imported assets against it. Lara's
+  is `docs/lara-contract.md`, with its numbers in `player::contract` and
+  `contract::check` to test a level against it.
 - Keep each feature plugin usable on its own. The player must run without the
   inventory, HUD or menus; where one feature needs another, make the
   dependency explicit (a shared component or message) or optional, never a
@@ -335,9 +337,10 @@ the game convenient to build on:
   example-mod`; `tests/dev_mcp.rs` renders it). It is a small game made only
   of hand-made assets: its own level, a type and a trigger action of its own,
   a replaced game type, and the presentation, sound, sky and water palette
-  disabled. As the port grows, make it use the port's real pieces: a
-  hand-made character whose animations meet Lara's contract, driven by her
-  controller, and an enemy added through the shared creature module. It uses
+  disabled. Its character is a placement of Lara's type with a hand-made
+  model meeting the ground part of her contract (`tools/make_character.py`).
+  As the port grows, make it use more of the port's real pieces: more of that
+  contract, and an enemy added through the shared creature module. It uses
   only `game`'s public API; if it needs an edit to `game/` or anything from
   the disc, a boundary is in the wrong place.
 

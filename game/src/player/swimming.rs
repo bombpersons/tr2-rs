@@ -1,7 +1,9 @@
 //! Submerged stroke, glide and tread, from PSX0x80045384..0x800456DC, and
 //! their shared collision response 0x80045CB8.
 use super::collision::{self, Contact};
-use super::{AnimationState, Motion, ORIGINAL_FPS, Player, PlayerAnimations, Traversal, original_frames, units};
+use super::{
+    AnimationState, Motion, ORIGINAL_FPS, Player, PlayerAnimations, Traversal, contract::state, original_frames, units,
+};
 use bevy::prelude::*;
 use engine::{
     animation::advance,
@@ -81,11 +83,11 @@ enum Phase {
 impl Phase {
     fn from_clip(state: usize) -> Option<Self> {
         match state {
-            13 => Some(Self::Treading),
-            17 => Some(Self::Stroking),
-            18 => Some(Self::Gliding),
-            35 => Some(Self::Diving),
-            44 => Some(Self::Dying),
+            state::TREAD => Some(Self::Treading),
+            state::SWIM => Some(Self::Stroking),
+            state::GLIDE => Some(Self::Gliding),
+            state::DIVE => Some(Self::Diving),
+            state::WATER_DEATH => Some(Self::Dying),
             _ => None,
         }
     }
@@ -151,7 +153,7 @@ pub(super) fn control(
         return;
     }
     if player.health <= 0 && !matches!(phase, Phase::Diving) {
-        traversal.goal = 44;
+        traversal.goal = state::WATER_DEATH;
         recover_angles(player, motion, water, tuning);
         return;
     }
@@ -192,22 +194,22 @@ pub(super) fn control(
             water.speed =
                 (water.speed + units(tuning.acceleration * ORIGINAL_FPS)).min(units(tuning.max_speed * ORIGINAL_FPS));
             if !pad.held(Button::Square) {
-                traversal.goal = 18;
+                traversal.goal = state::GLIDE;
             }
         }
         Phase::Gliding => {
             if pad.held(Button::Square) {
-                traversal.goal = 17;
+                traversal.goal = state::SWIM;
             }
             water.speed = (water.speed - units(tuning.drag * ORIGINAL_FPS)).max(0.0);
             if water.speed < units(tuning.tread_threshold * ORIGINAL_FPS) {
-                traversal.goal = 13;
+                traversal.goal = state::TREAD;
             }
         }
         Phase::Diving | Phase::Dying => {}
         Phase::Treading => {
             if pad.held(Button::Square) {
-                traversal.goal = 17;
+                traversal.goal = state::SWIM;
             }
             water.speed = (water.speed - units(tuning.drag * ORIGINAL_FPS)).max(0.0);
         }
@@ -250,7 +252,7 @@ pub(super) fn step(
     let old = player.position;
     player.position += delta;
     motion.grounded = false;
-    if clips.state(animation.animation) == Some(44) {
+    if clips.state(animation.animation) == Some(state::WATER_DEATH) {
         death_collision(player, motion, water, world, old, tuning, dt);
     } else if let Some(world) = world {
         collide(player, motion, water, world, old);

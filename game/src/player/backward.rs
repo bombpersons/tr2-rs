@@ -31,13 +31,14 @@ pub(super) fn step(
     let prior = clips.state(animation.animation);
     let next = step_animation(animation, request, None, Some(clips), original_frames(dt));
     let state = clips.state(next.animation);
-    traversal.goal = if prior == Some(5) { 2 } else { clips.state(request).unwrap_or(2) };
+    traversal.goal =
+        if prior == Some(state::HOP_BACK) { state::STAND } else { clips.state(request).unwrap_or(state::STAND) };
     *animation = next;
     traversal.animation_stepped = true;
-    if !matches!(state, Some(5 | 16)) {
+    if !matches!(state, Some(state::HOP_BACK | state::WALK_BACK)) {
         // An entry request may still be waiting for an authored window;
         // keep standing until the clip actually enters backward movement.
-        traversal.goal = state.unwrap_or(2);
+        traversal.goal = state.unwrap_or(state::STAND);
         player.mode = PlayerMode::Idle;
         motion.velocity = Vec3::ZERO;
         return true;
@@ -50,7 +51,7 @@ pub(super) fn step(
     motion.movement_heading = Some(heading);
     let Some(centre) = world.floor_at(proposed, player.room) else { return true };
     let probes = probes(proposed, heading);
-    let down_limit = if state == Some(16) { 384.0 } else { 32512.0 };
+    let down_limit = if state == Some(state::WALK_BACK) { 384.0 } else { 32512.0 };
     let blocked = |position: Vec3| {
         let Some(hit) = world.floor_at(position, player.room) else { return true };
         let relative = (old.y - hit.height) * 1024.0;
@@ -75,8 +76,8 @@ pub(super) fn step(
         player.position[axis] = proposed[axis] + grid_shift(probes[0][axis], proposed[axis]);
         player.mode = PlayerMode::Idle;
         motion.velocity = Vec3::ZERO;
-        traversal.goal = 2;
-        if prior == Some(2) {
+        traversal.goal = state::STAND;
+        if prior == Some(state::STAND) {
             // LaraColStop0x8003A56C restores a preceding standing/turn
             // pose and advances it. Repeated walk requests at an edge
             // therefore keep playing idle instead of restarting clip11.
@@ -97,21 +98,25 @@ pub(super) fn step(
         }
     }
     let drop = ((old.y - centre.height) * 1024.0).round();
-    if state == Some(5) && drop > 200.0 {
+    if state == Some(state::HOP_BACK) && drop > 200.0 {
         // Collision only seeds gravity here; its first +6 is next tick.
-        animation.enter(93, 0.0, 93);
-        traversal.goal = 29;
+        animation.enter(clip::FALL_BACK, 0.0, clip::FALL_BACK);
+        traversal.goal = state::FALL_BACK;
         player.mode = PlayerMode::FallingBack;
         motion.grounded = false;
         motion.velocity.y = 0.0;
         return true;
     }
-    if state == Some(16) && (129.0..384.0).contains(&drop) {
+    if state == Some(state::WALK_BACK) && (129.0..384.0).contains(&drop) {
         // Foot-dependent descending step: source absolute frames964..993
         // select62, all others61 (0x8003B4D8..0x8003B538).
         let absolute = clips.clips[animation.animation].frame_start as f32 + animation.frame;
-        let clip = if (964.0..994.0).contains(&absolute) { 62 } else { 61 };
-        animation.enter(clip, 0.0, 40);
+        let clip = if contract::frame::BACK_STEP_DOWN_RIGHT.contains(&absolute) {
+            clip::BACK_STEP_DOWN_RIGHT
+        } else {
+            clip::BACK_STEP_DOWN_LEFT
+        };
+        animation.enter(clip, 0.0, clip::WALK_BACK);
     }
     player.position.y = centre.height;
     player.room = world.floor_at(player.position, player.room).map_or(player.room, |h| h.room);
@@ -160,8 +165,8 @@ pub(super) fn probes(position: Vec3, yaw: f32) -> [Vec3; 3] {
 /// face behind, the right and left jumps to the side (0x8003B71C..0x8003B7B8).
 fn flight_turn(state: Option<usize>) -> f32 {
     match state {
-        Some(26) => std::f32::consts::FRAC_PI_2,
-        Some(27) => -std::f32::consts::FRAC_PI_2,
+        Some(state::JUMP_RIGHT) => std::f32::consts::FRAC_PI_2,
+        Some(state::JUMP_LEFT) => -std::f32::consts::FRAC_PI_2,
         _ => std::f32::consts::PI,
     }
 }
@@ -193,18 +198,22 @@ pub(super) fn fall(
         // then requests reach11 on Action with free hands (0x80039720).
         let fall_speed = -motion.velocity.y * 1024.0 / ORIGINAL_FPS;
         let twist = match clips.state(animation.animation) {
-            Some(25) => !matches!(traversal.goal, 1 | 2) && (pad.held(Button::Up) || pad.held(Button::Circle)),
-            Some(26) => traversal.goal != 2 && pad.held(Button::Left),
-            Some(27) => traversal.goal != 2 && pad.held(Button::Right),
+            Some(state::JUMP_BACK) => {
+                !matches!(traversal.goal, state::RUN | state::STAND)
+                    && (pad.held(Button::Up) || pad.held(Button::Circle))
+            }
+            Some(state::JUMP_RIGHT) => traversal.goal != state::STAND && pad.held(Button::Left),
+            Some(state::JUMP_LEFT) => traversal.goal != state::STAND && pad.held(Button::Right),
             _ => false,
         };
         if fall_speed >= 132.0 {
-            traversal.goal = 9;
+            traversal.goal = state::FAST_FALL;
         } else if twist {
-            traversal.goal = 68;
+            traversal.goal = state::TWIST;
         }
-        if clips.state(animation.animation) == Some(29) && weapon.hands_free() && pad.held(Button::Cross) {
-            traversal.goal = 11;
+        if clips.state(animation.animation) == Some(state::FALL_BACK) && weapon.hands_free() && pad.held(Button::Cross)
+        {
+            traversal.goal = state::REACH;
         }
     }
     let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
@@ -223,17 +232,18 @@ pub(super) fn fall(
         }
     }
     let state = clips.state(a.animation);
-    if matches!(state, Some(3 | 9 | 11)) {
+    if matches!(state, Some(state::FORWARD_JUMP | state::FAST_FALL | state::REACH)) {
         // Twist213 continues as forward flight, hop-fall reach94 as
         // forward reach, and fall83/84/85/36 as fast fall. Their handlers
         // own this tick's move and collision.
-        player.mode = if state == Some(9) { PlayerMode::FastFalling } else { PlayerMode::JumpingForward };
+        player.mode =
+            if state == Some(state::FAST_FALL) { PlayerMode::FastFalling } else { PlayerMode::JumpingForward };
         traversal.enter = Some((a.animation, a.frame));
         return false;
     }
     let facing = player.yaw + flight_turn(state);
     let back = Vec3::new(facing.sin(), 0.0, facing.cos());
-    if motion.grounded && matches!(state, Some(25..=27)) {
+    if motion.grounded && matches!(state, Some(state::JUMP_BACK..=state::JUMP_LEFT)) {
         // Takeoffs74/80/78 move at their authored speed with no gravity;
         // the end command launches75/81/79 (slide_jump_back.csv: 99, then
         // 50/-94).
@@ -248,7 +258,7 @@ pub(super) fn fall(
             motion.grounded = false;
         }
     }
-    if motion.grounded && state == Some(2) {
+    if motion.grounded && state == Some(state::STAND) {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
         // The landing clip's stop collision runs on this same tick.
@@ -295,7 +305,7 @@ pub(super) fn fall(
             player.position.y = hit.height;
             motion.grounded = true;
             motion.velocity.y = 0.0;
-            traversal.goal = if player.health > 0 { 2 } else { 8 };
+            traversal.goal = if player.health > 0 { state::STAND } else { state::DEATH };
             if player.health == 0 {
                 motion.velocity = Vec3::ZERO;
             }
