@@ -274,9 +274,11 @@ pub fn window(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, sho
     });
     let (bases, live) = (flip_bases(level), live_rooms(level, editor.flipped));
     ui.label(egui::RichText::new("Click to choose; double-click to frame.").weak());
-    egui::ScrollArea::vertical().id_salt("room list").max_height(220.0).auto_shrink([false, true]).show_rows(
+    let row = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace))
+        + ui.spacing().item_spacing.y;
+    egui::ScrollArea::vertical().id_salt("room list").max_height(200.0).auto_shrink([false, true]).show_rows(
         ui,
-        18.0,
+        row,
         level.rooms.len(),
         |ui, range| {
             ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Truncate);
@@ -813,11 +815,11 @@ pub fn map(
         rect.left_bottom() + EVec2::new(6.0, -6.0),
         egui::Align2::LEFT_BOTTOM,
         if view.drawing {
-            "New room: drag its floor   Right-drag: pan   Scroll: zoom"
+            "New room: drag its floor  Right-drag: pan  Scroll: zoom"
         } else {
-            "Drag: pan   Scroll: zoom   Click: choose (again: next in a stack)   Double-click: frame"
+            "Drag: pan  Scroll: zoom  Click: choose (again: next in stack)  Double-click: frame"
         },
-        egui::FontId::proportional(11.0),
+        egui::FontId::proportional(10.0),
         Color32::from_gray(140),
     );
 }

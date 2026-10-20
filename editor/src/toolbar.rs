@@ -1,4 +1,4 @@
-//! The strip under the menu bar: the mode, the tool, the mode's actions, and
+//! The top bar's items after the menus: the mode, the tool, the mode's actions, and
 //! its settings. Every button calls the same function as its key and menu
 //! item, so they can never disagree. See docs/editor-design.md.
 use crate::{Editor, viewport::ViewportFocus};
@@ -125,46 +125,23 @@ fn action(ui: &mut egui::Ui, text: &str, shortcut: &str, help: &str, blocked: Op
     .clicked()
 }
 
-/// Draw the toolbar at `top`; returns its height.
-pub fn toolbar(
-    ctx: &egui::Context,
-    editor: &mut Editor,
-    top: f32,
-    level: Option<&Level>,
-    atlas: Option<egui::TextureId>,
-) -> f32 {
-    let width = ctx.viewport_rect().width();
-    egui::Area::new("toolbar".into())
-        .fixed_pos([0.0, top])
-        .order(egui::Order::Middle)
-        .show(ctx, |ui| {
-            egui::Frame::side_top_panel(ui.style())
-                .show(ui, |ui| {
-                    ui.set_width(width - 16.0);
-                    ui.horizontal_wrapped(|ui| {
-                        modes(ui, editor);
-                        ui.separator();
-                        tools(ui, editor);
-                        ui.separator();
-                        if editor.mesh.on {
-                            mesh_actions(ui, editor);
-                            ui.separator();
-                            mesh_settings(ui, editor, level, atlas);
-                        } else {
-                            object_actions(ui, editor);
-                            ui.separator();
-                            ui.checkbox(&mut editor.snap, "Snap").on_hover_text(
-                                "Moves snap to 256 units and turns to 15 degrees; Ctrl inverts while dragging",
-                            );
-                            flip_toggle(ui, editor, level);
-                        }
-                    });
-                })
-                .response
-                .rect
-                .height()
-        })
-        .inner
+/// Draw the toolbar's items into the top bar, after the menus.
+pub fn toolbar(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, atlas: Option<egui::TextureId>) {
+    modes(ui, editor);
+    ui.separator();
+    tools(ui, editor);
+    ui.separator();
+    if editor.mesh.on {
+        mesh_actions(ui, editor);
+        ui.separator();
+        mesh_settings(ui, editor, level, atlas);
+    } else {
+        object_actions(ui, editor);
+        ui.separator();
+        ui.checkbox(&mut editor.snap, "Snap")
+            .on_hover_text("Moves snap to 256 units and turns to 15 degrees; Ctrl inverts while dragging");
+        flip_toggle(ui, editor, level);
+    }
 }
 
 fn modes(ui: &mut egui::Ui, editor: &mut Editor) {

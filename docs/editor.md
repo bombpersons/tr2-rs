@@ -20,6 +20,7 @@ keeps its ordinary scene rendering.
 cargo run -p editor
 cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
 cargo run -p editor -- --software
+cargo run -p editor -- --ui-scale 0.9 --theme "tomb raider"
 ```
 
 The default opens the hand-authored engine sandbox; no disc, baked game data
@@ -27,12 +28,17 @@ or game crate is needed. `--level` takes a file path. The atlas is `atlas.png`
 next to the level file. `--types` optionally reads `{"types":[{"id":1,"name":"walker"}]}`
 metadata through the engine registry. Extra controller-specific fields in a
 game's type table are ignored. The editor never runs the registered controllers.
+`--ui-scale` (0.5 to 2) sets the interface's starting size and `--theme` its
+colours (Tomb Raider, Dark, Light or Orange; Dark by default).
 
 ## Current authoring surface
 
-The 3D view fills the window. A **File / Edit / View** menu bar sits on top
-with the toolbar under it, a status bar along the bottom, and the tool
-windows float over the view.
+The 3D view fills the window. One bar along the top holds the **File / Edit /
+View** menus followed by the toolbar (it wraps onto a second row when the
+window is narrow). A status bar along the bottom shows the mode, the last
+message and the level's name (hover it for the path), and the tool windows
+float over the view. The theme is compact: small text, slim title bars and
+tight spacing, so the windows cover as little of the view as possible.
 Windows can be moved, resized, collapsed or closed; **View** reopens them.
 The UI is egui (`bevy_egui`), drawn by its own camera over the level camera.
 
@@ -200,6 +206,8 @@ the level format's units, with Y increasing downward.
 | F / View > Frame selection | Frame the selection (or the Data window's room) |
 | View > Rooms / Map | Room list and details / top-down map of the rooms |
 | View > Overview | Frame the first room |
+| Ctrl + / Ctrl - / Ctrl 0, View > Larger / Smaller / Default size | Interface size, in 10% steps |
+| View > Theme | Tomb Raider, Dark, Light or Orange colours |
 | Hold right mouse + drag | Look around |
 | Middle mouse + drag / mouse wheel | Pan / zoom |
 | WASD, Q/E (after clicking the view) | Fly, descend/ascend; Shift moves faster |

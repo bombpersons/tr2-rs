@@ -4,6 +4,7 @@ use crate::{
     animation::AnimationPreview,
     edit::{Change, TURN},
     files::{self, Ask},
+    theme::Theme,
 };
 use bevy::{camera::RenderTarget, prelude::*, window::WindowCloseRequested};
 use bevy_egui::{
@@ -83,21 +84,29 @@ fn setup(mut commands: Commands, target: Res<EditorTarget>) {
     }
 }
 
-fn style(mut contexts: EguiContexts, mut done: Local<bool>) -> Result {
+fn style(mut contexts: EguiContexts, target: Res<EditorTarget>, theme: Res<Theme>, mut done: Local<bool>) -> Result {
+    let ctx = contexts.ctx_mut()?;
+    if theme.is_changed() || !*done {
+        let visuals = theme.visuals();
+        ctx.all_styles_mut(|style| style.visuals = visuals.clone());
+    }
     if !*done {
-        compact(contexts.ctx_mut()?);
+        compact(ctx);
+        // View > Interface size and Ctrl +/- change it from here.
+        ctx.set_zoom_factor(target.ui_scale);
         *done = true;
     }
     Ok(())
 }
 
-/// A denser theme than egui's default: smaller text, tighter spacing and
-/// margins, so more of the 3D view stays visible around the windows.
+/// A denser theme than egui's default: smaller text, slimmer title bars,
+/// tighter spacing and margins, so more of the 3D view stays visible around
+/// the windows.
 fn compact(ctx: &egui::Context) {
     use egui::{FontFamily, FontId, TextStyle};
     ctx.all_styles_mut(|style| {
         style.text_styles = [
-            (TextStyle::Heading, FontId::new(14.0, FontFamily::Proportional)),
+            (TextStyle::Heading, FontId::new(12.0, FontFamily::Proportional)),
             (TextStyle::Body, FontId::new(11.5, FontFamily::Proportional)),
             (TextStyle::Button, FontId::new(11.5, FontFamily::Proportional)),
             (TextStyle::Monospace, FontId::new(10.5, FontFamily::Monospace)),
@@ -108,9 +117,10 @@ fn compact(ctx: &egui::Context) {
         s.item_spacing = egui::vec2(5.0, 2.0);
         s.button_padding = egui::vec2(3.0, 0.0);
         s.interact_size = egui::vec2(32.0, 15.0);
-        s.window_margin = egui::Margin::same(5);
+        // The title bar is the heading row plus this margin above and below.
+        s.window_margin = egui::Margin::symmetric(5, 2);
         s.menu_margin = egui::Margin::same(3);
-        s.indent = 12.0;
+        s.indent = 10.0;
         s.icon_width = 11.0;
         s.icon_width_inner = 6.0;
         s.icon_spacing = 3.0;
@@ -119,10 +129,6 @@ fn compact(ctx: &egui::Context) {
         s.text_edit_width = 160.0;
         s.combo_height = 300.0;
         s.scroll = egui::style::ScrollStyle::thin();
-        style.visuals.window_corner_radius = egui::CornerRadius::same(3);
-        style.visuals.menu_corner_radius = egui::CornerRadius::same(3);
-        style.visuals.window_shadow = egui::Shadow::NONE;
-        style.visuals.popup_shadow = egui::Shadow::NONE;
     });
 }
 
@@ -135,6 +141,7 @@ fn quit(mut editor: ResMut<Editor>, mut close: MessageReader<WindowCloseRequeste
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ui(
     mut contexts: EguiContexts,
     mut editor: ResMut<Editor>,
@@ -143,7 +150,14 @@ fn ui(
     world: Option<Res<WorldGeometry>>,
     server: Res<AssetServer>,
     cameras: Query<&GlobalTransform, With<engine::render::GameCamera>>,
+    mut theme: ResMut<Theme>,
+    mut started: Local<bool>,
 ) -> Result {
+    // The starting interface size applies from the next pass; windows placed
+    // before it would sit where the unscaled window edges were.
+    if !std::mem::replace(&mut *started, true) {
+        return Ok(());
+    }
     // The Textures window and the toolbar's brush swatch draw from the atlas.
     let atlas = (editor.windows.textures || editor.mesh.on)
         .then(|| contexts.add_image(EguiTextureHandle::Strong(server.load::<Image>(editor.atlas()))));
@@ -155,21 +169,20 @@ fn ui(
     if let Some(world) = world.as_deref() {
         editor.diagnostics.refresh(&world.data);
     }
-    let top = menu_bar(ctx, editor);
-    let top = top + crate::toolbar::toolbar(ctx, editor, top, world.as_deref().map(|w| &*w.data), atlas);
+    let top = top_bar(ctx, editor, &mut theme, world.as_deref().map(|w| &*w.data), atlas);
     status_bar(ctx, editor);
     let area = ctx.viewport_rect();
     let mut windows = std::mem::take(&mut editor.windows);
     egui::Window::new("Objects")
         .open(&mut windows.objects)
         .default_pos([8.0, top + 8.0])
-        .default_size([270.0, 460.0])
+        .default_size([220.0, 300.0])
         .show(ctx, |ui| objects(ui, editor, types, &mut windows.group, &mut windows.filter));
     let mut show_data = false;
     egui::Window::new("Properties")
         .open(&mut windows.properties)
-        .default_pos([area.right() - 318.0, top + 8.0])
-        .default_width(310.0)
+        .default_pos([area.right() - 268.0, top + 8.0])
+        .default_width(260.0)
         .show(ctx, |ui| {
             if editor.mesh.on {
                 crate::mesh::panel(ui, editor, world.as_deref());
@@ -179,39 +192,39 @@ fn ui(
         });
     egui::Window::new("Rooms")
         .open(&mut windows.rooms)
-        .default_pos([8.0, top + 300.0])
-        .default_size([330.0, 460.0])
+        .default_pos([8.0, top + 240.0])
+        .default_size([290.0, 380.0])
         .show(ctx, |ui| crate::rooms::window(ui, editor, world.as_deref().map(|w| &*w.data), &mut show_data));
     egui::Window::new("Map")
         .open(&mut windows.map)
-        .default_pos([area.right() - 448.0, area.bottom() - 470.0])
-        .default_size([440.0, 420.0])
+        .default_pos([area.right() - 408.0, area.bottom() - 380.0])
+        .default_size([400.0, 340.0])
         .show(ctx, |ui| {
             let level = world.as_deref().map(|w| &*w.data);
             crate::rooms::map(ui, editor, &mut windows.map_view, level, cameras.single().ok())
         });
     egui::Window::new("Diagnostics")
         .open(&mut windows.diagnostics)
-        .default_pos([290.0, area.bottom() - 330.0])
-        .default_size([560.0, 290.0])
+        .default_pos([236.0, area.bottom() - 260.0])
+        .default_size([460.0, 220.0])
         .show(ctx, |ui| crate::diagnostics::window(ui, editor, world.as_deref().map(|w| &*w.data)));
     windows.data |= show_data;
     egui::Window::new("Data")
         .open(&mut windows.data)
-        .default_pos([290.0, top + 8.0])
-        .default_size([480.0, 420.0])
+        .default_pos([236.0, top + 8.0])
+        .default_size([420.0, 340.0])
         .show(ctx, |ui| data(ui, editor));
     if let Ok(mut preview) = previews.single_mut() {
         egui::Window::new("Animation")
             .open(&mut windows.animation)
-            .default_pos([290.0, area.bottom() - 190.0])
-            .default_width(560.0)
+            .default_pos([236.0, area.bottom() - 170.0])
+            .default_width(460.0)
             .show(ctx, |ui| crate::animation::window(ui, editor, &mut preview, world.as_deref()));
     }
     egui::Window::new("Textures")
         .open(&mut windows.textures)
-        .default_pos([area.right() - 318.0, top + 300.0])
-        .default_size([310.0, 360.0])
+        .default_pos([area.right() - 268.0, top + 240.0])
+        .default_size([260.0, 320.0])
         .show(ctx, |ui| crate::mesh::textures(ui, editor, world.as_deref().map(|w| &*w.data), atlas));
     editor.windows = windows;
     leave_question(ctx, editor);
@@ -269,8 +282,15 @@ fn shortcut(ui: &mut egui::Ui, text: &str, shortcut: &KeyboardShortcut, enabled:
     ui.add_enabled(enabled, egui::Button::new(text).shortcut_text(ui.ctx().format_shortcut(shortcut))).clicked()
 }
 
-/// The File / Edit / View bar; returns its height.
-fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
+/// The File / Edit / View menus followed by the toolbar, in one row that
+/// wraps when the window is narrow; returns its height.
+fn top_bar(
+    ctx: &egui::Context,
+    editor: &mut Editor,
+    theme: &mut ResMut<Theme>,
+    level: Option<&engine::world::Level>,
+    atlas: Option<egui::TextureId>,
+) -> f32 {
     let width = ctx.viewport_rect().width();
     egui::Area::new("menu bar".into())
         .fixed_pos([0.0, 0.0])
@@ -279,56 +299,81 @@ fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
             egui::Frame::side_top_panel(ui.style())
                 .show(ui, |ui| {
                     ui.set_width(width - 16.0);
-                    egui::MenuBar::new().ui(ui, |ui| {
-                        ui.menu_button("File", |ui| file_menu(ui, editor));
-                        ui.menu_button("Edit", |ui| {
-                            if shortcut(ui, "Undo", &UNDO, editor.doc.can_undo()) {
-                                editor.undo();
-                            }
-                            if shortcut(ui, "Redo", &REDO, editor.doc.can_redo()) {
-                                editor.redo();
-                            }
-                            ui.separator();
-                            if shortcut(ui, "Select all objects", &SELECT_ALL, true) {
-                                select_all(editor);
-                            }
-                            if ui.add_enabled(!editor.selection.is_empty(), egui::Button::new("Deselect all")).clicked()
-                            {
-                                editor.click(None, false);
-                            }
-                            ui.separator();
-                            let mut mesh = editor.mesh.on;
-                            if ui
-                                .add(egui::Checkbox::new(&mut mesh, "Mesh mode"))
-                                .on_hover_text("Tab in the 3D view")
-                                .changed()
-                            {
-                                editor.set_mesh_mode(mesh);
-                            }
+                    ui.horizontal_wrapped(|ui| {
+                        // A menu bar takes the whole row, so give it last
+                        // frame's width of its menus and the toolbar the rest.
+                        let id = egui::Id::new("menus width");
+                        let wide = ui.data(|d| d.get_temp::<f32>(id)).unwrap_or(100.0);
+                        let size = egui::vec2(wide, ui.spacing().interact_size.y);
+                        ui.allocate_ui(size, |ui| {
+                            egui::MenuBar::new().ui(ui, |ui| {
+                                let left = ui.cursor().min.x;
+                                ui.menu_button("File", |ui| file_menu(ui, editor));
+                                ui.menu_button("Edit", |ui| {
+                                    if shortcut(ui, "Undo", &UNDO, editor.doc.can_undo()) {
+                                        editor.undo();
+                                    }
+                                    if shortcut(ui, "Redo", &REDO, editor.doc.can_redo()) {
+                                        editor.redo();
+                                    }
+                                    ui.separator();
+                                    if shortcut(ui, "Select all objects", &SELECT_ALL, true) {
+                                        select_all(editor);
+                                    }
+                                    if ui
+                                        .add_enabled(!editor.selection.is_empty(), egui::Button::new("Deselect all"))
+                                        .clicked()
+                                    {
+                                        editor.click(None, false);
+                                    }
+                                    ui.separator();
+                                    let mut mesh = editor.mesh.on;
+                                    if ui
+                                        .add(egui::Checkbox::new(&mut mesh, "Mesh mode"))
+                                        .on_hover_text("Tab in the 3D view")
+                                        .changed()
+                                    {
+                                        editor.set_mesh_mode(mesh);
+                                    }
+                                });
+                                ui.menu_button("View", |ui| {
+                                    let windows = &mut editor.windows;
+                                    ui.checkbox(&mut windows.objects, "Objects");
+                                    ui.checkbox(&mut windows.properties, "Properties");
+                                    ui.checkbox(&mut windows.data, "Data");
+                                    ui.checkbox(&mut windows.animation, "Animation");
+                                    ui.checkbox(&mut windows.textures, "Textures");
+                                    ui.checkbox(&mut windows.rooms, "Rooms");
+                                    ui.checkbox(&mut windows.map, "Map");
+                                    ui.checkbox(&mut windows.diagnostics, "Diagnostics");
+                                    ui.separator();
+                                    if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
+                                        editor.frame = true;
+                                    }
+                                    if ui.button("Overview").clicked() {
+                                        editor.frame = true;
+                                        editor.overview = true;
+                                    }
+                                    ui.separator();
+                                    interface_size(ui);
+                                    ui.menu_button("Theme", |ui| {
+                                        for choice in Theme::ALL {
+                                            // Set only on a click, so the style is rebuilt only then.
+                                            if ui.radio(**theme == choice, choice.name()).clicked() {
+                                                **theme = choice;
+                                            }
+                                        }
+                                    });
+                                });
+                                let used = ui.cursor().min.x - left - ui.spacing().item_spacing.x;
+                                if (used - wide).abs() > 0.5 {
+                                    ui.data_mut(|d| d.insert_temp(id, used));
+                                    ui.ctx().request_repaint();
+                                }
+                            })
                         });
-                        ui.menu_button("View", |ui| {
-                            let windows = &mut editor.windows;
-                            ui.checkbox(&mut windows.objects, "Objects");
-                            ui.checkbox(&mut windows.properties, "Properties");
-                            ui.checkbox(&mut windows.data, "Data");
-                            ui.checkbox(&mut windows.animation, "Animation");
-                            ui.checkbox(&mut windows.textures, "Textures");
-                            ui.checkbox(&mut windows.rooms, "Rooms");
-                            ui.checkbox(&mut windows.map, "Map");
-                            ui.checkbox(&mut windows.diagnostics, "Diagnostics");
-                            ui.separator();
-                            if ui.add(egui::Button::new("Frame selection").shortcut_text("F")).clicked() {
-                                editor.frame = true;
-                            }
-                            if ui.button("Overview").clicked() {
-                                editor.frame = true;
-                                editor.overview = true;
-                            }
-                        });
-                        let name = editor.doc.value()["name"].as_str().unwrap_or("Untitled level").to_owned();
-                        let dirty = if editor.doc.is_dirty() { "  (unsaved)" } else { "" };
-                        ui.add_space(16.0);
-                        ui.label(RichText::new(format!("{name}{dirty}")).weak());
+                        ui.separator();
+                        crate::toolbar::toolbar(ui, editor, level, atlas);
                     });
                 })
                 .response
@@ -336,6 +381,22 @@ fn menu_bar(ctx: &egui::Context, editor: &mut Editor) -> f32 {
                 .height()
         })
         .inner
+}
+
+/// The View menu's interface size items; egui also takes Ctrl +/- and Ctrl 0.
+fn interface_size(ui: &mut egui::Ui) {
+    use egui::gui_zoom::{self, kb_shortcuts};
+    let ctx = ui.ctx().clone();
+    ui.label(RichText::new(format!("Interface size {:.0}%", ctx.zoom_factor() * 100.0)).weak());
+    if shortcut(ui, "Larger", &kb_shortcuts::ZOOM_IN, true) {
+        gui_zoom::zoom_in(&ctx);
+    }
+    if shortcut(ui, "Smaller", &kb_shortcuts::ZOOM_OUT, true) {
+        gui_zoom::zoom_out(&ctx);
+    }
+    if shortcut(ui, "Default size", &kb_shortcuts::ZOOM_RESET, ctx.zoom_factor() != 1.0) {
+        ctx.set_zoom_factor(1.0);
+    }
 }
 
 fn file_menu(ui: &mut egui::Ui, editor: &mut Editor) {
@@ -383,10 +444,9 @@ fn file_menu(ui: &mut egui::Ui, editor: &mut Editor) {
 
 fn status_bar(ctx: &egui::Context, editor: &mut Editor) {
     let rect = ctx.viewport_rect();
-    egui::Area::new("status bar".into())
-        .fixed_pos([0.0, rect.bottom() - 26.0])
-        .order(egui::Order::Middle)
-        .show(ctx, |ui| {
+    egui::Area::new("status bar".into()).anchor(egui::Align2::LEFT_BOTTOM, [0.0, 0.0]).order(egui::Order::Middle).show(
+        ctx,
+        |ui| {
             egui::Frame::side_top_panel(ui.style()).show(ui, |ui| {
                 ui.set_width(rect.width() - 16.0);
                 ui.horizontal(|ui| {
@@ -405,14 +465,18 @@ fn status_bar(ctx: &egui::Context, editor: &mut Editor) {
                     }
                     ui.label(&editor.status);
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(RichText::new(editor.doc.path().display().to_string()).weak());
+                        let path = editor.doc.path().display().to_string();
+                        let name = editor.doc.value()["name"].as_str().unwrap_or("Untitled level");
+                        let dirty = if editor.doc.is_dirty() { " (unsaved)" } else { "" };
+                        ui.label(RichText::new(format!("{name}{dirty}")).strong()).on_hover_text(path);
                         if !editor.selection.is_empty() {
                             ui.label(format!("{} selected  |", editor.selection.len()));
                         }
                     });
                 });
             });
-        });
+        },
+    );
 }
 
 fn leave_question(ctx: &egui::Context, editor: &mut Editor) {
@@ -447,11 +511,10 @@ fn type_name(types: &ObjectTypes, kind: u64) -> String {
 
 fn objects(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes, group: &mut Group, filter: &mut String) {
     ui.horizontal(|ui| {
-        ui.label("Group by");
-        ui.selectable_value(group, Group::Room, "Room");
-        ui.selectable_value(group, Group::Type, "Type");
+        ui.selectable_value(group, Group::Room, "Room").on_hover_text("Group by room");
+        ui.selectable_value(group, Group::Type, "Type").on_hover_text("Group by type");
+        ui.add(egui::TextEdit::singleline(filter).hint_text("Filter by name or number").desired_width(f32::INFINITY));
     });
-    ui.add(egui::TextEdit::singleline(filter).hint_text("Filter by name or number"));
     ui.separator();
     let query = filter.trim().to_lowercase();
     let mut groups = BTreeMap::<(u64, String), Vec<(usize, String)>>::new();
@@ -478,7 +541,8 @@ fn objects(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes, group: &
                 .show(ui, |ui| {
                     for (index, label) in items {
                         let selected = editor.selection.contains(&index);
-                        let text = if editor.active() == Some(index) { RichText::new(label).strong() } else { label.into() };
+                        let text =
+                            if editor.active() == Some(index) { RichText::new(label).strong() } else { label.into() };
                         let response = ui.selectable_label(selected, text);
                         if response.clicked() {
                             let modifiers = ui.input(|i| i.modifiers);
@@ -533,7 +597,8 @@ fn flag(ui: &mut egui::Ui, editor: &mut Editor, field: &str, label: &str) {
     }
 }
 
-const PLACEMENT_FIELDS: [&str; 8] = ["kind", "room", "position", "rotation", "code", "inverted", "invisible", "other_flags"];
+const PLACEMENT_FIELDS: [&str; 8] =
+    ["kind", "room", "position", "rotation", "code", "inverted", "invisible", "other_flags"];
 
 /// The active object's fields; returns whether to show it in the Data window.
 fn properties(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes) -> bool {
@@ -547,22 +612,28 @@ fn properties(ui: &mut egui::Ui, editor: &mut Editor, types: &ObjectTypes) -> bo
     ui.heading(format!("Object {index}: {}", type_name(types, kind)));
     if editor.selection.len() > 1 {
         ui.label(
-            RichText::new(format!("{} selected. Edits apply to all; drags move them together.", editor.selection.len()))
-                .weak(),
+            RichText::new(format!(
+                "{} selected. Edits apply to all; drags move them together.",
+                editor.selection.len()
+            ))
+            .weak(),
         );
     }
     ui.separator();
-    egui::Grid::new("properties").num_columns(2).spacing([12.0, 6.0]).striped(true).show(ui, |ui| {
+    egui::Grid::new("properties").num_columns(2).spacing([8.0, 3.0]).striped(true).show(ui, |ui| {
         ui.label("Type");
         ui.horizontal(|ui| {
             if types.iter().next().is_some() {
-                egui::ComboBox::from_id_salt("kind").selected_text(type_name(types, kind)).height(400.0).show_ui(ui, |ui| {
-                    for (id, info) in types.iter() {
-                        if ui.selectable_label(u64::from(id) == kind, format!("{id}  {}", info.name)).clicked() {
-                            editor.edit_selected("kind", Change::Set(&Value::from(id)), false);
+                egui::ComboBox::from_id_salt("kind").selected_text(type_name(types, kind)).height(400.0).show_ui(
+                    ui,
+                    |ui| {
+                        for (id, info) in types.iter() {
+                            if ui.selectable_label(u64::from(id) == kind, format!("{id}  {}", info.name)).clicked() {
+                                editor.edit_selected("kind", Change::Set(&Value::from(id)), false);
+                            }
                         }
-                    }
-                });
+                    },
+                );
             }
             number(ui, editor, "kind", 0.05, Some((0.0, u16::MAX as f64)));
         });
@@ -670,23 +741,31 @@ fn data(ui: &mut egui::Ui, editor: &mut Editor) {
         };
         if count > 0 {
             let height = ui.text_style_height(&egui::TextStyle::Body) + 4.0;
-            egui::ScrollArea::vertical().max_height(320.0).auto_shrink([false, true]).show_rows(ui, height, count, |ui, rows| {
-                egui::Grid::new("data rows").num_columns(2).striped(true).show(ui, |ui| {
-                    for i in rows {
-                        let Some((key, name, value)) = child(i) else { continue };
-                        if ui.selectable_label(false, name).clicked() {
-                            let pointer = child_pointer(pointer, &key);
-                            if value.is_array() || value.is_object() {
-                                go = Some(pointer);
-                            } else {
-                                draft = Some((pointer, value.as_str().map_or_else(|| value.to_string(), str::to_owned)));
+            egui::ScrollArea::vertical().max_height(320.0).auto_shrink([false, true]).show_rows(
+                ui,
+                height,
+                count,
+                |ui, rows| {
+                    egui::Grid::new("data rows").num_columns(2).striped(true).show(ui, |ui| {
+                        for i in rows {
+                            let Some((key, name, value)) = child(i) else { continue };
+                            if ui.selectable_label(false, name).clicked() {
+                                let pointer = child_pointer(pointer, &key);
+                                if value.is_array() || value.is_object() {
+                                    go = Some(pointer);
+                                } else {
+                                    draft = Some((
+                                        pointer,
+                                        value.as_str().map_or_else(|| value.to_string(), str::to_owned),
+                                    ));
+                                }
                             }
+                            ui.label(summary(value));
+                            ui.end_row();
                         }
-                        ui.label(summary(value));
-                        ui.end_row();
-                    }
-                });
-            });
+                    });
+                },
+            );
         } else if let Some(value) = current {
             ui.label(summary(value));
         }
@@ -696,7 +775,8 @@ fn data(ui: &mut egui::Ui, editor: &mut Editor) {
             let edit = ui.add_enabled(fits, egui::Button::new("Edit as JSON"));
             let edit = edit.on_disabled_hover_text("This table is too large to edit as one text; open its entries.");
             if edit.clicked() {
-                let text = if count > 0 { serde_json::to_string_pretty(current.unwrap()).unwrap_or(text) } else { text };
+                let text =
+                    if count > 0 { serde_json::to_string_pretty(current.unwrap()).unwrap_or(text) } else { text };
                 draft = Some((pointer.to_string(), text));
             }
             if pointer.starts_with("/placements/")
@@ -828,7 +908,9 @@ mod tests {
         editor.open(&target);
         assert_eq!(
             editor.doc.level().unwrap().placements[1].position[0],
-            serde_json::from_slice::<Value>(&original).unwrap()["placements"][1]["position"][0].as_i64().unwrap() as i32 + 256
+            serde_json::from_slice::<Value>(&original).unwrap()["placements"][1]["position"][0].as_i64().unwrap()
+                as i32
+                + 256
         );
     }
 }

@@ -768,8 +768,8 @@ pub fn textures(ui: &mut egui::Ui, editor: &mut Editor, level: Option<&Level>, a
         None => format!("{} textures; click one to choose it", level.textures.len()),
     });
     ui.separator();
-    let size = 56.0;
-    let columns = ((ui.available_width() / (size + 8.0)).floor() as usize).max(1);
+    let size = 40.0;
+    let columns = ((ui.available_width() / (size + 6.0)).floor() as usize).max(1);
     let rows = level.textures.len().div_ceil(columns);
     egui::ScrollArea::vertical().auto_shrink([false, false]).show_rows(ui, size + 8.0, rows, |ui, range| {
         for row in range {

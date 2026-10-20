@@ -7,6 +7,7 @@ mod gizmo;
 mod mesh;
 mod play;
 mod rooms;
+mod theme;
 mod toolbar;
 mod ui;
 mod viewport;
@@ -217,7 +218,7 @@ fn main() -> AppExit {
     let args = engine::launcher::Args::from_env();
     if args.flag("--help") {
         println!(
-            "cargo run -p editor -- --level PATH/level.json [--types PATH/types.json] [--software] [--headless --mcp]\nSee docs/editor.md for controls and save semantics."
+            "cargo run -p editor -- --level PATH/level.json [--types PATH/types.json] [--ui-scale 0.9] [--theme NAME] [--software] [--headless --mcp]\nSee docs/editor.md for controls and save semantics."
         );
         return AppExit::Success;
     }
@@ -235,6 +236,25 @@ fn main() -> AppExit {
         return AppExit::error();
     }
     let headless = args.flag("--headless");
+    let ui_scale = match args.value("--ui-scale").map(|v| v.parse::<f32>()) {
+        None => 1.0,
+        Some(Ok(scale)) if (0.5..=2.0).contains(&scale) => scale,
+        Some(_) => {
+            eprintln!("--ui-scale takes a number from 0.5 to 2");
+            return AppExit::error();
+        }
+    };
+    let theme = match args.value("--theme") {
+        None => theme::Theme::default(),
+        Some(name) => match theme::Theme::parse(&name) {
+            Some(theme) => theme,
+            None => {
+                let names: Vec<_> = theme::Theme::ALL.iter().map(|t| t.name()).collect();
+                eprintln!("--theme takes one of: {}", names.join(", "));
+                return AppExit::error();
+            }
+        },
+    };
     let mut app = App::new();
     let mut plugins = DefaultPlugins
         .set(AssetPlugin { file_path: std::path::MAIN_SEPARATOR_STR.into(), ..default() })
@@ -304,7 +324,7 @@ fn main() -> AppExit {
         canvas: image.clone(),
         ..default()
     });
-    app.insert_resource(EditorTarget { headless, image });
+    app.insert_resource(EditorTarget { headless, image, ui_scale }).insert_resource(theme);
     #[cfg(feature = "dev-mcp")]
     if args.flag("--mcp") {
         app.add_plugins(engine::dev_mcp::GameMcpPlugin);
@@ -333,6 +353,8 @@ fn main() -> AppExit {
 struct EditorTarget {
     headless: bool,
     image: Handle<Image>,
+    /// The interface's starting size (egui zoom), from `--ui-scale`.
+    ui_scale: f32,
 }
 #[derive(Resource)]
 struct Capture {
