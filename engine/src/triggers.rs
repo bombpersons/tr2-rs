@@ -63,27 +63,34 @@ pub struct TriggerDiagnostics {
     pub unsupported_actions: BTreeSet<String>,
 }
 
-/// Per-level trigger memory. Games report uses and pickups here so switch,
-/// key and pickup triggers can test them.
+/// Per-level trigger memory. Games say here which switches, keyholes and
+/// pickups would let a trigger naming them fire this tick.
 #[derive(Resource, Default)]
 pub struct TriggerState {
     level: String,
     once: BTreeSet<usize>,
-    used: BTreeSet<usize>,
-    collected: BTreeSet<usize>,
+    ready: BTreeSet<usize>,
     timers: BTreeMap<usize, f32>,
 }
 
 impl TriggerState {
-    /// The avatar used object `index` (a switch or keyhole) this tick.
-    pub fn mark_used(&mut self, index: usize) {
-        self.used.insert(index);
+    /// A switch, key or pickup trigger whose first action names object
+    /// `index` may fire this tick (the original's SwitchTrigger, KeyTrigger
+    /// and PickupTrigger tests). Cleared after each dispatch; a trigger that
+    /// fires reports it with [`TriggerSourceFired`].
+    pub fn mark_ready(&mut self, index: usize) {
+        self.ready.insert(index);
     }
+}
 
-    /// The avatar collected object `index`.
-    pub fn mark_collected(&mut self, index: usize) {
-        self.collected.insert(index);
-    }
+/// A switch, key or pickup trigger fired for the object its first action
+/// names: the game updates that object as the original's test did.
+#[derive(Message, Debug, Clone, Copy)]
+pub struct TriggerSourceFired {
+    pub index: usize,
+    pub kind: TriggerKind,
+    /// The trigger's timer byte.
+    pub timer: u8,
 }
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -112,6 +119,7 @@ fn dispatch_triggers(
     mut cameras: ResMut<CameraCues>,
     mut fired: MessageWriter<TriggerAction>,
     mut activated: MessageWriter<ObjectActivated>,
+    mut sources: MessageWriter<TriggerSourceFired>,
 ) {
     cameras.0.clear();
     let Some(w) = world else {
@@ -159,13 +167,17 @@ fn dispatch_triggers(
         let allowed = match kind {
             TriggerKind::Floor => true,
             TriggerKind::Pad | TriggerKind::AntiPad => avatar.grounded,
-            TriggerKind::Switch | TriggerKind::Key => source.is_some_and(|s| state.used.contains(&s)),
-            TriggerKind::Pickup => source.is_some_and(|s| state.collected.contains(&s)),
+            TriggerKind::Switch | TriggerKind::Key | TriggerKind::Pickup => {
+                source.is_some_and(|s| state.ready.contains(&s))
+            }
             TriggerKind::Combat => avatar.armed,
             TriggerKind::Other(_) => false,
         };
         if !allowed {
             continue;
+        }
+        if let (TriggerKind::Switch | TriggerKind::Key | TriggerKind::Pickup, Some(index)) = (kind, source) {
+            sources.write(TriggerSourceFired { index, kind, timer: trigger.timer });
         }
         if trigger.once {
             state.once.insert(trigger.id);
@@ -219,7 +231,7 @@ fn dispatch_triggers(
             }
         }
     }
-    state.used.clear();
+    state.ready.clear();
 }
 
 pub struct TriggersPlugin;
@@ -232,6 +244,7 @@ impl Plugin for TriggersPlugin {
             .init_resource::<CameraCues>()
             .add_message::<TriggerAction>()
             .add_message::<ObjectActivated>()
+            .add_message::<TriggerSourceFired>()
             .configure_sets(FixedUpdate, TriggerSystems::Dispatch.in_set(InteractionSystems::Triggers))
             .add_systems(
                 FixedUpdate,

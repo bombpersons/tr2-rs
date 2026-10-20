@@ -47,16 +47,6 @@ fn authored_pad_activates_only_its_original_object_index() {
     assert!(!app.world().get::<WorldObject>(no).unwrap().active);
 }
 #[test]
-fn collecting_same_medipack_twice_is_impossible() {
-    let mut app = app();
-    app.world_mut().spawn(Player::default());
-    let pickup = app.world_mut().spawn(WorldObject::new(5, 149, 0, 0)).id();
-    app.run_ticks(3, &[Button::Cross]);
-    assert!(app.world().get::<WorldObject>(pickup).unwrap().consumed);
-    assert_eq!(app.world().resource::<Inventory>().small_medipacks, 1);
-    assert_eq!(app.world().resource::<InteractionProgress>().pickups, 1);
-}
-#[test]
 fn an_unrelated_room_cannot_supply_a_key() {
     let mut app = app();
     app.world_mut().spawn(Player::default());

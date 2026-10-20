@@ -21,7 +21,7 @@ fn wall() -> (App, Entity) {
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins((CameraRulesPlugin, InteractionsPlugin));
     let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
-    app.insert_resource(WorldGeometry { data: Arc::new(data) });
+    app.insert_resource(WorldGeometry::from(Arc::new(data)));
     let player = app.world_mut().spawn(Player::at(position([62976, 1542, 23040]), 0.0, 35)).id();
     (app, player)
 }
@@ -67,7 +67,7 @@ fn authored_one_second_timer_matches_patched_original_operand() {
         patched += 1;
     }
     assert_eq!(patched, 2);
-    app.insert_resource(WorldGeometry { data: Arc::new(data) });
+    app.insert_resource(WorldGeometry::from(Arc::new(data)));
     for row in include_str!("data/original/camera_authored_timer_probe.csv").lines().skip(19).step_by(2) {
         app.run_tick(&[]);
         let values: Vec<i32> = row.split(',').map(|s| s.parse().unwrap()).collect();

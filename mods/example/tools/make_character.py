@@ -37,7 +37,7 @@ PLAYER = 0
 PICKUP = 135
 # One past the highest clip number the contract names
 # (`game::player::contract::CLIP_COUNT`).
-CLIP_COUNT = 194
+CLIP_COUNT = 198
 
 # Contract states (`game::player::contract::state`).
 WALK, RUN, STAND, TURN_RIGHT, TURN_LEFT, FAST_TURN = 0, 1, 2, 6, 7, 20

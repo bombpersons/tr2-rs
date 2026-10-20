@@ -177,14 +177,16 @@ fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, anim
     let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
     let elevation =
         player.camera_elevation.map_or(0, |radians| (radians * 65536.0 / std::f32::consts::TAU).round() as i32);
-    let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, elevation, chase::CHASE_DISTANCE);
+    let distance = player.camera_distance.unwrap_or(chase::CHASE_DISTANCE);
+    let yaw = yaw + i32::from(player.camera_angle);
+    let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, elevation, distance);
     camera.chase_distance2 = Some(distance2);
     if !camera.initialized {
         eye = ideal;
     }
     chase::shift_ideal(space, target, eye, &mut ideal, distance2);
-    // 0x8001a22c: divisor 10 for chase.
-    let offset = chase::move_eye(space, target, &mut eye, ideal, 10);
+    // 0x8001a22c: divisor 10 for chase unless the state asked otherwise.
+    let offset = chase::move_eye(space, target, &mut eye, ideal, player.camera_speed.unwrap_or(10));
     camera.position = eye.world();
     camera.target = target.world();
     camera.room = eye.room;

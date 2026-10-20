@@ -1,0 +1,302 @@
+//! Using objects on the real levels: Lara's use clips, the pickup frame,
+//! a switch whose trigger waits for its own clip, and the door it opens.
+//! Bounds, alignment, clips and frames come from the original's routines
+//! (docs/interaction-evidence.md).
+#![cfg(feature = "baked-assets")]
+
+use bevy::prelude::*;
+use engine::{
+    animation::ObjectAnimation,
+    controller::Button,
+    objects::{ObjectTypes, SpawnContext, WorldObject},
+    schedule::Avatar,
+    testing::{TickApp, headless_app},
+    world::{Level, WorldGeometry, angle, position},
+};
+use game::{
+    creature::ItemStatus,
+    interactions::{InteractionProgress, InteractionsPlugin, Inventory, UsableItem},
+    player::{
+        AnimationState, GunStatus, Player, PlayerAnimations, PlayerMode, WeaponState,
+        contract::{clip, frame},
+    },
+};
+
+/// A level's objects as the renderer spawns them, without Lara; `lara` is
+/// placed instead, standing.
+fn app(level: &str, lara: Player) -> (App, Entity) {
+    let data: Level =
+        serde_json::from_slice(&std::fs::read(format!("assets/levels/{level}/level.json")).unwrap()).unwrap();
+    let clips = PlayerAnimations::from(&data);
+    let world = WorldGeometry::new(data);
+    let mut app = headless_app(game::tick_rate(game::REGION));
+    app.add_plugins((game::player::PlayerRulesPlugin, InteractionsPlugin))
+        .insert_resource(clips)
+        .insert_resource(world.clone());
+    let root = app.world_mut().spawn_empty().id();
+    for (index, placement) in world.data.placements.iter().enumerate() {
+        if placement.kind == game::player::LARA {
+            continue;
+        }
+        let hook = app.world().resource::<ObjectTypes>().get(placement.kind).and_then(|t| t.spawn_hook().cloned());
+        let first = world.data.model(placement.kind).map_or(0, |m| m.animations[0]);
+        let mut commands = app.world_mut().commands();
+        let mut entity = commands.spawn(
+            Transform::from_translation(position(placement.position))
+                .with_rotation(Quat::from_rotation_y(angle(placement.rotation))),
+        );
+        match hook {
+            Some(hook) => hook(
+                &mut entity,
+                &SpawnContext { index, placement, world: &world, render_root: root, meshes: &[], lit_material: None },
+            ),
+            None => {
+                entity.insert((
+                    WorldObject::from_placement(index, placement),
+                    ObjectAnimation { animation: first, frame: 0.0 },
+                ));
+            }
+        }
+    }
+    let lara = app.world_mut().spawn((lara, AnimationState::at_frame(clip::STAND_IDLE, 0.0))).id();
+    app.world_mut().flush();
+    (app, lara)
+}
+
+fn object(app: &mut App, index: usize) -> Entity {
+    app.world_mut().query::<(Entity, &WorldObject)>().iter(app.world()).find(|(_, o)| o.index == index).unwrap().0
+}
+
+/// Wall's secret 21 (type 192): Lara stands on it, facing +z.
+#[test]
+fn a_pickup_lands_in_the_hand_on_frame_42_and_counts_once() {
+    let at = position([64000, 384, 36352]);
+    let (mut app, lara) = app("wall", Player::at(at - Vec3::Z * 0.05, 0.0, 38));
+    let secret = object(&mut app, 21);
+    app.run_tick(&[Button::Cross]);
+    let player = app.world().get::<Player>(lara).unwrap();
+    assert_eq!(player.mode, PlayerMode::Using { animation: clip::PICKUP });
+    // AlignLaraPosition: 100 units behind the item along Lara's facing.
+    assert!((player.position - (at - Vec3::Z * 100.0 / 1024.0)).length() < 1e-3, "{}", player.position);
+    assert_eq!(app.world().get::<WeaponState>(lara).unwrap().status, GunStatus::HandsBusy);
+    let a = app.world().get::<AnimationState>(lara).unwrap();
+    assert_eq!((a.animation, a.frame), (clip::PICKUP, 0.0));
+    for tick in 1..frame::PICKUP_TAKE as usize {
+        app.run_tick(&[Button::Cross]);
+        assert!(!app.world().get::<WorldObject>(secret).unwrap().consumed, "taken early, tick {tick}");
+    }
+    app.run_tick(&[Button::Cross]);
+    assert!(app.world().get::<WorldObject>(secret).unwrap().consumed);
+    assert_eq!(app.world().get::<UsableItem>(secret).unwrap().status, ItemStatus::Invisible);
+    // The clip runs to its end (66 frames), then standing frees the hands.
+    app.run_ticks(30, &[Button::Cross]);
+    assert_eq!(app.world().get::<Player>(lara).unwrap().mode, PlayerMode::Idle);
+    assert_eq!(app.world().get::<WeaponState>(lara).unwrap().status, GunStatus::HandsFree);
+    assert_eq!(app.world().resource::<Inventory>().items.get(&192), Some(&1));
+    assert_eq!(app.world().resource::<InteractionProgress>().pickups, 1);
+    assert_eq!(app.world().resource::<InteractionProgress>().secrets, 1);
+}
+
+/// Home's switch 32 (type 103, room 64) opens door 34 through its switch
+/// trigger, which waits for the switch's own clip to deactivate it.
+#[test]
+fn a_switch_fires_its_trigger_once_its_own_clip_has_played() {
+    let switch_at = position([36352, 3072, 75264]);
+    let yaw = angle(16384);
+    let lara = Player::at(switch_at + Vec3::X * 400.0 / 1024.0, yaw, 64);
+    let (mut app, lara) = app("assault", lara);
+    let switch = object(&mut app, 32);
+    let door = object(&mut app, 34);
+    app.run_tick(&[Button::Cross]);
+    let player = app.world().get::<Player>(lara).unwrap();
+    assert_eq!(player.mode, PlayerMode::Using { animation: clip::LEVER });
+    // Type 103 lines Lara up 292 units in front of it.
+    assert!((player.position.x - (36352.0 + 292.0) / 1024.0).abs() < 1e-3, "{}", player.position);
+    assert_eq!(app.world().get::<UsableItem>(switch).unwrap().status, ItemStatus::Active);
+    let mut fired = None;
+    for tick in 0..200 {
+        app.run_tick(&[]);
+        if fired.is_none() && app.world().get::<WorldObject>(door).unwrap().active {
+            fired = Some(tick);
+        }
+    }
+    assert!(fired.is_some(), "the door never opened");
+    assert_eq!(app.world().get::<UsableItem>(switch).unwrap().status, ItemStatus::Inactive);
+    assert_eq!(app.world().get::<Player>(lara).unwrap().mode, PlayerMode::Idle);
+    println!("door activated on tick {:?}", fired);
+}
+
+/// Home's front-door button (switch 13, type 103) and the door beside it
+/// (12), against `.psx/rec_home_button`: Lara walks one step up to the
+/// button from the handoff checkpoint, then presses Action. Ticks count from
+/// the press; the recording's switch and door frames are absolute (clip 234
+/// starts at 2, clip 245 at 1).
+#[test]
+fn the_front_door_button_matches_the_recording() {
+    let lara = Player::at(position([46515, 2560, 69766]), angle(33932), 50);
+    let (mut app, lara) = app("assault", lara);
+    let switch = object(&mut app, 13);
+    let door = object(&mut app, 12);
+    for tick in 0..=80 {
+        app.run_tick(if tick == 0 { &[Button::Cross] } else { &[] });
+        let player = app.world().get::<Player>(lara).unwrap();
+        let animation = app.world().get::<AnimationState>(lara).unwrap();
+        let hands = app.world().get::<WeaponState>(lara).unwrap().status;
+        let avatar = app.world().get::<Avatar>(lara).unwrap();
+        let s = app.world().get::<ObjectAnimation>(switch).unwrap();
+        let used = app.world().get::<UsableItem>(switch).unwrap().status;
+        let d = app.world().get::<ObjectAnimation>(door).unwrap();
+        let open = app.world().get::<WorldObject>(door).unwrap().active;
+        // AlignLaraPosition: 292 in front of the button, facing it.
+        assert!((player.position - position([46592, 2560, 69852])).length() < 1e-3, "tick {tick}");
+        assert!((player.yaw - angle(32768)).abs() < 1e-4, "tick {tick}");
+        if tick < 47 {
+            assert_eq!((animation.animation, animation.frame), (clip::LEVER, tick as f32), "tick {tick}");
+            assert_eq!(hands, GunStatus::HandsBusy, "tick {tick}");
+            assert_eq!((s.animation, s.frame, used), (234, tick as f32, ItemStatus::Active), "tick {tick}");
+            assert!(!open, "tick {tick}");
+        } else {
+            assert_eq!(hands, GunStatus::HandsFree, "tick {tick}");
+            assert_eq!((s.animation, used), (233, ItemStatus::Inactive), "tick {tick}");
+            assert!(open, "tick {tick}");
+        }
+        // The state handler's camera request, from the tick after the press
+        // to the clip's last tick.
+        let requested = (1..=47).contains(&tick);
+        assert_eq!(avatar.camera_angle, if requested { 14560 } else { 0 }, "tick {tick}");
+        assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
+        assert_eq!(avatar.camera_speed, requested.then_some(6), "tick {tick}");
+        match tick {
+            47 => {
+                assert_eq!((animation.animation, animation.frame), (clip::STAND, 0.0));
+                assert_eq!((d.animation, d.frame), (244, 0.0));
+            }
+            48..80 => assert_eq!((d.animation, d.frame), (245, (tick - 48) as f32), "tick {tick}"),
+            80 => assert_eq!((d.animation, d.frame), (246, 0.0)),
+            _ => {}
+        }
+    }
+}
+
+/// Running into Home's closed front door (12) from standing at the button,
+/// against `.psx/rec_home_door_push` (UP from run frame 120). The original
+/// pins Lara at x 46185 by the door's push and keeps her running, sliding 2
+/// units a tick along it: its run collision (0x8003A844) runs after object
+/// collision and probes from the pushed position, which never reaches the
+/// shut sector. The port's ground collision still runs before object pushes,
+/// so it stops her at the wall (docs/interaction-evidence.md, "Doors").
+#[test]
+#[ignore = "ground state collision still runs before object pushes"]
+fn running_into_a_closed_door_matches_the_recording() {
+    let lara = Player::at(position([46556, 2560, 69988]), angle(49748), 50);
+    let (mut app, lara) = app("assault", lara);
+    app.world_mut().entity_mut(lara).insert(AnimationState::at_frame(clip::STAND_IDLE, 32.0));
+    let before = [
+        (46533, 69989),
+        (46508, 69990),
+        (46481, 69991),
+        (46452, 69992),
+        (46421, 69993),
+        (46389, 69994),
+        (46355, 69995),
+        (46319, 69997),
+        (46281, 69999),
+        (46242, 70001),
+        (46201, 70003),
+    ];
+    for tick in 0..40 {
+        app.run_tick(&[Button::Up]);
+        let p = app.world().get::<Player>(lara).unwrap();
+        let (x, z) = ((p.position.x * 1024.0).round() as i32, (p.position.z * 1024.0).round() as i32);
+        let expected = before.get(tick).copied().unwrap_or((46185, 70005 + 2 * (tick as i32 - 11)));
+        assert_eq!((x, z), expected, "tick {tick}");
+        if tick > 0 {
+            assert_eq!(p.mode, PlayerMode::Run, "tick {tick}");
+        }
+    }
+}
+
+/// Wall's first keyhole (1, type 201) and the door it opens (0), against
+/// `.psx/rec_wall_keyhole`: from the handoff checkpoint, Action opens the
+/// inventory and a second Action chooses key 193 (197 in the ring). The
+/// game's ticks stop while the ring is open; tick 0 here is the first one
+/// after it closes (run frame 149). The port has no ring yet and uses the
+/// key on the press.
+#[test]
+fn the_first_wall_keyhole_matches_the_recording() {
+    let lara = Player::at(position([30821, 0, 33213]), angle(49432), 0);
+    let (mut app, lara) = app("wall", lara);
+    // The level's first tick clears the keys Lara carried in; give her the
+    // key after it.
+    app.run_tick(&[]);
+    app.world_mut().resource_mut::<Inventory>().items.insert(193, 1);
+    let keyhole = object(&mut app, 1);
+    let door = object(&mut app, 0);
+    for tick in 0..=168 {
+        app.run_tick(if tick == 0 { &[Button::Cross] } else { &[] });
+        let player = app.world().get::<Player>(lara).unwrap();
+        let animation = app.world().get::<AnimationState>(lara).unwrap();
+        let hands = app.world().get::<WeaponState>(lara).unwrap().status;
+        let avatar = app.world().get::<Avatar>(lara).unwrap();
+        let used = app.world().get::<UsableItem>(keyhole).unwrap().status;
+        let d = app.world().get::<ObjectAnimation>(door).unwrap();
+        let open = app.world().get::<WorldObject>(door).unwrap().active;
+        // AlignLaraPosition: 362 in front of the keyhole, facing it.
+        assert!((player.position - position([30870, 0, 33280])).length() < 1e-3, "tick {tick}");
+        assert!((player.yaw - angle(49152)).abs() < 1e-4, "tick {tick}");
+        if tick < 135 {
+            assert_eq!((animation.animation, animation.frame), (clip::USE_KEY, tick as f32), "tick {tick}");
+            assert_eq!((hands, used, open), (GunStatus::HandsBusy, ItemStatus::Active, false), "tick {tick}");
+        } else {
+            assert_eq!((hands, used, open), (GunStatus::HandsFree, ItemStatus::Deactivated, true), "tick {tick}");
+        }
+        let requested = (1..=135).contains(&tick);
+        assert_eq!(avatar.camera_angle, if requested { -14560 } else { 0 }, "tick {tick}");
+        assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
+        assert_eq!(avatar.camera_speed, None, "tick {tick}");
+        match tick {
+            135 => {
+                assert_eq!((animation.animation, animation.frame), (clip::STAND, 0.0));
+                assert_eq!((d.animation, d.frame), (327, 0.0));
+            }
+            136..168 => assert_eq!((d.animation, d.frame), (328, (tick - 136) as f32), "tick {tick}"),
+            168 => assert_eq!((d.animation, d.frame), (329, 0.0)),
+            _ => {}
+        }
+    }
+    assert_eq!(app.world().resource::<Inventory>().items.get(&193).copied().unwrap_or(0), 0);
+}
+
+/// Wall's second key (15, type 194) at the top of the ladder, against
+/// `.psx/rec_wall_pickup`: Lara stands almost on it and presses Action once.
+#[test]
+fn the_ladder_key_pickup_matches_the_recording() {
+    let lara = Player::at(position([25059, -3584, 36378]), angle(54417), 32);
+    let (mut app, lara) = app("wall", lara);
+    let key = object(&mut app, 15);
+    for tick in 0..=70 {
+        app.run_tick(if tick == 0 { &[Button::Cross] } else { &[] });
+        let player = app.world().get::<Player>(lara).unwrap();
+        let animation = app.world().get::<AnimationState>(lara).unwrap();
+        let hands = app.world().get::<WeaponState>(lara).unwrap().status;
+        let avatar = app.world().get::<Avatar>(lara).unwrap();
+        let taken = app.world().get::<WorldObject>(key).unwrap().consumed;
+        let key_yaw = app.world().get::<Transform>(key).unwrap().rotation.to_euler(EulerRot::YXZ).0;
+        // AlignLaraPosition: 100 behind the key along Lara's heading, which
+        // the key takes on as she starts (PickUpCollision returns without
+        // restoring the item's rotation).
+        assert!((player.position - position([25175, -3584, 36303])).length() < 1e-3, "tick {tick}");
+        assert!((key_yaw.rem_euclid(std::f32::consts::TAU) - angle(54417)).abs() < 1e-4, "tick {tick}");
+        assert_eq!(taken, tick >= 42, "tick {tick}");
+        if tick < 66 {
+            assert_eq!((animation.animation, animation.frame), (clip::PICKUP, tick as f32), "tick {tick}");
+            assert_eq!(hands, GunStatus::HandsBusy, "tick {tick}");
+        } else {
+            assert_eq!(hands, GunStatus::HandsFree, "tick {tick}");
+        }
+        let requested = (1..=66).contains(&tick);
+        assert_eq!(avatar.camera_angle, if requested { -23660 } else { 0 }, "tick {tick}");
+        assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
+    }
+    assert_eq!(app.world().resource::<Inventory>().items.get(&194), Some(&1));
+}

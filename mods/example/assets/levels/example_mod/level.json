@@ -831,7 +831,7 @@
      "parent": 7
     }
    ],
-   "animations": [0, 194]
+   "animations": [0, 198]
   },
   {
    "id": 135,
@@ -841,7 +841,7 @@
      "offset": [0, 0, 0]
     }
    ],
-   "animations": [194, 198]
+   "animations": [198, 202]
   }
  ],
  "static_meshes": [],
@@ -9509,8 +9509,156 @@
    "frame_rate": 1,
    "frame_start": 455,
    "frame_end": 455,
-   "next_animation": 194,
-   "next_frame": 455,
+   "next_animation": 11,
+   "next_frame": 107,
+   "state": 2,
+   "speed": 0,
+   "accel": 0,
+   "poses": [
+    {
+     "root": [0, -490, 0],
+     "angles": [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [546, 0, 64808],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [546, 0, 728],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+     ]
+    }
+   ],
+   "bounds": [
+    [-110, 110, -800, 0, -110, 110]
+   ],
+   "state_changes": [],
+   "commands": []
+  },
+  {
+   "frame_rate": 1,
+   "frame_start": 456,
+   "frame_end": 456,
+   "next_animation": 11,
+   "next_frame": 107,
+   "state": 2,
+   "speed": 0,
+   "accel": 0,
+   "poses": [
+    {
+     "root": [0, -490, 0],
+     "angles": [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [546, 0, 64808],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [546, 0, 728],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+     ]
+    }
+   ],
+   "bounds": [
+    [-110, 110, -800, 0, -110, 110]
+   ],
+   "state_changes": [],
+   "commands": []
+  },
+  {
+   "frame_rate": 1,
+   "frame_start": 457,
+   "frame_end": 457,
+   "next_animation": 11,
+   "next_frame": 107,
+   "state": 2,
+   "speed": 0,
+   "accel": 0,
+   "poses": [
+    {
+     "root": [0, -490, 0],
+     "angles": [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [546, 0, 64808],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [546, 0, 728],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+     ]
+    }
+   ],
+   "bounds": [
+    [-110, 110, -800, 0, -110, 110]
+   ],
+   "state_changes": [],
+   "commands": []
+  },
+  {
+   "frame_rate": 1,
+   "frame_start": 458,
+   "frame_end": 458,
+   "next_animation": 11,
+   "next_frame": 107,
+   "state": 2,
+   "speed": 0,
+   "accel": 0,
+   "poses": [
+    {
+     "root": [0, -490, 0],
+     "angles": [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+      [546, 0, 64808],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [546, 0, 728],
+      [1092, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0]
+     ]
+    }
+   ],
+   "bounds": [
+    [-110, 110, -800, 0, -110, 110]
+   ],
+   "state_changes": [],
+   "commands": []
+  },
+  {
+   "frame_rate": 1,
+   "frame_start": 459,
+   "frame_end": 459,
+   "next_animation": 198,
+   "next_frame": 459,
    "state": 0,
    "speed": 0,
    "accel": 0,
@@ -9528,20 +9676,20 @@
    "state_changes": [
     {
      "state": 1,
-     "first_frame": 455,
-     "last_frame": 456,
-     "animation": 195,
-     "frame": 456
+     "first_frame": 459,
+     "last_frame": 460,
+     "animation": 199,
+     "frame": 460
     }
    ],
    "commands": []
   },
   {
    "frame_rate": 7,
-   "frame_start": 456,
-   "frame_end": 463,
-   "next_animation": 196,
-   "next_frame": 464,
+   "frame_start": 460,
+   "frame_end": 467,
+   "next_animation": 200,
+   "next_frame": 468,
    "state": 1,
    "speed": 0,
    "accel": 0,
@@ -9568,10 +9716,10 @@
   },
   {
    "frame_rate": 1,
-   "frame_start": 464,
-   "frame_end": 464,
-   "next_animation": 196,
-   "next_frame": 464,
+   "frame_start": 468,
+   "frame_end": 468,
+   "next_animation": 200,
+   "next_frame": 468,
    "state": 1,
    "speed": 0,
    "accel": 0,
@@ -9589,20 +9737,20 @@
    "state_changes": [
     {
      "state": 0,
-     "first_frame": 464,
-     "last_frame": 465,
-     "animation": 197,
-     "frame": 465
+     "first_frame": 468,
+     "last_frame": 469,
+     "animation": 201,
+     "frame": 469
     }
    ],
    "commands": []
   },
   {
    "frame_rate": 7,
-   "frame_start": 465,
-   "frame_end": 472,
-   "next_animation": 194,
-   "next_frame": 455,
+   "frame_start": 469,
+   "frame_end": 476,
+   "next_animation": 198,
+   "next_frame": 459,
    "state": 0,
    "speed": 0,
    "accel": 0,

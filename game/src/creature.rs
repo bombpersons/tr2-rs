@@ -78,6 +78,8 @@ pub enum ItemStatus {
     Active,
     /// Its animation ran a kill command; the AI slot is released.
     Deactivated,
+    /// Taken out of the world: a collected pickup.
+    Invisible,
 }
 
 /// The original item fields a creature's code reads and writes.

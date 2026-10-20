@@ -20,6 +20,7 @@ pub use engine::world::units;
 use engine::world::{FloorHit, WorldGeometry};
 
 mod traversal;
+pub mod using;
 pub use traversal::Traversal;
 mod backward;
 mod collision;
@@ -185,6 +186,11 @@ pub enum PlayerMode {
     Rolling {
         entering: bool,
     },
+    /// Using an object: a pickup, switch, key or puzzle clip plays in
+    /// place until it ends into standing ([`using`]).
+    Using {
+        animation: usize,
+    },
     /// Submerged: stroke, glide, tread and the dive (water mode 1).
     Swimming,
     /// On the water surface: tread and the four strokes (water mode 2).
@@ -222,6 +228,10 @@ pub struct Motion {
     pub camera_exact_slopes: bool,
     /// State camera elevation request, radians, cleared before each control tick.
     pub camera_elevation: Option<f32>,
+    /// State camera angle, distance and speed requests, cleared with it.
+    pub camera_angle: i16,
+    pub camera_distance: Option<i32>,
+    pub camera_speed: Option<i32>,
 }
 
 impl Default for Motion {
@@ -240,6 +250,9 @@ impl Default for Motion {
             guns_ready: false,
             camera_exact_slopes: false,
             camera_elevation: None,
+            camera_angle: 0,
+            camera_distance: None,
+            camera_speed: None,
         }
     }
 }
@@ -337,7 +350,10 @@ impl Plugin for PlayerRulesPlugin {
                 FixedUpdate,
                 (integrate, apply_turn_rate).chain().in_set(PlayerSystems::Motion).run_if(simulation_enabled),
             )
-            .add_systems(FixedUpdate, animate.in_set(PlayerSystems::Animation).run_if(simulation_enabled))
+            .add_systems(
+                FixedUpdate,
+                (animate, using::finish).chain().in_set(PlayerSystems::Animation).run_if(simulation_enabled),
+            )
             .add_systems(FixedUpdate, update_guns.in_set(PlayerSystems::Weapons).run_if(simulation_enabled))
             .add_systems(FixedUpdate, sync_transform.in_set(InteractionSystems::Publish).run_if(simulation_enabled));
     }
@@ -498,6 +514,9 @@ pub fn publish_avatar(mut players: Query<(&Player, &Motion, &WeaponState, &Anima
             aim: weapon.aiming_camera().then(|| weapon.camera_aim()),
             camera_exact_slopes: motion.camera_exact_slopes,
             camera_elevation: motion.camera_elevation,
+            camera_angle: motion.camera_angle,
+            camera_distance: motion.camera_distance,
+            camera_speed: motion.camera_speed,
             alive: player.health > 0,
         });
     }
@@ -778,6 +797,9 @@ fn control(
     let controls = GroundControls::read(&pad);
     for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading) in &mut players {
         motion.camera_elevation = None;
+        motion.camera_angle = 0;
+        motion.camera_distance = None;
+        motion.camera_speed = None;
         // LaraControl's water transitions precede the tick's state handler.
         if let Some(world) = world.as_deref() {
             wading::transitions(
@@ -969,6 +991,10 @@ fn control(
                         running,
                     };
                 }
+                continue;
+            }
+            PlayerMode::Using { .. } => {
+                using::control(&mut motion, clips.as_deref(), animation);
                 continue;
             }
             PlayerMode::Climbing { .. }
@@ -1191,6 +1217,11 @@ fn integrate(
     for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading, mut collision) in
         &mut players
     {
+        if let PlayerMode::Using { .. } = player.mode {
+            // The use clips have no speed: Lara stays where her object put her.
+            motion.velocity = Vec3::ZERO;
+            continue;
+        }
         if player.mode == PlayerMode::Surface {
             surface::step(
                 &mut player,
@@ -1751,7 +1782,9 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::PullingUp => clip::PULL_UP,
         PlayerMode::Recovering => clip::JUMP_IMPACT,
         PlayerMode::WalkStopping => STANDING_CLIP,
-        PlayerMode::Climbing { animation, .. } | PlayerMode::HitWall { animation, .. } => animation,
+        PlayerMode::Climbing { animation, .. }
+        | PlayerMode::HitWall { animation, .. }
+        | PlayerMode::Using { animation } => animation,
         PlayerMode::Rolling { .. } => clip::ROLL,
         PlayerMode::Surface => clip::SURFACE_TREAD,
         PlayerMode::Swimming => {

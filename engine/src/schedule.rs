@@ -106,6 +106,15 @@ pub struct Avatar {
     pub camera_exact_slopes: bool,
     /// Optional chase elevation requested by gameplay this tick, radians.
     pub camera_elevation: Option<f32>,
+    /// Chase angle requested this tick, added to the facing (65536 per
+    /// turn). The original resets it to 0 every tick (`0x8008B29C`).
+    pub camera_angle: i16,
+    /// Chase distance requested this tick, original units; `None` is the
+    /// default 1536 (`0x8008B294`).
+    pub camera_distance: Option<i32>,
+    /// Chase eye approach divisor requested this tick; `None` is the default
+    /// 10 (`0x8008B2AA`).
+    pub camera_speed: Option<i32>,
 }
 
 pub struct SchedulePlugin;

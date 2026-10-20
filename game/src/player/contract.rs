@@ -128,6 +128,23 @@ pub mod clip {
     pub const CLIMB_OUT_MID: usize = 191;
     pub const STAND_UP: usize = 192;
     pub const CLIMB_OUT_LOW: usize = 193;
+
+    /// Using objects. Each plays in place and ends in [`STAND`], whose
+    /// end command frees the hands. Picking up and the key and puzzle
+    /// clips are reached through standing's ranges; the switch clips are
+    /// entered directly, by switch type (SwitchCollision 0x800507E4).
+    pub const USE_KEY: usize = 131;
+    pub const USE_PUZZLE: usize = 134;
+    /// The pickup lands in the hand on frame [`super::frame::PICKUP_TAKE`].
+    pub const PICKUP: usize = 135;
+    /// Type 104 and the others not named below: turning a switch off and on.
+    pub const SWITCH_OFF: usize = 63;
+    pub const SWITCH_ON: usize = 64;
+    /// Type 93, the wall button.
+    pub const BUTTON_OFF: usize = 195;
+    pub const BUTTON_ON: usize = 196;
+    /// Type 103, used the same way both ways.
+    pub const LEVER: usize = 197;
 }
 
 /// Clip states, as clips declare them and as goals the controller asks for.
@@ -173,6 +190,12 @@ pub mod state {
     pub const CLIMB_OUT: usize = 55;
     pub const WADE: usize = 65;
     pub const TWIST: usize = 68;
+    pub const PICKUP: usize = 39;
+    /// Using a switch whose state is 1, and one whose state is 0.
+    pub const SWITCH_OFF: usize = 40;
+    pub const SWITCH_ON: usize = 41;
+    pub const USE_KEY: usize = 42;
+    pub const USE_PUZZLE: usize = 43;
 }
 
 /// Absolute frame windows (across the whole table, not clip-relative) that
@@ -180,6 +203,13 @@ pub mod state {
 /// [`clip::WALK`], which must therefore cover frames 22..=57.
 pub mod frame {
     use std::ops::Range;
+
+    /// Pickup collision 0x80050580 takes the item on clip
+    /// [`super::clip::PICKUP`]'s frame 42 (relative).
+    pub const PICKUP_TAKE: f32 = 42.0;
+    /// Puzzle-hole collision 0x800512CC fills the hole on clip
+    /// [`super::clip::USE_PUZZLE`]'s frame 80 (relative).
+    pub const PUZZLE_PLACE: f32 = 80.0;
     /// The walk loop's absolute frames.
     pub const WALK_LOOP: Range<usize> = 22..58;
     /// Walking into a wall: stop on the left foot ([`super::clip::WALK_STOP_LEFT`]) ...
@@ -230,7 +260,7 @@ pub mod joint {
 }
 
 /// One past the highest clip number the controller names.
-pub const CLIP_COUNT: usize = clip::CLIMB_OUT_LOW + 1;
+pub const CLIP_COUNT: usize = clip::LEVER + 1;
 
 /// A group of moves a character can provide on its own. A model meeting
 /// [`Feature::Ground`] can stand, walk, run, turn and stop under Lara's
@@ -254,10 +284,12 @@ pub enum Feature {
     Death,
     /// The joint layout the arms, guns, head and braid presentation read.
     Skeleton,
+    /// Picking up, switches, keys and puzzle pieces.
+    Use,
 }
 
 impl Feature {
-    pub const ALL: [Feature; 11] = [
+    pub const ALL: [Feature; 12] = [
         Feature::Ground,
         Feature::Steps,
         Feature::Backward,
@@ -269,6 +301,7 @@ impl Feature {
         Feature::Water,
         Feature::Death,
         Feature::Skeleton,
+        Feature::Use,
     ];
 }
 
@@ -356,6 +389,14 @@ pub const CLIPS: &[ClipRule] = {
         rule(Water, clip::CLIMB_OUT_LOW, state::CLIMB_OUT),
         rule(Death, clip::FATAL_LANDING, state::DEATH),
         rule(Death, clip::DEAD, state::GLIDE),
+        rule(Use, clip::PICKUP, state::PICKUP),
+        rule(Use, clip::USE_KEY, state::USE_KEY),
+        rule(Use, clip::USE_PUZZLE, state::USE_PUZZLE),
+        rule(Use, clip::SWITCH_OFF, state::SWITCH_OFF),
+        rule(Use, clip::SWITCH_ON, state::SWITCH_ON),
+        rule(Use, clip::BUTTON_OFF, state::SWITCH_OFF),
+        rule(Use, clip::BUTTON_ON, state::SWITCH_ON),
+        rule(Use, clip::LEVER, state::SWITCH_OFF),
     ]
 };
 
@@ -412,6 +453,9 @@ pub const DISPATCHES: &[DispatchRule] = {
         dispatch(Slide, clip::SLIDE, state::STAND),
         dispatch(Water, clip::SURFACE_TREAD, state::SURFACE_FORWARD),
         dispatch(Water, clip::TREAD, state::SWIM),
+        dispatch(Use, clip::STAND_IDLE, state::PICKUP),
+        dispatch(Use, clip::STAND_IDLE, state::USE_KEY),
+        dispatch(Use, clip::STAND_IDLE, state::USE_PUZZLE),
     ]
 };
 
@@ -443,6 +487,14 @@ pub const LINKS: &[LinkRule] = {
         link(Jump, clip::HEAVY_LANDING, state::STAND),
         link(Climb, clip::VAULT_TWO, state::STAND),
         link(Climb, clip::VAULT_THREE, state::STAND),
+        link(Use, clip::PICKUP, state::STAND),
+        link(Use, clip::USE_KEY, state::STAND),
+        link(Use, clip::USE_PUZZLE, state::STAND),
+        link(Use, clip::SWITCH_OFF, state::STAND),
+        link(Use, clip::SWITCH_ON, state::STAND),
+        link(Use, clip::BUTTON_OFF, state::STAND),
+        link(Use, clip::BUTTON_ON, state::STAND),
+        link(Use, clip::LEVER, state::STAND),
     ]
 };
 
@@ -453,6 +505,8 @@ pub enum CommandKind {
     SetPosition,
     /// An end-of-clip launch (takeoffs).
     JumpVelocity,
+    /// An end-of-clip release of the hands (using objects).
+    EmptyHands,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -469,6 +523,14 @@ pub const COMMANDS: &[CommandRule] = &[
     CommandRule { clip: clip::JUMP_UP_PREPARE, command: CommandKind::JumpVelocity, feature: Feature::Jump },
     CommandRule { clip: clip::JUMP_FORWARD_TAKEOFF, command: CommandKind::JumpVelocity, feature: Feature::Jump },
     CommandRule { clip: clip::STANDING_TAKEOFF, command: CommandKind::JumpVelocity, feature: Feature::Jump },
+    CommandRule { clip: clip::PICKUP, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::USE_KEY, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::USE_PUZZLE, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::SWITCH_OFF, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::SWITCH_ON, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::BUTTON_OFF, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::BUTTON_ON, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::LEVER, command: CommandKind::EmptyHands, feature: Feature::Use },
 ];
 
 /// Something a level's player model or table lacks.
@@ -574,6 +636,7 @@ pub fn check(level: &Level) -> ContractReport {
         let has = clips[r.clip].commands.iter().any(|c| match r.command {
             CommandKind::SetPosition => matches!(c, Command::SetPosition(_)),
             CommandKind::JumpVelocity => matches!(c, Command::JumpVelocity(_)),
+            CommandKind::EmptyHands => matches!(c, Command::EmptyHands),
         });
         if !has {
             issue(r.feature, format!("clip {} lacks a {:?} command", r.clip, r.command));

@@ -30,7 +30,7 @@ fn room(raised: i32, water: bool) -> WorldGeometry {
         .map(|i| Sector { floor: if i % 4 >= 2 { -raised } else { 0 }, ceiling: -4096, ..Default::default() })
         .collect();
     let room = Room { top: -4096, bottom: 0, x_sectors: 4, z_sectors: 4, sectors, water, ..Default::default() };
-    WorldGeometry { data: Arc::new(Level { name: "test".into(), rooms: vec![room], ..Default::default() }) }
+    WorldGeometry::from(Arc::new(Level { name: "test".into(), rooms: vec![room], ..Default::default() }))
 }
 
 #[test]
@@ -325,7 +325,7 @@ fn original_wall_entry_falls_slides_and_turns_across_every_recorded_tick() {
     let starts: Vec<usize> = clips.clips.iter().map(|c| c.frame_start).collect();
     let (mut app, entity) = app();
     app.insert_resource(clips);
-    app.insert_resource(WorldGeometry { data: Arc::new(data) });
+    app.insert_resource(WorldGeometry::from(Arc::new(data)));
     {
         let mut p = app.world_mut().get_mut::<Player>(entity).unwrap();
         p.position = Vec3::new(62976.0, -1536.0, 23040.0) / 1024.0;
@@ -391,7 +391,7 @@ fn compare_wall_climb(csv: &str, forward_windows: &[(usize, usize)]) {
     let starts: Vec<usize> = clips.clips.iter().map(|c| c.frame_start).collect();
     let (mut app, entity) = app();
     app.insert_resource(clips);
-    app.insert_resource(WorldGeometry { data: Arc::new(data) });
+    app.insert_resource(WorldGeometry::from(Arc::new(data)));
     {
         let mut p = app.world_mut().get_mut::<Player>(entity).unwrap();
         p.position = Vec3::new(64176.0, -5376.0, 26090.0) / 1024.0;

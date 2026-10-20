@@ -110,17 +110,17 @@
   {
    "id": 92,
    "name": "switch_92",
-   "switch": {}
+   "switch": {"align": 212, "one_way": true}
   },
   {
    "id": 93,
    "name": "switch_93",
-   "switch": {}
+   "switch": {"align": 362, "clips": [195, 196]}
   },
   {
    "id": 103,
    "name": "switch_103",
-   "switch": {}
+   "switch": {"align": 292, "clips": [197, 197]}
   },
   {
    "id": 104,
@@ -332,28 +332,32 @@
    "id": 182,
    "name": "puzzle_hole_1",
    "keyhole": {
-    "key": 174
+    "key": 174,
+    "puzzle": true
    }
   },
   {
    "id": 183,
    "name": "puzzle_hole_2",
    "keyhole": {
-    "key": 175
+    "key": 175,
+    "puzzle": true
    }
   },
   {
    "id": 184,
    "name": "puzzle_hole_3",
    "keyhole": {
-    "key": 176
+    "key": 176,
+    "puzzle": true
    }
   },
   {
    "id": 185,
    "name": "puzzle_hole_4",
    "keyhole": {
-    "key": 177
+    "key": 177,
+    "puzzle": true
    }
   },
   {

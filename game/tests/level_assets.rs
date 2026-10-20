@@ -97,7 +97,7 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
         }
         let atlas = fs::read(dir.join("atlas.png")).unwrap();
         assert!(atlas.starts_with(b"\x89PNG\r\n\x1a\n"), "{label}: standalone texture atlas");
-        let geometry = WorldGeometry { data: Arc::new(data) };
+        let geometry = WorldGeometry::from(Arc::new(data));
         // Invoke the actual portal/slope collision query over every sector.
         // Solid or out-of-stack sectors may return None, but valid hits must be finite.
         for (room_index, room) in geometry.data.rooms.iter().enumerate() {

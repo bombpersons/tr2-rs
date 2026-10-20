@@ -16,15 +16,18 @@ use bevy::prelude::*;
 pub use engine::objects::{CODE_BITS, WorldObject};
 use engine::{
     animation::{AnimationGoal, ObjectAnimation, select_state},
-    controller::{Button, ControllerState},
     objects::{AppObjectTypes, ObjectType},
     schedule::{InteractionSystems, ItemSystems, LifecycleSystems, simulation_enabled},
-    triggers::{AppTriggerActions, TriggerAction, TriggerState, TriggerSystems},
+    triggers::{AppTriggerActions, TriggerAction, TriggerSystems},
     world::WorldGeometry,
 };
 
-use crate::player::{Motion, PLAYER_HEIGHT, PLAYER_RADIUS, Player, PlayerMode, WeaponState};
+use crate::player::{Motion, PLAYER_HEIGHT, PLAYER_RADIUS, Player};
+
 use crate::presentation::{LEVELS, LevelRequest, Session};
+
+mod usable;
+pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, in_bounds, trigger_active};
 
 /// The behaviours an object type can have, as `data/object_types.json`
 /// lists them.
@@ -59,7 +62,7 @@ struct ObjectTypeTable {
     types: Vec<ObjectTypeData>,
 }
 
-/// Collected by walking over it and holding Action.
+/// Picked up by standing at it and holding Action ([`usable`]).
 #[derive(Component, serde::Deserialize, Debug, Clone)]
 pub struct Pickup {
     pub message: String,
@@ -68,18 +71,37 @@ pub struct Pickup {
     pub secret: Option<u8>,
 }
 
-/// Used with Action from in front of it; toggles its object.
-#[derive(Component, serde::Deserialize, Debug, Clone, Default)]
+/// Used with Action from in front of it ([`usable`]); its trigger toggles
+/// the objects it names once its own clip has played.
+#[derive(Component, serde::Deserialize, Debug, Clone)]
 pub struct Switch {
-    /// Reached from a larger box around it, while swimming.
+    /// Reached from a larger box around it, while swimming (not ported).
     #[serde(default)]
     pub underwater: bool,
+    /// Lara is moved to stand this far in front of it (units); without it
+    /// she stays where she pressed Action.
+    #[serde(default)]
+    pub align: Option<i32>,
+    /// Lara's clip for a switch in state 1, then in state 0.
+    #[serde(default = "default_switch_clips")]
+    pub clips: [usize; 2],
+    /// Only usable in state 0 (type 92).
+    #[serde(default)]
+    pub one_way: bool,
 }
 
-/// Consumes the inventory item `key` when used.
+fn default_switch_clips() -> [usize; 2] {
+    [crate::player::contract::clip::SWITCH_OFF, crate::player::contract::clip::SWITCH_ON]
+}
+
+/// Consumes the inventory item `key` when used ([`usable`]).
 #[derive(Component, serde::Deserialize, Debug, Clone)]
 pub struct Keyhole {
     pub key: u16,
+    /// A puzzle hole: Lara places the piece (clip 134) and the hole turns
+    /// into its filled type.
+    #[serde(default)]
+    pub puzzle: bool,
 }
 
 /// Blocks Lara with its model's bounds while closed.
@@ -94,6 +116,11 @@ pub struct MovableBlock {}
 /// The navigation boxes a door blocks while shut.
 #[derive(Component, Debug, Clone, Default)]
 pub struct DoorBoxes(pub Vec<usize>);
+
+/// The sectors a door makes solid while shut, as (room, x, z) in world
+/// units ([`door_sectors`]).
+#[derive(Component, Debug, Clone, Default)]
+pub struct DoorSectors(pub Vec<(usize, i32, i32)>);
 
 /// Kills on a fall, hurts while running over it.
 #[derive(Component, serde::Deserialize, Debug, Clone, Default)]
@@ -204,13 +231,23 @@ fn register_object_types(app: &mut App) {
                 entity.insert((crate::winston::Winston::default(), AnimationGoal { state: 2 }));
             }
             if let Some(pickup) = &hook.pickup {
-                entity.insert(pickup.clone());
+                entity.insert((pickup.clone(), UsableItem::default()));
             }
             if let Some(switch) = &hook.switch {
-                entity.insert(switch.clone());
+                // The switch animates itself in its control and collision
+                // (AnimateItem calls), starting in its first clip's state.
+                let state = world
+                    .and_then(|w| w.data.model(hook.id).and_then(|m| w.data.animations.get(m.animations[0])))
+                    .map_or(0, |clip| clip.state);
+                entity.insert((
+                    switch.clone(),
+                    UsableItem { state, ..default() },
+                    AnimationGoal { state },
+                    engine::animation::ControllerAnimated,
+                ));
             }
             if let Some(keyhole) = &hook.keyhole {
-                entity.insert(keyhole.clone());
+                entity.insert((keyhole.clone(), UsableItem::default()));
             }
             if let Some(spikes) = &hook.spikes {
                 entity.insert(spikes.clone());
@@ -230,15 +267,13 @@ fn register_object_types(app: &mut App) {
                 if let Some(world) = world
                     && let Some(placement) = world.data.placements.get(object.index)
                 {
-                    entity.insert(DoorBoxes(door_boxes(world, placement)));
+                    entity
+                        .insert((DoorBoxes(door_boxes(world, placement)), DoorSectors(door_sectors(world, placement))));
                 }
                 let state = world
                     .and_then(|w| w.data.model(hook.id).and_then(|m| w.data.animations.get(m.animations[0])))
                     .map_or(0, |clip| clip.state);
                 entity.insert((door.clone(), AnimationGoal { state }));
-                if let Some((min, max)) = world.and_then(|w| w.model_bounds(hook.id)) {
-                    entity.insert(ObjectCollider { min, max });
-                }
             }
         });
         app.register_object_type(data.id, object_type);
@@ -283,6 +318,34 @@ pub fn door_boxes(world: &WorldGeometry, placement: &engine::world::Placement) -
     boxes.retain(|&b| level.boxes.get(b).is_some_and(|b| b.overlap as u16 & engine::world::BLOCKABLE != 0));
     boxes.dedup();
     boxes
+}
+
+/// The sectors InitialiseDoor `0x8004C358` saves and ShutThatDoor
+/// `0x8004C284` makes solid: the sector beside the door, one step against
+/// its facing, in its room; the door's own sector in the room through that
+/// sector's portal (GetDoor `0x8001FACC`); and both in the flipped rooms.
+pub fn door_sectors(world: &WorldGeometry, placement: &engine::world::Placement) -> Vec<(usize, i32, i32)> {
+    let level = &world.data;
+    let [x, _, z] = placement.position;
+    let (dx, dz) = match placement.rotation {
+        0 => (0, -1),
+        0x8000 => (0, 1),
+        0x4000 => (-1, 0),
+        _ => (1, 0),
+    };
+    let (bx, bz) = (x + dx * 1024, z + dz * 1024);
+    let alternate = |room: usize| level.rooms.get(room).and_then(|r| r.alternate);
+    let mut sectors = vec![(placement.room, bx, bz)];
+    sectors.extend(alternate(placement.room).map(|r| (r, bx, bz)));
+    if let Some(other) = world
+        .sector_at(placement.room, bx, bz)
+        .and_then(|s| level.floor_info(s).portal)
+        .filter(|&r| r < level.rooms.len())
+    {
+        sectors.push((other, x, z));
+        sectors.extend(alternate(other).map(|r| (r, x, z)));
+    }
+    sectors
 }
 
 /// The box a placed block raises and blocks (InitialiseMovableBlock
@@ -408,9 +471,13 @@ impl Plugin for InteractionsPlugin {
                 (
                     reset_level.in_set(LifecycleSystems::Reset),
                     block_level_boxes.in_set(LifecycleSystems::Initialize),
-                    collect_and_use.in_set(InteractionSystems::Use),
+                    (usable::collide, usable::use_keys).chain().in_set(InteractionSystems::Use),
+                    usable::control.in_set(ItemSystems::Control),
+                    usable::ready_sources.in_set(InteractionSystems::Triggers).before(TriggerSystems::Dispatch),
+                    usable::sources_fired.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
                     trigger_actions.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
                     resolve_objects.in_set(InteractionSystems::Resolve),
+                    collide_doors.in_set(InteractionSystems::Resolve),
                     creatures.in_set(ItemSystems::Control),
                     control_doors.in_set(ItemSystems::Control),
                     combat.in_set(InteractionSystems::Combat).after(crate::player::PlayerSystems::Weapons),
@@ -436,71 +503,6 @@ fn reset_level(
         // Keys/puzzles/secrets belong to a level; weapons, ammo and healing carry.
         inv.items.retain(|&kind, _| !(174..=177).contains(&kind) && !(190..=206).contains(&kind));
         inv.secret_mask = 0;
-    }
-}
-
-#[allow(clippy::type_complexity)]
-fn collect_and_use(
-    pad: Res<ControllerState>,
-    mut inv: ResMut<Inventory>,
-    mut progress: ResMut<InteractionProgress>,
-    mut triggers: ResMut<TriggerState>,
-    players: Query<(&Player, &WeaponState)>,
-    mut objects: Query<(&mut WorldObject, &Transform, Option<&Pickup>, Option<&Switch>, Option<&Keyhole>)>,
-) {
-    let Ok((p, weapon)) = players.single() else {
-        return;
-    };
-    if p.health <= 0 || !weapon.hands_free() || !pad.held(Button::Cross) {
-        return;
-    }
-    for (mut o, t, pickup, switch, keyhole) in &mut objects {
-        if o.consumed || o.room != p.room {
-            continue;
-        }
-        let local = t.rotation.inverse() * (p.position - t.translation) * 1024.0;
-        if let Some(pickup) = pickup {
-            let underwater = p.mode == PlayerMode::Swimming;
-            let in_range = if underwater {
-                local.abs().max_element() <= 512.0
-            } else {
-                local.x.abs() <= 256.0 && local.y.abs() <= 100.0 && (-256.0..=100.0).contains(&local.z)
-            };
-            if !in_range {
-                continue;
-            }
-            o.consumed = true;
-            triggers.mark_collected(o.index);
-            inv.add(o.kind);
-            progress.pickups += 1;
-            if pickup.secret.is_some() {
-                progress.secret_mask |= u32::from(inv.secret_mask);
-                progress.secrets = progress.secret_mask.count_ones();
-            }
-            progress.message = pickup.message.clone();
-        } else if pad.pressed(Button::Cross) && (switch.is_some() || keyhole.is_some()) {
-            let underwater = switch.is_some_and(|s| s.underwater);
-            let near = if underwater {
-                local.x.abs() <= 1024.0 && local.y.abs() <= 1024.0 && (-1024.0..=512.0).contains(&local.z)
-            } else {
-                local.x.abs() <= 200.0 && local.y.abs() <= 100.0 && (250.0..=512.0).contains(&local.z)
-            };
-            if !near {
-                continue;
-            }
-            if switch.is_some() {
-                triggers.mark_used(o.index);
-                o.active = !o.active;
-            } else if let Some(keyhole) = keyhole {
-                if inv.consume(keyhole.key) {
-                    triggers.mark_used(o.index);
-                    o.active = true;
-                    progress.message = "Lock opened".into();
-                } else {
-                    progress.message = "A matching item is required".into();
-                }
-            }
-        }
     }
 }
 
@@ -689,16 +691,21 @@ fn resolve_objects(
 // closed+active or open+inactive. Reopening during a close cannot cancel it:
 // the close completes before the next open request (docs/door-animation-evidence.md).
 // Active, the door opens its sectors once it has left its closed state;
-// inactive, it shuts them again unless fully open (0x8004C9FC..0x8004CA80).
-// Only the navigation boxes are ported here; the sectors still read as
-// open floor, and Lara is kept out by the door's collider instead.
+// inactive, it shuts them again unless fully open (0x8004C9FC..0x8004CA80):
+// shut sectors read as solid ([`door_sectors`]) and their boxes blocked.
+// Venice keeps a door open while Lara is in one area (0x8004C964..0x8004C9C4,
+// when type 14 is loaded and 0x80087A48 is 0); that is not ported.
+#[allow(clippy::type_complexity)]
 fn control_doors(
-    world: Option<Res<WorldGeometry>>,
+    world: Option<ResMut<WorldGeometry>>,
     mut flags: ResMut<engine::world::BoxFlags>,
-    mut doors: Query<(&WorldObject, &ObjectAnimation, &mut AnimationGoal, Option<&DoorBoxes>), With<Door>>,
+    mut doors: Query<
+        (&WorldObject, &ObjectAnimation, &mut AnimationGoal, Option<&DoorBoxes>, Option<&DoorSectors>),
+        With<Door>,
+    >,
 ) {
-    let Some(world) = world else { return };
-    for (object, animation, mut goal, boxes) in &mut doors {
+    let Some(mut world) = world else { return };
+    for (object, animation, mut goal, boxes, sectors) in &mut doors {
         let Some(clip) = world.data.animations.get(animation.animation) else { continue };
         let shut = match (object.active, clip.state) {
             (true, 0) => {
@@ -712,11 +719,40 @@ fn control_doors(
             }
             (false, _) => Some(true),
         };
-        if let (Some(shut), Some(boxes)) = (shut, boxes) {
-            for &b in &boxes.0 {
-                flags.set_blocked(b, shut);
+        let Some(shut) = shut else { continue };
+        for &b in boxes.map_or(&[][..], |b| &b.0) {
+            flags.set_blocked(b, shut);
+        }
+        for &(room, x, z) in sectors.map_or(&[][..], |s| &s.0) {
+            if world.is_shut(room, x, z) != shut {
+                world.shut_sector(room, x, z, shut);
             }
         }
+    }
+}
+
+/// DoorCollision `0x8001C70C`: Lara is pushed out of a door whose meshes
+/// touch hers, through the shared contact pass, unless her state has turned
+/// pushes off (the use states clear the flag, `0x80039950`).
+#[allow(clippy::type_complexity)]
+fn collide_doors(
+    world: Option<Res<WorldGeometry>>,
+    mut players: Query<(
+        &mut Player,
+        &engine::animation::AnimationState,
+        &mut crate::player::CollisionFrame,
+        Option<&engine::animation::PoseOverrides>,
+    )>,
+    doors: Query<(&WorldObject, &Transform, &ObjectAnimation), (With<Door>, Without<Player>)>,
+) {
+    let (Some(world), Ok((mut player, pose, mut collision, aim))) = (world, players.single_mut()) else { return };
+    if matches!(player.mode, crate::player::PlayerMode::Using { .. }) {
+        return;
+    }
+    let aim = aim.map_or(&[][..], |a| a.0.as_slice());
+    let Some(mut pass) = crate::contact::ContactPass::begin(&world, &player, pose, &collision, aim) else { return };
+    for (object, transform, animation) in &doors {
+        pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &[]);
     }
 }
 

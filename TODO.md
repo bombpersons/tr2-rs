@@ -219,17 +219,30 @@ it off. Record partial progress below without checking the parent item.
   [Evidence](docs/creature-evidence.md), [tiger tests](game/tests/tiger.rs),
   [spider tests](game/tests/spider.rs). The other creature types, effect
   pieces, blood, flip zones and flying creatures remain.
-- [ ] Pickups: alignment, animation and collection timing.
-- [ ] Switches and key/puzzle use: alignment, animation and trigger timing.
-- [ ] Doors: collision and floor/portal changes during opening/closing,
-  including occupancy override. Navigation-box blocking is done
-  ([creature evidence](docs/creature-evidence.md)).
+- [ ] Pickups, switches, keys, puzzle holes and doors: ported from the
+  binary ([evidence](docs/interaction-evidence.md),
+  [tests](game/tests/using.rs)). The original bounds and alignment tables,
+  the use clips with their camera requests and hands-busy, the pickup taken on
+  frame 42, switch status/timer and SwitchControl, switch/key/pickup trigger
+  tests (targets change once the switch's own clip ends), door sectors made
+  solid while shut, and door pushes through the shared contact pass.
+  A dry-land key pickup, Home's front-door button and Wall's first keyhole,
+  with the doors they open, match no-poke `psx handoff` recordings tick for
+  tick, camera included. Running into a closed door is recorded but its
+  test is ignored: the original's run collision follows the door's push, so
+  Lara stays running pinned against it, and the port's ground collision
+  still runs before object pushes. Still to record: a puzzle hole, a timed
+  switch and the inventory ring. Not ported: the inventory ring at
+  keyholes (the matching key is used directly), underwater pickups and
+  switch 105 (MoveLaraPosition), flares, type 92's own clip and trigger,
+  Venice's door hold, the object-collision room list.
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
   elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,
   `0x80039BC8`, `0x80039CE0`, `0x8003A134`, `0x8003EADC`, `0x8005EFD8`.
-  Only the slide's flags 2 (exact slopes) is ported. Needs chase-mode
-  recordings. [Notes](docs/chase-camera-evidence.md).
+  Only the slide's flags 2 (exact slopes) and the use states' angle,
+  elevation, distance and speed (`Avatar::camera_angle` and friends) are
+  ported. Needs chase-mode recordings. [Notes](docs/chase-camera-evidence.md).
 
 ## Appearance
 

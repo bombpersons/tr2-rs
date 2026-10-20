@@ -5,7 +5,7 @@
 //! The asset is [`Level`] ([`format`] describes the file and its units).
 //! Rules work in Bevy's level space: y up, metres; [`position`] and
 //! [`units`] convert from the file's integer world units.
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
@@ -66,11 +66,49 @@ impl AssetLoader for LevelLoader {
 #[derive(Resource, Clone)]
 pub struct WorldGeometry {
     pub data: Arc<Level>,
+    /// Sectors a shut door has made solid, as (room, sector index).
+    shut: BTreeSet<(usize, usize)>,
 }
+
+impl From<Arc<Level>> for WorldGeometry {
+    fn from(data: Arc<Level>) -> Self {
+        Self { data, shut: BTreeSet::new() }
+    }
+}
+
+/// What a shut sector reads as: solid, with no floor data, box or stacked
+/// rooms (ShutThatDoor `0x8004C284`).
+static SHUT: Sector =
+    Sector { floor: format::SOLID, ceiling: format::SOLID, below: None, above: None, nav_box: None, floor_info: None };
 
 impl WorldGeometry {
     pub fn new(level: Level) -> Self {
-        Self { data: Arc::new(level) }
+        Self::from(Arc::new(level))
+    }
+
+    /// Make the sector of `room` holding world (x, z) solid, as a shut door
+    /// does, or give it back its authored data.
+    pub fn shut_sector(&mut self, room: usize, x: i32, z: i32, shut: bool) {
+        let Some(index) = self.sector_index(room, x, z) else { return };
+        if shut {
+            self.shut.insert((room, index));
+        } else {
+            self.shut.remove(&(room, index));
+        }
+    }
+
+    pub fn is_shut(&self, room: usize, x: i32, z: i32) -> bool {
+        self.sector_index(room, x, z).is_some_and(|i| self.shut.contains(&(room, i)))
+    }
+
+    fn sector_index(&self, room: usize, x: i32, z: i32) -> Option<usize> {
+        let r = self.data.rooms.get(room)?;
+        let sx = (x - r.origin[0]).div_euclid(1024);
+        let sz = (z - r.origin[2]).div_euclid(1024);
+        if sx < 0 || sz < 0 || sx as usize >= r.x_sectors || sz as usize >= r.z_sectors {
+            return None;
+        }
+        Some(sx as usize * r.z_sectors + sz as usize)
     }
 }
 
@@ -127,13 +165,11 @@ impl WorldGeometry {
     }
 
     fn sector(&self, room: usize, x: i32, z: i32) -> Option<&Sector> {
-        let r = self.data.rooms.get(room)?;
-        let sx = (x - r.origin[0]).div_euclid(1024);
-        let sz = (z - r.origin[2]).div_euclid(1024);
-        if sx < 0 || sz < 0 || sx as usize >= r.x_sectors || sz as usize >= r.z_sectors {
-            return None;
+        let index = self.sector_index(room, x, z)?;
+        if self.shut.contains(&(room, index)) {
+            return Some(&SHUT);
         }
-        r.sectors.get(sx as usize * r.z_sectors + sz as usize)
+        self.data.rooms.get(room)?.sectors.get(index)
     }
 
     /// The room whose sector holds (x, y, z), in world units: floor-data

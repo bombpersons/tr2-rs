@@ -458,7 +458,7 @@ fn finish_level(
             Name::new("LevelWorld"),
         ))
         .id();
-    let world = WorldGeometry { data: data.clone() };
+    let world = WorldGeometry::from(data.clone());
     let atlas = server.load(atlas_path);
     let material =
         materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });

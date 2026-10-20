@@ -140,7 +140,9 @@ pub(super) fn control(
     {
         return false;
     }
-    if player.health <= 0 || matches!(player.mode, PlayerMode::Climbing { .. } | PlayerMode::Dead) {
+    if player.health <= 0
+        || matches!(player.mode, PlayerMode::Climbing { .. } | PlayerMode::Using { .. } | PlayerMode::Dead)
+    {
         return false;
     }
     if state == state::STAND && pad.held(Button::Square) {
@@ -274,7 +276,7 @@ pub(super) fn step(
     let (Some(world), Some(clips)) = (world, clips) else {
         return false;
     };
-    if matches!(player.mode, PlayerMode::Climbing { .. } | PlayerMode::Dead) {
+    if matches!(player.mode, PlayerMode::Climbing { .. } | PlayerMode::Using { .. } | PlayerMode::Dead) {
         return false;
     }
     let prior = clips.state(animation.animation);
