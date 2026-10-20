@@ -2,7 +2,7 @@
 //! bounds and end commands use the engine's existing animation machinery.
 use super::*;
 use collision::Contact;
-use engine::animation::{AnimationGoal, ObjectAnimation, advance_authored_animation, vertical_bounds};
+use engine::animation::vertical_bounds;
 use engine::world::Command;
 
 /// The persistent goal requested by ledge collision. It is consumed by the
@@ -24,6 +24,10 @@ impl Default for Traversal {
         Self { goal: 2, run_jump_ready: false, animation_stepped: false, enter: None }
     }
 }
+
+/// Forward-flight control requests fast fall9 once the fall speed read at
+/// the start of the tick reaches132 (0x80038C4C..0x80038C60).
+const FAST_FALL_SPEED: f32 = 132.0;
 
 /// Facing quadrant, cardinal heading and its angular error. Grab accepts
 /// +/-6370 binary-angle units (0x8003D3C0); vault uses the narrower 5460.
@@ -116,7 +120,10 @@ pub(super) fn step(
                 // and gives Walk's dive request priority over Action's reach
                 // (0x80038B88..0x80038C48). The current clip owns acceptance;
                 // fall35 has no range for52, so flight continues unchanged.
-                traversal.goal = if weapon.hands_free() && pad.held(Button::R1) {
+                traversal.goal = if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED {
+                    // A long drop overrides both requests (0x80038C4C..0x80038C60).
+                    9
+                } else if weapon.hands_free() && pad.held(Button::R1) {
                     52
                 } else if weapon.hands_free() && pad.held(Button::Cross) {
                     11
@@ -229,6 +236,11 @@ pub(super) fn step(
         PlayerMode::PullingUp => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } if state == 19 => pull_up(player, motion, world, state),
         PlayerMode::Hanging { .. } => hang_collision(player, motion, animation, traversal, world, pad),
+        PlayerMode::Recovering
+            if state == 2 && motion.grounded && start_slide(player, motion, animation, traversal, world) =>
+        {
+            true
+        }
         PlayerMode::Recovering => recover(player, motion, animation, clips, state),
         PlayerMode::JumpImpact => impact_motion(player, motion, animation, world, clips, dt),
         _ => jump_motion(player, motion, animation, traversal, world, clips, weapon, pad, dt),
@@ -338,12 +350,43 @@ fn hang_collision(
     true
 }
 
+/// LaraDeflectEdgeJump0x8003C66C: every frontal impact quarters speed and
+/// reverses the movement heading. More than512 above the floor it also
+/// enters fast-fall32 at+1; below129 it enters low impact31 with state/goal
+/// 14, overriding that clip's declared state2 until an authored end link.
+/// Between them the current clip and goal survive. Thresholds are tested in
+/// the original's integral world units; `clearance` is the floor's depth
+/// below the feet. Fall speed at or below0 becomes1.
+pub(super) fn rebound(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    clearance: i32,
+    collision_heading: f32,
+    speed: i32,
+) {
+    if clearance > 512 {
+        *animation = AnimationState::at_frame(32, 1.0);
+        traversal.goal = 9;
+        player.mode = PlayerMode::FastFalling;
+    } else if clearance < 129 {
+        *animation = AnimationState::at_frame(31, 0.0);
+        traversal.goal = 14;
+        player.mode = PlayerMode::JumpImpact;
+    }
+    let heading = collision_heading + std::f32::consts::PI;
+    motion.movement_heading = Some(heading);
+    motion.velocity = (Vec3::new(heading.sin(), 0.0, heading.cos()) * units((speed / 4) as f32 * ORIGINAL_FPS))
+        .with_y(motion.velocity.y.min(-units(ORIGINAL_FPS)));
+}
+
 /// The non-frontal airborne deflections. Forward jump0x8003C5F4 and reach
 /// 0x8003C7F4 share them: a side contact turns910 away from the wall
 /// (tables at0x80010994 and0x80010A14). A ceiling contact (and, for reach,
 /// a front-ceiling contact) stops ascent. Forward jump's frontal rebound is
 /// handled by its caller; reach keeps only the shift for a front contact.
-fn deflect(player: &mut Player, motion: &mut Motion, contact: Contact, facing: i32, reach: bool) {
+pub(super) fn deflect(player: &mut Player, motion: &mut Motion, contact: Contact, facing: i32, reach: bool) {
     const SIDE_TURN: f32 = 910.0 * std::f32::consts::TAU / 65536.0;
     let stop_ascent = |motion: &mut Motion, fall_speed: f32| {
         // Fall speed is y-down; only a nonpositive speed is replaced.
@@ -368,6 +411,47 @@ fn deflect(player: &mut Player, motion: &mut Motion, contact: Contact, facing: i
         }
         _ => {}
     }
+}
+
+/// Stop collision0x8003AA20 calls TestLaraSlide0x8003DD30 on any floor
+/// tilted3 or more. Its body probe (limits+/-384, ceiling0) supplies the
+/// shift, applied before the slide clip starts with no speed. The downhill
+/// heading is cardinal, X winning a tie; Lara slides forward (70, state24)
+/// when facing within90 degrees of it, otherwise backward (104, state32).
+/// The slopes-as-walls/pits probe flags are not modelled (collision.rs).
+pub(super) fn start_slide(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    world: &WorldGeometry,
+) -> bool {
+    let [tx, tz] = world.slope_at(player.position, player.room).map(i32::from);
+    if tx.abs() < 3 && tz.abs() < 3 {
+        return false;
+    }
+    let downhill = if tz.abs() > tx.abs() {
+        if tz > 0 { -32768 } else { 0 }
+    } else if tx > 0 {
+        -16384
+    } else {
+        16384
+    };
+    let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let limits = collision::Limits { radius: 100, bad_pos: 384, bad_neg: -384, bad_ceiling: 0 };
+    let at = collision::original(player.position);
+    let info = collision::info(world, at, at, player.room, 762, yaw as i16 as i32, &limits);
+    player.position += collision::level(info.shift);
+    let forward = (downhill - yaw + 16384) & 0xffff <= 0x8000;
+    let heading = collision::angle_radians(downhill);
+    let (clip, state, facing) = if forward { (70, 24, downhill) } else { (104, 32, downhill - 32768) };
+    animation.enter(clip, 0.0, clip);
+    traversal.goal = state;
+    player.yaw = collision::angle_radians(facing);
+    player.mode = PlayerMode::Sliding { direction: Vec3::new(heading.sin(), 0.0, heading.cos()), backwards: !forward };
+    motion.movement_heading = Some(heading);
+    motion.velocity = Vec3::ZERO;
+    true
 }
 
 /// True completes this tick; false hands the new authored motion to ordinary collision.
@@ -604,27 +688,9 @@ fn jump_motion(
         && state == 3
         && let Some(floor) = world.floor_at(proposed, player.room)
     {
-        // LaraDeflectEdgeJump0x8003C66C: every frontal impact quarters
-        // speed and reverses heading. Above512 it also enters32 at+1;
-        // at129..512 the current jump clip and goal survive the impact.
         // Reach uses0x8003C7F4 and deliberately keeps its speed/pose.
-        // Thresholds are tested in the original's integral world units.
         let clearance = ((proposed.y - floor.height) * 1024.0).round() as i32;
-        if clearance > 512 {
-            *animation = AnimationState::at_frame(32, 1.0);
-            traversal.goal = 9;
-            player.mode = PlayerMode::FastFalling;
-        } else if clearance < 129 {
-            // The same handler enters31 with state/goal14, overriding
-            // the clip's declared state2 until an authored end link.
-            *animation = AnimationState::at_frame(31, 0.0);
-            traversal.goal = 14;
-            player.mode = PlayerMode::JumpImpact;
-        }
-        let heading = collision_heading + std::f32::consts::PI;
-        motion.movement_heading = Some(heading);
-        motion.velocity = (Vec3::new(heading.sin(), 0.0, heading.cos()) * units((speed / 4) as f32 * ORIGINAL_FPS))
-            .with_y(motion.velocity.y.min(-units(ORIGINAL_FPS)));
+        rebound(player, motion, animation, traversal, clearance, collision_heading, speed);
     }
     if vertical_jump {
         let speed = if blocked || ceiling_contact {

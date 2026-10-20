@@ -2,7 +2,7 @@
 //! docs/backward-collision-evidence.md. Distances below are original world units
 //! at the boundary; gameplay positions remain Bevy y-up metres.
 use super::*;
-use engine::animation::{AnimationGoal, ObjectAnimation, advance_authored_animation};
+use collision::Contact;
 
 /// Walk-back accepts +/-384 heights; hop-back has no downward probe limit
 /// and falls when its centre is over200 above the floor (0x8003B414/0x8003AC48).
@@ -173,14 +173,41 @@ fn fall(
     if motion.grounded && clips.state(a.animation) == Some(2) {
         player.mode = PlayerMode::Recovering;
         motion.velocity = Vec3::ZERO;
+        // The landing clip's stop collision runs on this same tick.
+        super::traversal::start_slide(player, motion, animation, traversal, world);
         return;
     }
     let old = player.position;
     let fall_speed = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round();
     motion.velocity.y -= units(if fall_speed < 128.0 { 6.0 } else { 1.0 } * ORIGINAL_FPS) * original_frames(dt);
+    // AnimateLara moves along the heading the previous collision left; the
+    // velocity already points that way, so only its magnitude is needed.
+    let facing = player.yaw + std::f32::consts::PI;
+    let speed = (motion.velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round();
     player.position += ground_displacement(motion.velocity, dt);
-    // Hop-fall collision0x8003B9A8 keeps the backward heading and lands
-    // without a second animation advance. The next tick accepts goal2.
+    // Hop-fall collision0x8003B9A8 faces backwards and shares forward-jump
+    // collision's limits and deflection (0x8003B9C0..0x8003B9F4). It lands
+    // without a second animation advance; the next tick accepts goal2.
+    motion.movement_heading = Some(facing);
+    motion.velocity =
+        (Vec3::new(facing.sin(), 0.0, facing.cos()) * units(speed * ORIGINAL_FPS)).with_y(motion.velocity.y);
+    let angle = (facing * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32;
+    let limits = collision::Limits { radius: 100, bad_pos: -collision::NO_HEIGHT, bad_neg: -384, bad_ceiling: 192 };
+    let info = collision::info(
+        world,
+        collision::original(player.position),
+        collision::original(old),
+        player.room,
+        762,
+        angle,
+        &limits,
+    );
+    player.position += collision::level(info.shift);
+    if matches!(info.contact, Contact::Front | Contact::TopFront) {
+        super::traversal::rebound(player, motion, animation, traversal, info.mid.floor, facing, speed as i32);
+    } else {
+        super::traversal::deflect(player, motion, info.contact, angle, false);
+    }
     if let Some(hit) = world.floor_at(player.position, player.room) {
         player.room = super::body_room(world, player.position, hit.room, 381.0);
         if player.position.y <= hit.height && motion.velocity.y < 0.0 {

@@ -94,3 +94,5 @@ Corner/side and forward-top contacts remain unverified.
 - [Bounded-height local corridor targets](navigation-height-evidence.md): native step/drop and zone filtering, runtime boxes/connectivity/zone verification, and 420 full-controller ticks across four routes. One fresh 120-tick route independently validates target X/Y/Z. Physical creature steps and general path search remain unported.
 
 - [Airborne side/corner contacts](corner-jump-evidence.md): forward-jump and reach GetCollisionInfo limits, both deflection tables, and the released run's wall-stop clip. Seven controlled-spawn routes (727 ticks), three independent, plus 69 standalone poses. Vertical-jump/fast-fall sides, clamp and static meshes remain open.
+
+- [Natural fast falls and slide-edge landings](fall-recovery-evidence.md): forward-flight fast-fall request, stop-collision slide test, slide-edge falls and back-fall rebound. Six controlled-spawn routes (706 ticks), three independent, plus 53 standalone poses. A native-core stall on one mirrored ramp is documented.

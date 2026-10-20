@@ -316,3 +316,22 @@ corner_case!(heldout_forward_jump_right_contact_turns_into_a_low_frontal_impact,
 corner_case!(heldout_delayed_right_contact_under_a_low_ceiling, "low_right_delay_heldout");
 corner_case!(heldout_reach_side_contact_release_landing_and_run, "open_reach_release_heldout");
 corner_case!(heldout_right_reach_contact_landing_run_and_release, "open_right_reach_validation_heldout");
+
+macro_rules! fall_case {
+    ($test:ident, $case:literal) => {
+        #[test]
+        fn $test() {
+            compare_case(
+                include_str!(concat!("data/original/fall_", $case, ".csv")),
+                include_str!(concat!("data/original/fall_", $case, ".json")),
+            );
+        }
+    };
+}
+
+fall_case!(original_long_jump_into_a_pit_enters_fast_fall_and_heavy_landing, "pit_jump");
+fall_case!(original_run_onto_a_steep_ramp_slides_off_its_edge, "ramp_run");
+fall_case!(original_backward_hop_onto_a_steep_ramp_slides_off_backwards, "ramp_hop_back");
+fall_case!(heldout_angled_pit_jump_fast_falls_into_a_heavy_landing, "pit_angled_heldout");
+fall_case!(heldout_delayed_ramp_run_slides_off_and_restarts, "ramp_run_late_heldout");
+fall_case!(heldout_backward_hop_from_a_new_start_slides_off_backwards, "ramp_back_near_heldout");

@@ -27,6 +27,11 @@ pub(super) fn remember(mut players: Query<(&super::Player, &mut CollisionFrame)>
     }
 }
 
+/// A binary angle (65536 per turn) as radians in [0, 2pi).
+pub(super) fn angle_radians(angle: i32) -> f32 {
+    (angle & 0xffff) as f32 * std::f32::consts::TAU / 65536.0
+}
+
 /// GetHeight's sentinel for a solid or missing sector.
 pub(super) const NO_HEIGHT: i32 = -32512;
 

@@ -88,7 +88,10 @@ it off. Record partial progress below without checking the parent item.
 - [ ] Landing recovery: original animation dispatch and input recovery windows.
   Standing/forward jumps, hang drops and low/middle/high forward wall impacts are done;
   ordinary running ledge falls now use authored running/standing landings.
-  Unassisted fast falls, slide landings and backward/sideways jump collision remain.
+  Unassisted fast falls, slope landings into slides, slide-edge falls and the
+  back-fall wall rebound now match six routes
+  ([evidence](docs/fall-recovery-evidence.md)). Sideways jump collision,
+  walk-off ledge falls and slide jumps remain.
 - [x] Ordinary grounded run-start room-wall stop and held-jump retry.
   The retained diagnostic and two fresh independent routes pass; see
   [evidence](docs/run-start-evidence.md) and [tests](game/tests/airborne.rs).
@@ -401,7 +404,7 @@ it off. Record partial progress below without checking the parent item.
   (`0x80019CF4`). Ported as `Avatar::camera_exact_slopes`; all six tiger
   routes now match the camera on every tick (was windowed to tick 102).
   [Evidence](docs/chase-camera-evidence.md).
-- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, fast-fall/slide recovery,
+- Next: remaining blocked-world/static item contacts, vertical-jump/fast-fall side contacts, walk-off ledge falls and slide jumps,
   remaining traversal and water.
   Combat, interactions and appearance remain queued above.
 
@@ -474,3 +477,12 @@ it off. Record partial progress below without checking the parent item.
   fix. All 462 workspace tests pass; Clippy has only existing unrelated
   warnings; the standalone smoke matches 69 poses. No engine, format, editor or
   template change. [Evidence](docs/corner-jump-evidence.md).
+- 2026-10-20: Natural fast falls and slide-edge landings: forward flight
+  requests fast fall at fall speed 132; landing recovery runs the stop
+  collision's slide test; slides use authored clip speed and leave an edge
+  into forward flight or the back fall; the back fall now shares forward-jump
+  deflection. Six controlled-spawn routes compare 706 ticks, three
+  independent. All 468 workspace tests pass; Clippy has only existing
+  unrelated warnings; the standalone smoke matches 53 poses. A native-core
+  stall on the mirrored ramp is documented, not fitted. No engine, format,
+  editor or template change. [Evidence](docs/fall-recovery-evidence.md).

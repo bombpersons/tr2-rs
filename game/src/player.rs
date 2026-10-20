@@ -9,7 +9,8 @@
 use bevy::prelude::*;
 pub use engine::animation::AnimationState;
 use engine::animation::{
-    ANIMATION_FPS as ORIGINAL_FPS, AnimationLibrary, ObjectAnimation, advance, animation_frames as original_frames,
+    ANIMATION_FPS as ORIGINAL_FPS, AnimationGoal, AnimationLibrary, ObjectAnimation, advance,
+    advance_authored_animation, animation_frames as original_frames,
 };
 use engine::camera::CameraSystems;
 use engine::controller::{Button, ControllerState};
@@ -1321,6 +1322,19 @@ fn integrate(
                 } else {
                     player.mode = PlayerMode::Sliding { direction, backwards };
                     motion.velocity = direction * units(50.0 * ORIGINAL_FPS);
+                    if let (Some(world), Some(clips)) = (geometry, clips.as_deref())
+                        && matches!(clips.state(animation.animation), Some(24 | 32))
+                    {
+                        // Slide control keeps its own state; AnimateLara then
+                        // moves along the downhill heading at the authored
+                        // speed. Back-slide104 accelerates before looping105.
+                        let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
+                        let mut goal = AnimationGoal { state: if backwards { 32 } else { 24 } };
+                        advance_authored_animation(&world.data, &mut a, &mut goal, original_frames(dt));
+                        *animation = AnimationState::at_frame(a.animation, a.frame);
+                        traversal.animation_stepped = true;
+                        motion.velocity = direction * clips.speed(&animation).unwrap_or(0.0);
+                    }
                 }
             } else if let PlayerMode::Sliding { direction, .. } = player.mode {
                 player.mode = PlayerMode::SlideStopping { direction, seconds_left: 0.8 };
@@ -1529,7 +1543,23 @@ fn integrate(
             motion.velocity.y = 0.0;
             player.position.y = hit.height;
         } else if motion.grounded {
-            if old.y - hit.height <= STEP_HEIGHT {
+            if let PlayerMode::Sliding { backwards, .. } = player.mode
+                && clips.is_some()
+                && old.y - hit.height > units(200.0)
+            {
+                // Slide collision0x8003C364 leaves the slope once the centre
+                // is over200 above the floor (0x8003C3B4..0x8003C41C): a
+                // forward slide enters clip34/state3, a back slide clip93/
+                // state29. Both keep the slide speed with zero fall speed.
+                let (clip, mode, goal) =
+                    if backwards { (93, PlayerMode::FallingBack, 29) } else { (34, PlayerMode::JumpingForward, 3) };
+                motion.grounded = false;
+                motion.velocity.y = 0.0;
+                player.mode = mode;
+                traversal.goal = goal;
+                traversal.animation_stepped = true;
+                animation.enter(clip, 0.0, clip);
+            } else if old.y - hit.height <= STEP_HEIGHT {
                 player.position.y = hit.height;
             } else {
                 motion.grounded = false;
