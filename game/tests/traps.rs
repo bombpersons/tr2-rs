@@ -342,3 +342,33 @@ fn the_tiles_and_sliding_blades_beyond_match_the_recording() {
 fn the_spiked_rollers_match_the_recording() {
     compare_case(include_str!("data/original/traps_spindles.csv"), &[90, 91, 88]);
 }
+
+/// The trapdoor's trigger is not under Lara's feet: it is on the floor of
+/// the pool two rooms below (31 over 3 over 33), which GetHeight reaches by
+/// following the rooms below whatever the height. With the game's own
+/// triggers, Lara standing where the original's stood the tick it opened
+/// sets it off, and she drops through.
+#[test]
+fn standing_over_the_trapdoor_opens_it_and_drops_lara() {
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let world = WorldGeometry::new(data);
+    let placement = world.data.placements[14].clone();
+    let mut app = headless_app(game::tick_rate(game::REGION));
+    app.add_plugins((InteractionsPlugin, game::player::PlayerRulesPlugin)).insert_resource(world);
+    app.insert_resource(SimulationEnabled(true));
+    // traps_trapdoor.csv, tick 47: the trigger lists the trapdoor.
+    let start = Vec3::new(53523.0, 3072.0, 34831.0) / 1024.0;
+    let lara = app.world_mut().spawn(Player::at(start, 0.0, 31)).id();
+    let trapdoor = app.world_mut().spawn(WorldObject::from_placement(14, &placement)).id();
+    let mut opened = None;
+    for tick in 0..60 {
+        app.run_tick(&[]);
+        if opened.is_none() && app.world().get::<ItemBody>(trapdoor).is_some_and(|b| b.current_state == 1) {
+            opened = Some(tick);
+        }
+    }
+    assert!(opened.is_some(), "the trapdoor never opened");
+    assert!(app.world().get::<Trap>(trapdoor).unwrap().listed);
+    let player = app.world().get::<Player>(lara).unwrap();
+    assert!(player.position.y < start.y - 1.0, "Lara stayed on the trapdoor at {}", player.position);
+}
