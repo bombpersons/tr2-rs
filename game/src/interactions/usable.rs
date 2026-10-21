@@ -13,26 +13,26 @@ use engine::{
     animation::{AnimationGoal, ObjectAnimation, step_animation_frame_from},
     camera::chase,
     controller::{Button, ControllerState},
-    objects::{CODE_BITS, INVERTED, WorldObject},
+    objects::{CODE_BITS, WorldObject},
     world::{Command, WorldGeometry},
 };
 
 use super::{InteractionProgress, Inventory, Keyhole, Pickup, Switch};
 use crate::creature::ItemStatus;
 use crate::player::{
-    Motion, Player, PlayerAnimations, PlayerMode, SubmergedMotion, Traversal, WeaponState,
+    GunStatus, Motion, Player, PlayerAnimations, PlayerMode, SubmergedMotion, Traversal, WeaponState,
     contract::{clip, frame, state},
     original_units, using,
 };
 
 /// What the original keeps in an item for the use routines: its status
-/// (`item+0x48` bits 1-2), the timer its control counts (`item+0x26`) and,
-/// for switches, its current animation state (`item+0x0E`).
+/// (`item+0x48` bits 1-2) and, for switches, its current animation state
+/// (`item+0x0E`). The timer its control counts (`item+0x26`) is the
+/// object's ([`WorldObject::timer`]).
 #[derive(Component, Reflect, Debug, Clone, Default)]
 #[reflect(Component)]
 pub struct UsableItem {
     pub status: ItemStatus,
-    pub timer: i16,
     pub state: usize,
 }
 
@@ -75,6 +75,17 @@ pub const SWITCH_BOUNDS: UseBounds = UseBounds {
     angle_max: [1820, 5460, 1820],
 };
 
+/// Underwater switches (0x80089780): a box around the switch, reaching
+/// further in front than behind, with every angle within 14560.
+pub const UNDERWATER_SWITCH_BOUNDS: UseBounds = UseBounds {
+    min: IVec3::splat(-1024),
+    max: IVec3::new(1024, 1024, 512),
+    angle_min: [-14560; 3],
+    angle_max: [14560; 3],
+};
+/// Where Lara swims to at an underwater switch, in its frame (0x80089798).
+pub const UNDERWATER_SWITCH_STAND: IVec3 = IVec3::new(0, 0, 108);
+
 /// Keyholes (0x800897A4) and puzzle holes (0x800897C8).
 pub const KEYHOLE_BOUNDS: UseBounds = UseBounds {
     min: IVec3::new(-200, 0, 312),
@@ -82,8 +93,10 @@ pub const KEYHOLE_BOUNDS: UseBounds = UseBounds {
     angle_min: [-1820, -5460, -1820],
     angle_max: [1820, 5460, 1820],
 };
-/// Where Lara stands at a keyhole or puzzle hole (0x800897BC, 0x800897E0).
+/// Where Lara stands at a keyhole (0x800897BC).
 pub const KEYHOLE_STAND: IVec3 = IVec3::new(0, 0, 362);
+/// Where Lara stands at a puzzle hole (0x800897E0), a little nearer.
+pub const PUZZLE_STAND: IVec3 = IVec3::new(0, 0, 327);
 
 /// An item's or Lara's rotation: pitch, yaw, roll (65536 per turn).
 pub type Angles = [i16; 3];
@@ -222,7 +235,7 @@ fn ready(player: &Player, motion: &Motion, weapon: &WeaponState, lara_state: Opt
     player.health > 0 && motion.grounded && weapon.hands_free() && lara_state == Some(state::STAND)
 }
 
-/// The use collision routines, for pickups and switches on land.
+/// The use collision routines, for pickups and switches.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(super) fn collide(
     pad: Res<ControllerState>,
@@ -335,15 +348,52 @@ pub(super) fn collide(
                 using::start(&mut player, &mut motion, &mut animation, &mut weapon, clip::PICKUP);
             }
         } else if let Some(switch) = switch {
-            // SwitchCollision 0x800507E4.
-            if switch.underwater
-                || !action
-                || item.status != ItemStatus::Inactive
-                || !ready(&player, &motion, &weapon, lara_state)
-            {
+            let yaw = binary_yaw(transform.rotation.to_euler(EulerRot::YXZ).0);
+            if switch.underwater {
+                // SwitchCollision2 0x80050AC4: while Action is held, Lara
+                // treading with free hands swims to the switch a step a tick;
+                // once there she pulls it from treading and treads again.
+                if !action
+                    || item.status != ItemStatus::Inactive
+                    || player.mode != PlayerMode::Swimming
+                    || !weapon.hands_free()
+                    || lara_state != Some(state::TREAD)
+                {
+                    continue;
+                }
+                let item_angles = [0, yaw, 0];
+                let mut lara_angles =
+                    [crate::player::binary_angle(motion.pitch), lara_yaw, crate::player::binary_angle(submerged.bank)];
+                if !in_bounds_turned(&UNDERWATER_SWITCH_BOUNDS, at, item_angles, lara, lara_angles) || item.state >= 2 {
+                    continue;
+                }
+                let mut at_lara = lara;
+                let there = move_lara(&mut at_lara, &mut lara_angles, at, item_angles, UNDERWATER_SWITCH_STAND);
+                player.position = level(at_lara);
+                motion.pitch = crate::player::binary_radians(lara_angles[0]);
+                player.yaw = crate::player::binary_radians(lara_angles[1]);
+                submerged.bank = crate::player::binary_radians(lara_angles[2]);
+                if !there {
+                    continue;
+                }
+                submerged.speed = 0.0;
+                // Treading's range for 40 covers its whole clip; the clip's
+                // EmptyHands frees the hands as it links back to treading.
+                animation.enter(clip::UNDERWATER_SWITCH, 0.0, clip::UNDERWATER_SWITCH);
+                traversal.goal = state::TREAD;
+                weapon.status = GunStatus::HandsBusy;
+                item.status = ItemStatus::Active;
+                if let (Some(mut a), Some(mut goal), Some(world)) = (item_animation, goal, world) {
+                    goal.state = if item.state == 1 { 0 } else { 1 };
+                    animate(world, &mut a, &mut goal, &mut item);
+                }
+                object.update_active();
                 continue;
             }
-            let yaw = binary_yaw(transform.rotation.to_euler(EulerRot::YXZ).0);
+            // SwitchCollision 0x800507E4.
+            if !action || item.status != ItemStatus::Inactive || !ready(&player, &motion, &weapon, lara_state) {
+                continue;
+            }
             if !in_bounds(&SWITCH_BOUNDS, at, yaw, lara, lara_yaw) {
                 continue;
             }
@@ -378,23 +428,6 @@ fn animate(world: &WorldGeometry, a: &mut ObjectAnimation, goal: &mut AnimationG
     }
 }
 
-/// TriggerActive 0x8001F6C8: the code bits are all set and the timer, if
-/// any, has not run out. A reversed item reads the other way.
-pub fn trigger_active(object: &WorldObject, timer: &mut i16) -> bool {
-    let ok = object.flags & INVERTED == 0;
-    if object.flags & CODE_BITS != CODE_BITS {
-        return !ok;
-    }
-    match *timer {
-        0 => ok,
-        -1 => !ok,
-        t => {
-            *timer = if t - 1 == 0 { -1 } else { t - 1 };
-            ok
-        }
-    }
-}
-
 /// SwitchControl 0x800516B8, for active switches: once its trigger stops
 /// holding it (a timed switch running out) it asks to go back to state 1.
 pub(super) fn control(
@@ -407,12 +440,10 @@ pub(super) fn control(
             continue;
         }
         object.flags |= CODE_BITS;
-        let mut timer = item.timer;
-        if !trigger_active(&object, &mut timer) {
+        if !object.trigger_active() {
             goal.state = 1;
-            timer = 0;
+            object.timer = 0;
         }
-        item.timer = timer;
         animate(&world, &mut a, &mut goal, &mut item);
     }
 }
@@ -462,7 +493,7 @@ pub(super) fn use_keys(
             progress.message = "A matching item is required".into();
             continue;
         }
-        align(world.as_deref(), &mut player, at, yaw, KEYHOLE_STAND);
+        align(world.as_deref(), &mut player, at, yaw, if keyhole.puzzle { PUZZLE_STAND } else { KEYHOLE_STAND });
         let clip = if keyhole.puzzle { clip::USE_PUZZLE } else { clip::USE_KEY };
         using::start(&mut player, &mut motion, &mut animation, &mut weapon, clip);
         item.status = ItemStatus::Active;
@@ -496,16 +527,16 @@ pub(super) fn ready_sources(
 /// keyholes and pickups are spent.
 pub(super) fn sources_fired(
     mut fired: MessageReader<engine::triggers::TriggerSourceFired>,
-    mut items: Query<(&WorldObject, &mut UsableItem, Has<Switch>)>,
+    mut items: Query<(&mut WorldObject, &mut UsableItem, Has<Switch>)>,
 ) {
     for source in fired.read() {
-        for (object, mut item, switch) in &mut items {
+        for (mut object, mut item, switch) in &mut items {
             if object.index != source.index {
                 continue;
             }
             if switch {
                 if item.state == 0 && source.timer > 0 {
-                    item.timer = if source.timer == 1 { 1 } else { i16::from(source.timer) * 30 };
+                    object.timer = if source.timer == 1 { 1 } else { i16::from(source.timer) * 30 };
                     item.status = ItemStatus::Active;
                 } else {
                     item.status = ItemStatus::Inactive;

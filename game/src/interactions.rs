@@ -27,7 +27,7 @@ use crate::player::{Motion, PLAYER_HEIGHT, PLAYER_RADIUS, Player};
 use crate::presentation::{LEVELS, LevelRequest, Session};
 
 mod usable;
-pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, in_bounds, trigger_active};
+pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, in_bounds};
 
 /// The behaviours an object type can have, as `data/object_types.json`
 /// lists them.
@@ -75,7 +75,7 @@ pub struct Pickup {
 /// the objects it names once its own clip has played.
 #[derive(Component, serde::Deserialize, Debug, Clone)]
 pub struct Switch {
-    /// Reached from a larger box around it, while swimming (not ported).
+    /// Reached from a larger box around it, while swimming.
     #[serde(default)]
     pub underwater: bool,
     /// Lara is moved to stand this far in front of it (units); without it
@@ -700,14 +700,16 @@ fn control_doors(
     world: Option<ResMut<WorldGeometry>>,
     mut flags: ResMut<engine::world::BoxFlags>,
     mut doors: Query<
-        (&WorldObject, &ObjectAnimation, &mut AnimationGoal, Option<&DoorBoxes>, Option<&DoorSectors>),
+        (&mut WorldObject, &ObjectAnimation, &mut AnimationGoal, Option<&DoorBoxes>, Option<&DoorSectors>),
         With<Door>,
     >,
 ) {
     let Some(mut world) = world else { return };
-    for (object, animation, mut goal, boxes, sectors) in &mut doors {
+    for (mut object, animation, mut goal, boxes, sectors) in &mut doors {
         let Some(clip) = world.data.animations.get(animation.animation) else { continue };
-        let shut = match (object.active, clip.state) {
+        // DoorControl asks TriggerActive, which counts a timed trigger's
+        // hold down (0x8001F718).
+        let shut = match (object.trigger_active(), clip.state) {
             (true, 0) => {
                 goal.state = 1;
                 None

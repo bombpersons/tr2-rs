@@ -12,7 +12,7 @@ use engine::animation::AnimationState;
 
 use super::{
     Motion, Player, PlayerAnimations, PlayerMode,
-    contract::state,
+    contract::{clip, state},
     weapons::{GunStatus, WeaponState},
 };
 
@@ -64,9 +64,17 @@ pub(super) fn control(motion: &mut Motion, clips: Option<&PlayerAnimations>, ani
 
 /// Once the use clip has ended into standing, its EmptyHands command has
 /// freed the hands (AnimateLara's end commands, 0x80042F00) and the stand
-/// handler takes over next tick.
+/// handler takes over next tick. Underwater, Lara stays swimming: the
+/// switch clip's EmptyHands frees them as it links back to treading
+/// (0x80042F90).
 pub(super) fn finish(mut players: Query<(&mut Player, &AnimationState, &mut WeaponState)>) {
     for (mut player, animation, mut weapon) in &mut players {
+        if player.mode == PlayerMode::Swimming
+            && weapon.status == GunStatus::HandsBusy
+            && animation.animation != clip::UNDERWATER_SWITCH
+        {
+            weapon.status = GunStatus::HandsFree;
+        }
         if let PlayerMode::Using { animation: clip } = player.mode
             && animation.animation != clip
         {

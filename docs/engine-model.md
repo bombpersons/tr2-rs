@@ -169,7 +169,12 @@ Fixed-shot selection, once flags, timers and eye easing are *PSX*
 - **Engine:** `engine::triggers` tests the sector under the `Avatar` each
   tick and runs `activate` and `camera` itself. Other actions go through
   `register_trigger_action(name)` and arrive as `TriggerAction` messages;
-  unregistered actions are listed in `TriggerDiagnostics`.
+  unregistered actions are listed in `TriggerDiagnostics`. An `activate`
+  gives the object the trigger's timer (`WorldObject::timer`, in ticks) as
+  well as toggling its code; the object's own controller counts it with
+  `WorldObject::trigger_active`, as the original's controls call
+  TriggerActive (*PSX*: the Rig's timed door,
+  [interaction-evidence](interaction-evidence.md)).
   **Game:** `game::interactions` handles `end_level`, `music` and `secret`.
   Flip maps, flyby cameras and other actions are not ported and stay reported.
 

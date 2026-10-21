@@ -141,6 +141,9 @@ pub mod clip {
     /// and ending back in [`TREAD`]; taken on frame
     /// [`super::frame::UNDERWATER_PICKUP_TAKE`].
     pub const UNDERWATER_PICKUP: usize = 130;
+    /// Pulling an underwater switch (type 105, state 40), reached through
+    /// treading's range and ending back in [`TREAD`].
+    pub const UNDERWATER_SWITCH: usize = 129;
     /// Type 104 and the others not named below: turning a switch off and on.
     pub const SWITCH_OFF: usize = 63;
     pub const SWITCH_ON: usize = 64;
@@ -397,6 +400,7 @@ pub const CLIPS: &[ClipRule] = {
         rule(Death, clip::DEAD, state::GLIDE),
         rule(Use, clip::PICKUP, state::PICKUP),
         rule(Use, clip::UNDERWATER_PICKUP, state::PICKUP),
+        rule(Use, clip::UNDERWATER_SWITCH, state::SWITCH_OFF),
         rule(Use, clip::USE_KEY, state::USE_KEY),
         rule(Use, clip::USE_PUZZLE, state::USE_PUZZLE),
         rule(Use, clip::SWITCH_OFF, state::SWITCH_OFF),
@@ -534,6 +538,7 @@ pub const COMMANDS: &[CommandRule] = &[
     CommandRule { clip: clip::USE_KEY, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::USE_PUZZLE, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::SWITCH_OFF, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::UNDERWATER_SWITCH, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::SWITCH_ON, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::BUTTON_OFF, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::BUTTON_ON, command: CommandKind::EmptyHands, feature: Feature::Use },

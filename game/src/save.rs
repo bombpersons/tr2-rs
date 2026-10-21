@@ -13,12 +13,12 @@ pub struct SaveGame {
     objects:Vec<SavedObject>,
 }
 #[derive(Serialize,Deserialize)]
-struct SavedObject {index:usize,active:bool,consumed:bool,flags:u16,position:[f32;3],rotation:[f32;4],health:Option<i32>}
+struct SavedObject {index:usize,active:bool,consumed:bool,flags:u16,#[serde(default)]timer:i16,position:[f32;3],rotation:[f32;4],health:Option<i32>}
 #[derive(Resource)]
 pub struct PendingRestore(pub SaveGame);
 
 pub fn write(level:&str,player:&Player,inventory:&Inventory,objects:&Query<(&WorldObject,&Transform,Option<&Enemy>)>)->Result<(),String> {
-    let objects=objects.iter().map(|(o,t,e)|SavedObject{index:o.index,active:o.active,consumed:o.consumed,flags:o.flags,position:t.translation.to_array(),rotation:t.rotation.to_array(),health:e.map(|e|e.health)}).collect();
+    let objects=objects.iter().map(|(o,t,e)|SavedObject{index:o.index,active:o.active,consumed:o.consumed,flags:o.flags,timer:o.timer,position:t.translation.to_array(),rotation:t.rotation.to_array(),health:e.map(|e|e.health)}).collect();
     let data=SaveGame{version:1,level:level.into(),position:player.position.to_array(),yaw:player.yaw,room:player.room,health:player.health,inventory:serde_json::to_value(inventory).map_err(|e|e.to_string())?,objects};
     let bytes=serde_json::to_vec_pretty(&data).map_err(|e|e.to_string())?;
     std::fs::write("savegame.json.tmp",bytes).map_err(|e|e.to_string())?;
@@ -46,7 +46,7 @@ pub(crate) fn restore(mut commands:Commands,pending:Option<Res<PendingRestore>>,
     if let Ok(saved_inventory)=serde_json::from_value(data.inventory.clone()){*inventory=saved_inventory;}
     for (entity,mut object,mut t,enemy) in &mut objects {
         let Some(saved)=data.objects.iter().find(|s|s.index==object.index)else{continue;};
-        object.active=saved.active;object.consumed=saved.consumed;object.flags=saved.flags;
+        object.active=saved.active;object.consumed=saved.consumed;object.flags=saved.flags;object.timer=saved.timer;
         t.translation=Vec3::from_array(saved.position);t.rotation=Quat::from_array(saved.rotation).normalize();
         if let Some(health)=saved.health {if let Some(mut enemy)=enemy {enemy.health=health;enemy.killed=health==0;}
             else if let Some(mut enemy)=Enemy::for_kind(object.kind){enemy.health=health;enemy.killed=health==0;commands.entity(entity).insert(enemy);}}

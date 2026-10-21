@@ -7,12 +7,12 @@
 //! [`AppTriggerActions::register_trigger_action`] and read [`TriggerAction`]
 //! messages in [`InteractionSystems::Triggers`], after [`TriggerSystems::Dispatch`].
 //! Actions nobody registered are listed in [`TriggerDiagnostics`].
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use bevy::prelude::*;
 
 use crate::camera::{CameraCue, CameraCues};
-use crate::objects::{CODE_BITS, WorldObject};
+use crate::objects::WorldObject;
 use crate::schedule::{Avatar, InteractionSystems, LifecycleSystems, simulation_enabled};
 use crate::shell::GameSystems;
 pub use crate::world::TriggerKind;
@@ -70,7 +70,6 @@ pub struct TriggerState {
     level: String,
     once: BTreeSet<usize>,
     ready: BTreeSet<usize>,
-    timers: BTreeMap<usize, f32>,
 }
 
 impl TriggerState {
@@ -128,18 +127,6 @@ fn dispatch_triggers(
     let Ok(avatar) = avatars.single() else {
         return;
     };
-    for (index, timer) in &mut state.timers {
-        *timer -= time.delta_secs();
-        if *timer <= 0.0 {
-            for (_, mut o) in &mut objects {
-                if o.index == *index {
-                    o.active = false;
-                    o.flags &= !CODE_BITS;
-                }
-            }
-        }
-    }
-    state.timers.retain(|_, v| *v > 0.0);
     let Some(floor) = w.trigger_floor(avatar.position, avatar.room) else {
         return;
     };
@@ -202,6 +189,13 @@ fn dispatch_triggers(
                     for (entity, mut o) in &mut objects {
                         if o.index == usize::from(argument) {
                             let was_active = o.active;
+                            // The trigger's timer byte goes to the object
+                            // every time, before its code changes: one tick
+                            // for 1, else seconds (TR2: 0x8001F160..0x8001F1E0).
+                            o.timer = match trigger.timer {
+                                1 => 1,
+                                t => (f32::from(t) / time.delta_secs()).round() as i16,
+                            };
                             match kind {
                                 TriggerKind::Switch => o.flags ^= mask,
                                 TriggerKind::AntiPad => o.flags &= !mask,
@@ -210,13 +204,6 @@ fn dispatch_triggers(
                             o.update_active();
                             if o.active && !was_active {
                                 activated.write(ObjectActivated { entity, index: o.index });
-                            }
-                            if trigger.timer > 0 && o.active {
-                                // Timer byte: seconds, except 1 = one tick.
-                                state.timers.insert(
-                                    o.index,
-                                    if trigger.timer == 1 { 1.0 / 30.0 } else { f32::from(trigger.timer) },
-                                );
                             }
                         }
                     }

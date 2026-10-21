@@ -33,7 +33,12 @@ pub struct WorldObject {
     pub kind: u16,
     pub room: usize,
     pub flags: u16,
+    /// The code is complete (or, inverted, not): what a trigger last left.
     pub active: bool,
+    /// Ticks the trigger that last named the object holds it for: 0 for no
+    /// limit, -1 once run out. Only [`WorldObject::trigger_active`] counts
+    /// it, so it runs while the object's controller asks.
+    pub timer: i16,
     /// Collected or otherwise removed from play.
     pub consumed: bool,
 }
@@ -43,7 +48,7 @@ impl WorldObject {
         // A complete authored code means "start active": it becomes an
         // inverted object with the code cleared, so triggers deactivate it.
         let flags = if flags & CODE_BITS == CODE_BITS { (flags & !CODE_BITS) | INVERTED } else { flags };
-        let mut object = Self { index, kind, room, flags, active: false, consumed: false };
+        let mut object = Self { index, kind, room, flags, active: false, timer: 0, consumed: false };
         object.update_active();
         object
     }
@@ -60,6 +65,25 @@ impl WorldObject {
     /// Recompute `active` from the code bits and the inverted flag.
     pub fn update_active(&mut self) {
         self.active = (self.flags & CODE_BITS == CODE_BITS) ^ (self.flags & INVERTED != 0);
+    }
+
+    /// What a controller asks each tick (the original's TriggerActive): the
+    /// code is complete and its timer, if any, has not run out. Each call
+    /// counts the timer down a tick; the tick it reaches zero still answers
+    /// yes and leaves -1. An inverted object reads the other way.
+    pub fn trigger_active(&mut self) -> bool {
+        let ok = self.flags & INVERTED == 0;
+        if self.flags & CODE_BITS != CODE_BITS {
+            return !ok;
+        }
+        match self.timer {
+            0 => ok,
+            -1 => !ok,
+            t => {
+                self.timer = if t == 1 { -1 } else { t - 1 };
+                ok
+            }
+        }
     }
 }
 

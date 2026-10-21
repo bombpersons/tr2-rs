@@ -231,10 +231,15 @@ it off. Record partial progress below without checking the parent item.
   tick, camera included, and so does running into a closed door: ground
   state collision waits for object pushes, so Lara stays running pinned
   against it. Airborne collision still runs before pushes. The underwater
-  key pickup (MoveLaraPosition, clip 130) matches its recording too.
-  Still to record: a puzzle hole, a timed switch and the inventory ring.
+  key pickup (MoveLaraPosition, clip 130) and Venice's underwater switch
+  (SwitchCollision2, clip 129, on the flipped level) match their recordings
+  too, and so does the Opera House Relay Box puzzle hole (Lara stands 327
+  in front, not 362 as at keyholes). The Offshore Rig's timed cell button
+  and door match too, now that a trigger's timer is held by the object and
+  counted by its control (`WorldObject::trigger_active`). Still to record:
+  the inventory ring.
   Not ported: the inventory ring at keyholes (the matching key is used
-  directly), switch 105 (underwater), flares, type 92's own clip and trigger,
+  directly), flares, flipping in play, type 92's own clip and trigger,
   Venice's door hold, the object-collision room list.
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide

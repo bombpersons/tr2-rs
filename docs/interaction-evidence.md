@@ -5,9 +5,9 @@ Wall RAM snapshot (`psx ghidra decompile --ram .psx/wall_game --range
 80010000-80080000`), `psx disasm --ram .psx/wall_game --text`, and RAM tables
 read from the same snapshot. No other reference was consulted.
 
-**Status:** a pickup on land and one underwater, a switch, a keyhole, the
-doors they open and a door push are compared with PSX recordings (below,
-"Recordings"). Puzzle holes and the inventory ring are not.
+**Status:** a pickup on land and one underwater, a switch on land and one
+underwater, a keyhole, the doors they open and a door push are compared with PSX recordings (below,
+"Recordings"). So is a puzzle hole, without the inventory ring.
 
 ## Object collision
 
@@ -59,8 +59,9 @@ rotation to Lara, then moves her to the item plus the rotated offset, but
 only when that spot's floor is within 256 of her height and its ceiling more
 than 761 above it (`0x8001D1E4..0x8001D25C`). Offsets: pickup (0, 0, -100)
 `0x800896F0`; switch 93 (0, 0, 362) `0x8008975C`, 103 (0, 0, 292)
-`0x80089768`, 92 (0, 0, 212) `0x80089774`, 104 none; keyhole and puzzle hole
-(0, 0, 362) `0x800897BC`, `0x800897E0`.
+`0x80089768`, 92 (0, 0, 212) `0x80089774`, 104 none; keyhole
+(0, 0, 362) `0x800897BC`; puzzle hole (0, 0, 327) `0x800897E0` (the port
+used 362 until the Opera recording below showed 327).
 
 MoveLaraPosition `0x8001D278(offset, item, lara)` (underwater pickups and
 switch 105) instead swims her there over several ticks. The spot is the
@@ -94,6 +95,18 @@ All land uses need Action held (input `&0x40`), Lara not airborne (status
   (`anim[130].frame_base + 0x12`). Every path but the fall-through returns
   without restoring the item's angles, so it keeps the tilt from the first
   in-range tick. At the surface (water status 2) neither branch runs.
+- **Switch underwater** (SwitchCollision2 `0x80050AC4`, type 105): needs
+  Action, the switch inactive (status `&6 == 0`), water status 1, hands free
+  (`0x8008C4EA` 0), Lara treading (state 13), Lara inside the underwater
+  switch table, and the switch's state below 2. Each such tick
+  MoveLaraPosition swims her toward (0, 0, 108) in the switch's frame
+  (`0x80089798`). On the tick she arrives her fall speed (`item+0x20`, the
+  swim speed) is zeroed, goal 40 is run through AnimateLara (treading's range
+  for 40 covers its clip: clip 129, frame 0), goal 13, gun status 1. The
+  switch goes active and is asked for state 0 if it is in state 1, else 1,
+  then AddActiveItem and one AnimateItem. Clip 129 (146 frames) ends with
+  EmptyHands (gun status written 0 by `0x80042F90`) into clip 108 frame 21.
+  The state-40 handler asks for the same camera as on land.
 - **Switch** (`0x80050844..0x80050A70`): also needs the switch inactive
   (status `&6 == 0`). Lara's yaw becomes the switch's, then the type's
   alignment. A switch in state 1 puts Lara in state 40 with clip 63 (93: 195,
@@ -157,6 +170,14 @@ TestTriggers `0x8001EE30` dispatches trigger types through `0x800100FC`:
   1, else seconds × 30) and goes back to active; otherwise it leaves the
   active list and goes inactive. The trigger's activations then toggle
   their objects' code bits (`flags ^= mask`, `0x8001F174..0x8001F184`).
+  Every activation first gives the object the trigger's timer byte the same
+  way (`item+0x26`, written by `0x8001F160` and `0x8001F170`, before the
+  flags at `0x8001F1E0`), even when the toggle turns it off. The object's
+  own control counts it through TriggerActive (`0x8001F718`), so a timed
+  door shuts on its own timer, not when its code bits change. The port
+  keeps it as `WorldObject::timer` and `WorldObject::trigger_active`; it
+  used to clear a timed object's code bits on a wall clock, which made a
+  timed door reopen when its switch came back out.
   Type 92 tests differently and is not ported.
 - **Key** (3): KeyTrigger `0x80051874` passes for an active keyhole once
   Lara's hands are no longer busy (gun status not 1), and deactivates it.
@@ -255,6 +276,58 @@ camera (-23660, -2730, 1024) runs on ticks 23..55, written by the same
 state-39 handler as on land (`0x8003996C..0x80039984`).
 `the_underwater_key_pickup_matches_the_recording` checks every tick.
 
+**Venice's underwater switch** (40, type 105, room 49). A handoff from
+`use_wall_game` through the Great Wall (`.psx/handoffs/venice_uw_switch`)
+leaves Lara treading in front of it at x33590 y1220 z36175, pitch 546, yaw
+-14969, with the level flipped: room 49 holds its flooded alternate, 51.
+Holding Action from there (`.psx/rec_venice_uw_switch`, run frames 0..240),
+she swims about (-14, -2, 6) a tick, levelling out at 364 a tick and
+turning to -16384, and arrives at x33172 y1152 z36352 on tick 29. That tick
+she enters clip 129 frame 0 with her hands busy (written by `0x80050BDC`),
+and the switch enters clip 412 (state 1, goal 0). Write watches on
+`.psx/rec_venice_uw_switch_cam` show the camera request (14560, -4550, 1024,
+divisor 6, from `0x80039A5C..0x80039A80`) on ticks 30..175. The switch's
+clip ends into 411 (state 0) on tick 151 and its trigger starts a fixed
+camera (`0x8001F344`). Lara's clip ends into clip 108 frame 21 on tick 175,
+and her hands are freed that tick. The camera trigger is not checked.
+`the_underwater_switch_matches_the_recording` checks every other value for
+201 ticks, on the level flipped with `engine::editor::flipped`. The port
+does not flip levels in play yet.
+
+**Opera House's Relay Box** (puzzle hole 195, type 182, room 183, beside
+the lift). A handoff from the Venice recording's end state
+(`.psx/handoffs/opera_puzzle_hole`) leaves Lara standing just short of the
+hole (x78307 z43769, yaw 107, local z 249, outside 312..512). In
+`.psx/rec_opera_puzzle_hole` she walks forward (UP+R1 for run frames 0..24)
+until the wall stops her at z43931, Action at frame 80 opens the ring and
+Action at 160 chooses the Relay Box (174). On the first tick after the ring
+closes (run frame 230, tick 0) she is aligned to x78336 z43847 (327 in
+front), yaw 0, in clip 134 frame 0 with her hands busy, and the hole goes
+active (`0x800515D8`). The hole becomes type 186 on tick 80 (`0x80051690`,
+clip frame 80), the clip ends into standing with hands free on tick 109,
+when the hole is marked used (`0x800518CC`), and the camera request
+(-14560, -4550, 1024, from `0x80039B94..0x80039BAC`) runs on ticks 1..109.
+`the_opera_puzzle_hole_matches_the_recording` checks these, using the piece
+on the press as for keys.
+
+**Offshore Rig's cell button** (switch 21, type 93, room 5) and the cell
+door (19). A handoff from the Opera recording's end state
+(`.psx/handoffs/rig_timed_switch`) leaves Lara standing 411 in front of the
+button. In `.psx/rec_rig_timed_switch` she presses Action once (run frames
+0..6) and waits. Tick 0 aligns her 362 in front (x53098 z94720, yaw
+16384) in clip 195, and the button enters clip 390. Lara's clip ends into
+standing on tick 83. The same tick the button's clip has deactivated it, so
+SwitchTrigger gives it 420 ticks (14 s, `0x80051814`, `0x80051824`), and the
+trigger's activation gives the door 420 too and sets its code bits. From
+tick 84 both count down a tick at a time through TriggerActive. The door
+enters clip 408 on tick 84, reaches 407 (open) on tick 145, and both timers
+reach -1 on tick 503. On tick 504 the button asks for state 1 (clip 391)
+and the door for state 0 (clip 406, `0x8004CA60`). The door is shut (clip
+405) on tick 565. On tick 587 the button's clip ends, its trigger fires
+again, and the activation clears the door's code bits and gives it 420 once
+more; the door stays shut. `the_rig_timed_button_matches_the_recording`
+checks these for 601 ticks.
+
 **Running into the closed front door.** From the same checkpoint, RIGHT for
 run frames 2..52 and UP from frame 120 (`.psx/rec_home_door_push`). Lara runs
 west into the door's shut sector and is pinned at x46185 while still in
@@ -271,7 +344,7 @@ all forty recorded ticks.
 
 ## Not ported
 
-- Switch 105 (underwater, MoveLaraPosition), flares (state 67).
+- Flares (state 67). Flipping a level in play.
 - The inventory ring at keyholes and puzzle holes.
 - Type 92's own clip and trigger test; Venice's door hold.
 - The room list of object collision.
