@@ -235,6 +235,33 @@ impl WorldGeometry {
         self.sector(room, x, z)
     }
 
+    /// The sector GetFloor `0x8001E41C` reads for (x, z) in `room`: a point
+    /// outside the room is clamped onto its edge sectors (the first and last
+    /// z rows keep x off the corners), whose portals lead on.
+    fn clamped_sector(&self, room: usize, x: i32, z: i32) -> Option<&Sector> {
+        let r = self.data.rooms.get(room)?;
+        let (xs, zs) = (r.x_sectors as i32, r.z_sectors as i32);
+        let mut sx = (x - r.origin[0]) >> 10;
+        let mut sz = (z - r.origin[2]) >> 10;
+        if sz <= 0 || sz >= zs - 1 {
+            sz = if sz <= 0 { 0 } else { zs - 1 };
+            if sx <= 0 {
+                sx = 1;
+            } else if sx > xs - 2 {
+                sx = xs - 2;
+            }
+        } else if sx < 0 {
+            sx = 0;
+        } else if sx >= xs {
+            sx = xs - 1;
+        }
+        let index = usize::try_from(sx).ok()? * r.z_sectors + usize::try_from(sz).ok()?;
+        if self.shut.contains(&(room, index)) {
+            return Some(&SHUT);
+        }
+        r.sectors.get(index)
+    }
+
     fn sector(&self, room: usize, x: i32, z: i32) -> Option<&Sector> {
         let index = self.sector_index(room, x, z)?;
         if self.shut.contains(&(room, index)) {
@@ -251,7 +278,7 @@ impl WorldGeometry {
         let rooms = self.data.rooms.len();
         // Portals form cycles. Bound traversal, rather than recurse on bad assets.
         for _ in 0..rooms.min(64) {
-            let sector = self.sector(room, x, z)?;
+            let sector = self.clamped_sector(room, x, z)?;
             let info = self.data.floor_info(sector);
             if let Some(next) = info.portal.filter(|&r| r != room && r < rooms) {
                 room = next;

@@ -53,6 +53,9 @@ struct ObjectTypeData {
     swimming: Option<crate::player::SwimmingTuning>,
     #[serde(default)]
     pistols: Option<crate::player::GunTuning>,
+    /// Another type whose clips this one plays (its setup shares them).
+    #[serde(default)]
+    animations_from: Option<u16>,
 }
 
 #[derive(serde::Deserialize)]
@@ -228,6 +231,9 @@ pub fn pistol_tuning() -> crate::player::GunTuning {
 fn register_object_types(app: &mut App) {
     for data in object_types() {
         let mut object_type = ObjectType::new(data.name.clone());
+        if let Some(source) = data.animations_from {
+            object_type = object_type.with_animations_from(source);
+        }
         if data.id == crate::player::LARA {
             object_type = object_type.on_spawn(crate::player::spawn_lara);
         }
@@ -465,6 +471,10 @@ impl Plugin for InteractionsPlugin {
         engine::add_once(app, crate::spider::SpiderRulesPlugin);
         engine::add_once(app, crate::crow::CrowRulesPlugin);
         engine::add_once(app, crate::trex::TRexRulesPlugin);
+        engine::add_once(app, crate::dog::DogRulesPlugin);
+        engine::add_once(app, crate::rat::RatRulesPlugin);
+        engine::add_once(app, crate::gunman::GunmanRulesPlugin);
+        engine::add_once(app, crate::club_man::ClubManRulesPlugin);
         engine::add_once(app, crate::traps::TrapsPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");

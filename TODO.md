@@ -227,6 +227,15 @@ it off. Record partial progress below without checking the parent item.
   recordings. [Evidence](docs/creature-evidence.md),
   [crow tests](game/tests/crow.rs), [T-Rex tests](game/tests/trex.rs).
   The eagle (same routine) has no recording.
+- [x] Venice's dogs, rats, gunmen (three looks) and club men, with
+  CreatureVault (climbing and dropping blocks), the gunmen's line of sight
+  and hit roll, GetFloor's edge clamp and shared animation sets. Seven
+  cases (5405 ticks) from one played run match tick for tick, recorded
+  before the port, with the boxes doors left blocked and Lara as each
+  creature saw her. [Evidence](docs/creature-evidence.md#venice),
+  [tests](game/tests/gunman.rs). The motorboat (it moves Lara at its place
+  in the active list), smashables on the line of fire and Lara's hit flag
+  remain.
 - [x] The Great Wall's traps: falling blocks, spikes, boulders, dart
   emitters and darts, sliding and wall blades, spiked rollers and the
   trapdoor, with object floors and ceilings. Eight cases (3434 ticks) from

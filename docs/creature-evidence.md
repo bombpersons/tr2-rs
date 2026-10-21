@@ -1,9 +1,11 @@
-# Creatures: shared AI, the tiger, the spider, the crow and the T-Rex
+# Creatures: shared AI, the Wall's creatures and Venice's
 
-The tiger (type 39), the small spider (type 36), the crow (type 38) and the
-T-Rex (type 214) run on shared creature routines (`game::creature`) with a
+The tiger (type 39), the small spider (type 36), the crow (type 38), the
+T-Rex (type 214) and Venice's dogs (15), gunmen (16, 17, 18), rats (21) and
+club men (32) run on shared creature routines (`game::creature`) with a
 control function per type (`game::tiger`, `game::spider`, `game::crow`,
-`game::trex`) registered by `register_creature`. The
+`game::trex`, `game::dog`, `game::gunman`, `game::rat`, `game::club_man`)
+registered by `register_creature`. The
 earlier rule in `game::interactions` still drives the other creature types.
 Only the supplied Tomb Raider II USA Rev 3 disc and `psx` were used; the
 earlier OpenLara/TR2Main-derived creature rules no longer apply to these
@@ -11,8 +13,10 @@ types.
 
 ## Sources
 
-Routines were read with `psx disasm --ram` from Wall checkpoints. Their
-listings are kept in the ignored `validation/tiger/asm/`.
+Routines were read with `psx disasm --ram` from Wall checkpoints, and
+Venice's from a Venice checkpoint (`.psx/venice_enemies_survey`). The Wall
+listings are kept in the ignored `validation/tiger/asm/`. Venice is the
+level file `boat` (the file `venice` is Bartoli's Hideout).
 
 | Routine | Address | Port |
 |---|---|---|
@@ -29,6 +33,12 @@ listings are kept in the ignored `validation/tiger/asm/`.
 | TigerControl | `0x80021FCC` | `tiger::control` |
 | InitialiseBird, BirdControl (crow and eagle) | `0x800127DC`, `0x800128A4` | `crow::initialise`, `crow::control` |
 | TRexControl, CreatureKill | `0x800239C4`, `0x80017978` | `trex::control`, `CreatureContext::kill` |
+| Dog control | `0x80021AC8` | `dog::control` |
+| Rat control | `0x80051990` | `rat::control` |
+| Gunmen: initialise, control, Targetable, ShotLara, GunHit | `0x8004DF34`, `0x8004DFE4`, `0x8004D648`, `0x8004DC90`, `0x8004DA24` | `gunman::control`, `targetable`, `shoot` |
+| Club man control | `0x8002BF54` | `club_man::control` |
+| CreatureNeck, CreatureVault | `0x80017530`, `0x800177C0` | `creature::neck`, `CreatureContext::vault` |
+| GetFloor (its edge clamp) | `0x8001E41C` | `engine::world::WorldGeometry::floor_room` |
 | SpiderControl, SpiderLeap, ExplodingDeath | `0x8005C1EC`, `0x8005C0D4`, `0x800498D8` | `spider::control`, `spider::leap` |
 | InitialiseDoor, ShutThatDoor, DoorControl, AlterFloorHeight | `0x8004C358`, `0x8004C284`, `0x8004C954`, `0x8004AA4C` | `interactions::door_boxes`, `block_level_boxes`, `control_doors` |
 | GetRandomControl | `0x8006E518`, seed `0x80089D54` | `engine::random::GameRandom` |
@@ -98,6 +108,53 @@ Creature slots are 68 bytes from `0x801A29C0`; the slot's LOT starts at +0x10.
   otherwise, roars at random (512 in 32768) when she is ahead, and bites
   within 1500. Touching her costs her 10 a tick while it runs and 1
   otherwise. Its jaws (meshes 0x3000) take 10000 and call CreatureKill.
+- **Dog.** Health 10, radius 341, pivot 300, head joint 20. Not violent.
+  Bored, it walks, stops and takes up two idle poses (4, 5; state 6 is
+  left the same way), one draw a tick. Roused, it runs, leaps from within
+  768 (squared `0x8FFFF`) and bites standing within 341 or on the run
+  within 682. Each attack bites once (touch `0x13F7000`): the leap for 200,
+  the others for 100. Death is its clip 13 in state 10.
+- **Rat.** Health 4, radius 102, pivot 50, head joint 4. Not violent; it
+  always turns at up to 1092 a tick. Every change of gait goes through its
+  stop: it sets the state it wants and stops. It bites once within 341
+  (touch `0x7F`) for 20. Death is its clip 9 in state 6.
+- **Gunmen.** Types 16, 17 and 18 are one man in three looks: the setup
+  gives 17 and 18 type 16's clips and frames (`animations_from` in
+  `object_types.json`, applied as a level loads by
+  `ObjectTypes::share_animations`), and their initialise only changes which
+  meshes show. Health 25, radius 102, pivot 50; joint 1 turns by the head
+  angle. Not violent. They fire when Lara is ahead within 8192 and in clear
+  sight from 768 above their feet to 768 above hers (Targetable, LOS
+  `0x8001FB54`): standing or kneeling (one draw), or on the run beyond 2048
+  in her zone. ShotLara rolls to hit: a draw against a chance that falls
+  with distance and with her speed across the line of fire (32-bit
+  arithmetic kept, overflow included); a hit costs her 50 and GunHit draws
+  once more. Only the stop state clears the turn limit. Death is clip 20
+  or 21 of type 16's, at random.
+- **Club man.** Health 27, radius 102, pivot 0; step 1024 and drop -1024
+  (InitialiseSlot gives types 32 and 33 these). Violent. Joint 1 turns by
+  the head angle (while it attacks) and joint 5 by the neck (while it
+  moves). Three attacks hit once each (touch `0x600`): two for 80, one for
+  100. Death is clip 26 in state 11.
+- **CreatureVault.** Animates as CreatureAnimation with no tilt. If that
+  took the creature across one block edge (x or z) onto a floor that rose
+  more than 384, or over a drop of more than 896, it is put back at its
+  old height and room, 260 short of the edge and facing across it; the
+  club man then starts a climb clip: 27 (rise over 896, state 12), 28 (up
+  to 640, 13), 29 (up to 896, 14) or 30 (the drop, 15). The dead club man
+  still calls it.
+- **GetFloor's edge clamp.** A point outside the room it is asked about is
+  clamped onto the room's edge sectors (on the first and last z rows x is
+  kept off the corners) and that sector's portal followed. Line-of-sight
+  sweeps sample points ahead of the room they start in, so the gunmen's
+  sight depended on it.
+- **Lara as creatures see her.** Lara is not in the active list: the
+  control phase runs the items, then the effects, then Lara
+  (`0x800424F0`), then counts the tick. So creatures see her as she ended
+  the tick before, unless an item earlier in the list moves her: the
+  motorboat she drives (item 26 in Venice) writes her position in its
+  control (`0x80014698`, `0x80014A5C` as she dives off), and creatures
+  woken before she boarded run after it.
 - **CreatureKill.** The creature goes to its clip 11 in state 8. Lara is
   put at its position and facing on the first clip of object 12 (a one-frame
   clip of state 0) with goal 6 and animated once, so its state change takes
@@ -182,6 +239,41 @@ at tick 32 while wraps were counted twice; `trex_kill` diverged at tick 169
 until the seed at its control was recorded. The kill tick also checks
 Lara's clip, frame, position, facing, room and set camera.
 
+### Venice
+
+The same tool cuts Venice's cases from one played run: `psx handoff` from
+`.psx/use_wall_game`, the level-skip cheat into Venice, then dogs, gunmen,
+a club man and rats fought on foot and shot (and the motorboat driven),
+29264 fields replayed from pad input with no pokes. Venice places its
+item list and boxes elsewhere than the Wall (the item pointer is
+`0x8008AAAC`, the slots `0x8008C1C0`), and runs more creatures at once, so
+its idle-search chunks are 10 fields. Two more things are recorded for
+these cases:
+
+- **Blocked boxes.** Doors Lara opened earlier unblock their boxes. Each
+  case's JSON lists the boxes blocked (overlap bit 0x4000, watched) from
+  the first row and wherever they change, and the harness applies them
+  (`with_blocked_boxes`); doors themselves are not replayed.
+- **Lara as seen.** `seen_lara_*` columns note her pose as CreatureAIInfo
+  first reads her x (`0x80014EB0`) after the type's control began; the
+  harness gives the creatures that pose.
+
+| Case | Ticks | What happens |
+|---|---|---|
+| dogs | 1365 | the first two dogs leap and bite and are shot; a gunman is about |
+| dog_shot | 311 | a dog bites Lara twice and is shot |
+| rats | 826 | three rats (one trigger wakes 37 before 36); one bites and is shot |
+| gunman | 1115 | the first gunman (type 17) shoots at Lara until shot |
+| gunman_long | 1161 | a gunman (18) fought while Lara drives the boat, swims, takes a medipack |
+| gunman_rats | 226 | a gunman (18) shot among the rats |
+| club_man | 401 | a club man hits Lara once and is shot |
+
+All were recorded before the routines were written. What they found:
+the dog's leap range (first read as `0x7FFFF`), the gunmen's turn limit
+(read as cleared in every state), type 16's death clips for 17 and 18,
+the rats' wake order, the blocked boxes, GetFloor's edge clamp and the
+boat moving Lara first.
+
 ## Not ported
 
 - The flinch ("spaz") branch of ItemPushLara: it is presentation only.
@@ -191,7 +283,14 @@ Lara's clip, frame, position, facing, room and set camera.
   cost are kept. Clip sound cues are emitted as for other objects.
 - Flip-map zones: no ported type needs them yet.
 - The eagle (type 47) shares the crow's routine but has no recording.
-- Lara's hit flag from the T-Rex's jaws, and her hands-busy gun status
-  during the kill (she is dead; the port's Killed mode stops her anyway).
+- Lara's hit flag (status 0x10), set by every bite, blow and gunshot, and
+  her hands-busy gun status during the T-Rex's kill (she is dead; the
+  port's Killed mode stops her anyway).
+- The gunmen's shots smashing objects on the line of fire (ObjectOnLOS
+  `0x80020618`, SmashItem `0x80041444`), their muzzle flashes and misses'
+  ricochets (presentation; GunMiss draws only from the presentation
+  generator), and the meshes their initialise hides.
+- The motorboat: its control moves Lara at its place in the active list.
+  When it is ported it must run there, among the creatures.
 - The frame catch-up after Lara's death.
 - Other creature types, which keep the older provisional rule.

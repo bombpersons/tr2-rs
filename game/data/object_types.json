@@ -52,6 +52,76 @@
    }
   },
   {
+   "id": 15,
+   "name": "dog",
+   "creature": {
+    "health": 10,
+    "radius": 341,
+    "damage": 100,
+    "pivot": 300,
+    "head_joint": 20
+   }
+  },
+  {
+   "id": 16,
+   "name": "gunman_1",
+   "creature": {
+    "health": 25,
+    "radius": 102,
+    "damage": 50,
+    "pivot": 50,
+    "head_joint": 1
+   }
+  },
+  {
+   "id": 17,
+   "name": "gunman_2",
+   "animations_from": 16,
+   "creature": {
+    "health": 25,
+    "radius": 102,
+    "damage": 50,
+    "pivot": 50,
+    "head_joint": 1
+   }
+  },
+  {
+   "id": 18,
+   "name": "gunman_3",
+   "animations_from": 16,
+   "creature": {
+    "health": 25,
+    "radius": 102,
+    "damage": 50,
+    "pivot": 50,
+    "head_joint": 1
+   }
+  },
+  {
+   "id": 21,
+   "name": "rat",
+   "creature": {
+    "health": 4,
+    "radius": 102,
+    "damage": 20,
+    "pivot": 50,
+    "head_joint": 4
+   }
+  },
+  {
+   "id": 32,
+   "name": "club_man",
+   "creature": {
+    "health": 27,
+    "radius": 102,
+    "damage": 100,
+    "step": 1024,
+    "drop": -1024,
+    "head_joint": 1,
+    "neck_joint": 5
+   }
+  },
+  {
    "id": 36,
    "name": "spider",
    "creature": {

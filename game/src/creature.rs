@@ -502,6 +502,15 @@ pub fn head(creature: &mut Creature, required: i16) {
     creature.head = creature.head.wrapping_add(change).clamp(-12288, 12288);
 }
 
+/// CreatureNeck `0x80017530`: as [`head`], for the neck.
+pub fn neck(creature: &mut Creature, required: i16) {
+    if creature.search.is_none() {
+        return;
+    }
+    let change = required.wrapping_sub(creature.neck).clamp(-910, 910);
+    creature.neck = creature.neck.wrapping_add(change).clamp(-12288, 12288);
+}
+
 /// Another creature it would walk into (`0x80016354`): an active, moving
 /// creature in the same room within its radius.
 #[derive(Clone, Copy, Debug)]
@@ -845,6 +854,54 @@ impl CreatureContext<'_> {
             self.health,
             self.cues,
         )
+    }
+
+    /// CreatureVault `0x800177C0`: animate as [`Self::animate`] (no tilt);
+    /// if that took the creature across one block edge onto a floor that
+    /// rose by more than 384, or over a drop of more than 896, put it back
+    /// at its height and room, `shift` short of the edge and facing across
+    /// it, and return the climb: 2 (up to 640), 3 (up to 896), 4 (higher)
+    /// or -4 (the drop). The caller starts its climb clip. 0 otherwise.
+    pub fn vault(&mut self, angle: i16, shift: i32) -> i32 {
+        let [x, y, z] = self.body.position;
+        let (block_x, block_z, room) = (x >> 10, z >> 10, self.body.room);
+        self.animate(angle, 0);
+        let new_y = self.body.position[1];
+        let climb = if self.body.floor > y + 896 {
+            -4
+        } else if new_y > y - 384 {
+            return 0;
+        } else if new_y > y - 640 {
+            2
+        } else if new_y > y - 896 {
+            3
+        } else {
+            4
+        };
+        let [new_x, _, new_z] = self.body.position;
+        let (new_block_x, new_block_z) = (new_x >> 10, new_z >> 10);
+        if block_z == new_block_z {
+            if block_x == new_block_x {
+                return 0;
+            }
+            (self.body.position[0], self.body.yaw) = if block_x < new_block_x {
+                ((new_block_x << 10) - shift, 16384)
+            } else {
+                ((block_x << 10) + shift, -16384)
+            };
+        } else if block_x == new_block_x {
+            (self.body.position[2], self.body.yaw) = if block_z < new_block_z {
+                ((new_block_z << 10) - shift, 0)
+            } else {
+                ((block_z << 10) + shift, -32768)
+            };
+        }
+        self.body.floor = y;
+        self.body.position[1] = y;
+        if self.body.room != room {
+            self.room_order.enter(self.body, room);
+        }
+        climb
     }
 
     /// CreatureKill `0x80017978`: the creature goes into its kill clip

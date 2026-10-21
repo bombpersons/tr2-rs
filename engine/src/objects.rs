@@ -12,7 +12,7 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 use crate::psx::PsxMaterial;
 use crate::schedule::{LifecycleSystems, simulation_enabled};
 use crate::shell::GameSystems;
-use crate::world::{Placement, WorldGeometry};
+use crate::world::{Level, Placement, WorldGeometry};
 
 /// Activation code bits of an object's flag word (one bit per trigger mask
 /// slot). An object is active when all five are set, unless it is inverted.
@@ -121,6 +121,8 @@ pub struct SpawnContext<'a> {
 #[derive(Clone, Default)]
 pub struct ObjectType {
     pub name: String,
+    /// Another type whose clips this type's model plays instead of its own.
+    pub animations_from: Option<u16>,
     init: Vec<InitHook>,
     spawn: Option<SpawnHook>,
 }
@@ -139,6 +141,14 @@ impl ObjectType {
     /// Build placements of this type with `hook` instead of as a [`WorldObject`].
     pub fn on_spawn(mut self, hook: impl Fn(&mut EntityCommands, &SpawnContext) + Send + Sync + 'static) -> Self {
         self.spawn = Some(Arc::new(hook));
+        self
+    }
+
+    /// Play type `source`'s clips instead of this model's own, for types
+    /// that share one animation set (the original's setup copies the
+    /// first-clip and frame pointers).
+    pub fn with_animations_from(mut self, source: u16) -> Self {
+        self.animations_from = Some(source);
         self
     }
 
@@ -180,6 +190,28 @@ impl ObjectTypes {
 
     pub fn get(&self, kind: u16) -> Option<&ObjectType> {
         self.types.get(&kind)
+    }
+
+    /// The level as it is played: the models of types that borrow another
+    /// type's clips ([`ObjectType::animations_from`]) given that type's. The
+    /// level file itself is left as it is.
+    pub fn share_animations(&self, level: &Arc<Level>) -> Arc<Level> {
+        let borrowed: Vec<(u16, [usize; 2])> = self
+            .types
+            .iter()
+            .filter_map(|(&kind, t)| Some((kind, level.model(t.animations_from?)?.animations)))
+            .filter(|(kind, _)| level.model(*kind).is_some())
+            .collect();
+        if borrowed.is_empty() {
+            return level.clone();
+        }
+        let mut shared = (**level).clone();
+        for (kind, clips) in borrowed {
+            for model in shared.models.iter_mut().filter(|m| m.id == kind) {
+                model.animations = clips;
+            }
+        }
+        Arc::new(shared)
     }
 
     /// Metadata for authoring tools; hooks remain owned by the running game.

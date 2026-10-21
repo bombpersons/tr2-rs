@@ -446,6 +446,7 @@ fn finish_level(
         let Some(data) = assets.remove(&p.handle) else { return };
         (p.name.clone(), Arc::new(data), format!("levels/{}/atlas.png", p.name))
     };
+    let data = types.share_animations(&data);
     for e in &old {
         commands.entity(e).despawn();
     }

@@ -20,7 +20,7 @@ use engine::{
     schedule::{InteractionSystems, WorldSystems},
     testing::{TickApp, Trajectory, headless_app},
     triggers::{ObjectActivated, TriggerSystems},
-    world::{Level, NO_BOX, WorldGeometry},
+    world::{BoxFlags, Level, NO_BOX, WorldGeometry},
 };
 use game::{
     creature::{Creature, IdleSearch, ItemBody, Mood, spawn_components},
@@ -55,6 +55,9 @@ struct Replayed {
     starts: Vec<usize>,
     lara: Entity,
     creatures: Vec<(usize, Entity)>,
+    /// From the recording's metadata: from each listed row on, the boxes
+    /// the original's doors left blocked (none listed: as the level starts).
+    blocked_boxes: Vec<(usize, Vec<usize>)>,
 }
 
 impl Replayed {
@@ -77,9 +80,9 @@ pub struct CreatureReplay {
 }
 
 impl CreatureReplay {
-    /// Set up `items` (all of type `kind`) as they stand in the recording's
-    /// first row. `pre_initialised` marks components a type's own set-up
-    /// would otherwise add and run again.
+    /// Set up Wall's `items` (all of type `kind`) as they stand in the
+    /// recording's first row. `pre_initialised` marks components a type's
+    /// own set-up would otherwise add and run again.
     pub fn new(
         csv: &str,
         kind: u16,
@@ -87,8 +90,21 @@ impl CreatureReplay {
         slot_fields: &[&'static str],
         pre_initialised: impl Fn(&mut EntityWorldMut),
     ) -> Self {
+        let level = include_bytes!("../../assets/levels/wall/level.json");
+        Self::in_level(level, csv, kind, items, slot_fields, pre_initialised)
+    }
+
+    /// [`Self::new`] in another level (its `level.json`).
+    pub fn in_level(
+        level: &[u8],
+        csv: &str,
+        kind: u16,
+        items: &[usize],
+        slot_fields: &[&'static str],
+        pre_initialised: impl Fn(&mut EntityWorldMut),
+    ) -> Self {
         let original = Trajectory::parse_csv(csv).unwrap();
-        let data: Level = serde_json::from_slice(include_bytes!("../../assets/levels/wall/level.json")).unwrap();
+        let data: Level = serde_json::from_slice(level).unwrap();
         let world = WorldGeometry::new(data);
         let starts: Vec<usize> = world.data.animations.iter().map(|c| c.frame_start).collect();
         let mut app = headless_app(game::tick_rate(game::REGION));
@@ -129,6 +145,7 @@ impl CreatureReplay {
             starts: starts.clone(),
             lara,
             creatures: creatures.clone(),
+            blocked_boxes: Vec::new(),
         });
         app.add_systems(
             FixedUpdate,
@@ -143,6 +160,15 @@ impl CreatureReplay {
         let cursor = original.get(0, "search_cursor").unwrap() as usize;
         app.insert_resource(IdleSearch { steps: None, cursor: (cursor + visits) % 5 });
         Self { app, original, starts, lara, creatures, slot_fields: slot_fields.to_vec() }
+    }
+
+    /// Block the boxes the original's doors blocked, row by row, from the
+    /// recording's metadata (`blocked_boxes`): doors are not replayed.
+    pub fn with_blocked_boxes(mut self, metadata: &str) -> Self {
+        let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
+        let changes = serde_json::from_value(metadata["blocked_boxes"].clone()).expect("no blocked_boxes");
+        self.app.world_mut().resource_mut::<Replayed>().blocked_boxes = changes;
+        self
     }
 
     /// The compared columns: each creature's item fields, then its slot's.
@@ -266,6 +292,8 @@ impl CreatureReplay {
 fn replay(
     enabled: Res<SimulationEnabled>,
     replayed: Res<Replayed>,
+    world: Res<WorldGeometry>,
+    mut flags: ResMut<BoxFlags>,
     mut random: ResMut<GameRandom>,
     mut players: Query<(&mut Player, &mut Motion, &mut AnimationState)>,
     mut creatures: Query<&mut ItemBody>,
@@ -274,7 +302,18 @@ fn replay(
         return;
     }
     let r = &*replayed;
-    let row = |name: &str| r.get(r.row, name);
+    // Lara as the creatures' control saw her, where the recording notes it
+    // (`seen_lara_*`: an item earlier in the active list, such as a boat she
+    // drives, can move her first); otherwise as she ended the row before.
+    let row = |name: &str| match r.original.get(r.row + 1, &format!("seen_{name}")) {
+        Some(seen) if r.original.get(r.row + 1, "control_seed").is_some_and(|s| s >= 0.0) => seen,
+        _ => r.get(r.row, name),
+    };
+    if let Some((_, blocked)) = r.blocked_boxes.iter().rev().find(|(tick, _)| *tick <= r.row) {
+        for b in 0..world.data.boxes.len() {
+            flags.set_blocked(b, blocked.contains(&b));
+        }
+    }
     if let Ok((mut player, mut motion, mut animation)) = players.get_mut(r.lara) {
         player.position = Vec3::new(row("lara_x") as f32, -row("lara_y") as f32, row("lara_z") as f32) / 1024.0;
         player.yaw = (row("lara_yaw") as f32 * std::f32::consts::TAU / 65536.0).rem_euclid(std::f32::consts::TAU);

@@ -16,12 +16,16 @@ pub mod braid;
 pub mod caustics;
 mod contact;
 pub mod creature;
+pub mod club_man;
 pub mod crow;
+pub mod dog;
+pub mod gunman;
 pub mod items;
 pub mod display;
 pub mod interactions;
 pub mod player;
 pub mod presentation;
+pub mod rat;
 pub mod save;
 pub mod sky;
 pub mod spider;
@@ -62,7 +66,8 @@ pub fn tick_rate(region: Region) -> TickRate {
 /// crate built on the game can drop or swap one feature:
 /// `GamePlugins.build().disable::<presentation::PresentationPlugin>()`.
 ///
-/// The creature types (`tiger`, `spider`, `winston`) come with
+/// The creature types (`tiger`, `spider`, `crow`, `trex`, `dog`, `rat`,
+/// `gunman`, `club_man`, `winston`) come with
 /// [`interactions::InteractionsPlugin`]; a mod changes one with
 /// `replace_creature` or `replace_object_type` rather than disabling it.
 pub struct GamePlugins;
