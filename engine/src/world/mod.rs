@@ -463,19 +463,27 @@ impl WorldGeometry {
     }
 
     /// Floor description of the sector under `position` in `room`, located
-    /// the way floor triggers are: coordinates truncate toward zero, and no
-    /// portal is followed.
+    /// the way floor triggers are: coordinates truncate toward zero, no
+    /// portal is followed, and the rooms below are followed down to the
+    /// bottom sector whatever the height, whose floor data GetHeight
+    /// `0x8001E944` leaves for TestTriggers. So a trigger on a pit's floor
+    /// fires for whoever stands over the pit (the Great Wall's trapdoor).
     pub fn trigger_floor(&self, position: Vec3, room: usize) -> Option<&FloorInfo> {
-        let room = self.data.rooms.get(room)?;
         let x = (position.x * 1024.0) as i32;
         let z = (position.z * 1024.0) as i32;
-        let sx = (x - room.origin[0]).div_euclid(1024);
-        let sz = (z - room.origin[2]).div_euclid(1024);
-        if sx < 0 || sz < 0 || sx as usize >= room.x_sectors || sz as usize >= room.z_sectors {
-            return None;
+        let mut room = self.data.rooms.get(room)?;
+        loop {
+            let sx = (x - room.origin[0]).div_euclid(1024);
+            let sz = (z - room.origin[2]).div_euclid(1024);
+            if sx < 0 || sz < 0 || sx as usize >= room.x_sectors || sz as usize >= room.z_sectors {
+                return None;
+            }
+            let sector = room.sectors.get(sx as usize * room.z_sectors + sz as usize)?;
+            match sector.below.and_then(|below| self.data.rooms.get(below)) {
+                Some(below) => room = below,
+                None => return Some(self.data.floor_info(sector)),
+            }
         }
-        let sector = room.sectors.get(sx as usize * room.z_sectors + sz as usize)?;
-        Some(self.data.floor_info(sector))
     }
 
     /// Bounds of every mesh vertex of the model of object type `kind`, in its

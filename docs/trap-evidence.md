@@ -37,6 +37,13 @@ Object table (`0x800936D0`, 48-byte records): +0x0C init, +0x10 control,
   trigger's kind. The port keeps these as `engine::world::ObjectSurface`
   entries in `WorldGeometry`, laid by `traps::floors::lay_surfaces` each
   tick.
+- **Triggers come from the bottom sector.** GetHeight starts by following
+  the sector's room below (byte 4, until 255) whatever the height, and the
+  floor data it reads, triggers included, is that bottom sector's. So the
+  trapdoor (item 14, room 31) is triggered by the floor of the pool two
+  rooms down (31 over 3 over 33), while Lara still stands on it: the
+  recording lists it at tick 47 with her in room 31 at y −3072.
+  `WorldGeometry::trigger_floor` follows the rooms below the same way.
 - **Activation.** TestTriggers (`0x8001F1E4..0x8001F304`) adds an object to
   the active list whenever its code is complete and it is not already
   listed, so `ObjectActivated` is sent on every such action.
