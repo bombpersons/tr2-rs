@@ -455,6 +455,16 @@ to `$XDG_CONFIG_HOME/<package-name>/controls.json`, otherwise
 `~/.config/<package-name>/controls.json` (Windows: `%APPDATA%`). `--bindings PATH`
 overrides this in the demo. No profile is created by opening or cancelling a menu.
 
+Games can add a page of their own settings: put `ControlOption` rows
+(`ControlOption::toggle`, or `ControlOption::new` with a list of choices) in the
+`ControlsOptions` resource and give it a `title`. The menu then shows tabs in its
+title row. Tab, L1/R1 or a click turns the page. On the options page, up/down
+select, left/right or Enter change the choice, and Delete/West restores one row's
+default. The options are drafted with the bindings, so Save applies both and
+Restore defaults resets both. The menu doesn't store them: the game watches
+`ControlsOptions` for changes and keeps its own file. With no options, there
+is no second page.
+
 The menu is a reusable example, independent of `demo/`. Keep it in a finished game
 where it fits the options screen, or use the binding API with your own UI:
 

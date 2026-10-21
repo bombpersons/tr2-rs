@@ -1,9 +1,13 @@
 //! Reusable example controls menu. Gameplay still consumes logical ControllerState.
 //! Add ControlsPlugin beside ShellPlugin/PsxPlugin; call ControlsMenu::open from
 //! your game's options screen. Persistence is explicit on Save and close.
+//! Games can add settings of their own on a second page ([`ControlsOptions`]).
+mod options;
 #[cfg(test)]
 mod tests;
 mod view;
+
+pub use options::{ControlOption, ControlsOptions, Page};
 
 use crate::{
     controller::{
@@ -40,6 +44,8 @@ impl Plugin for ControlsPlugin {
             .init_resource::<InputFocus>()
             .init_resource::<Pointer>()
             .init_resource::<Hitboxes<Item>>()
+            .init_resource::<ControlsOptions>()
+            .init_resource::<Hitboxes<Page>>()
             .insert_resource(BindingStore::new(self.path.clone()))
             .insert_resource(Shortcuts(self.global_shortcuts))
             .add_systems(Startup, load)
@@ -94,6 +100,9 @@ pub struct ControlsMenu {
     draft: Option<ControllerBindings>,
     mode: Mode,
     status: String,
+    /// The page shown; only [`Page::Bindings`] when no options are registered.
+    pub page: Page,
+    options_draft: Option<ControlsOptions>,
 }
 impl ControlsMenu {
     pub fn open(&mut self) {
@@ -108,6 +117,10 @@ impl ControlsMenu {
     pub fn draft(&self) -> Option<&ControllerBindings> {
         self.draft.as_ref()
     }
+    /// The options as edited, until Save applies them to [`ControlsOptions`].
+    pub fn options_draft(&self) -> Option<&ControlsOptions> {
+        self.options_draft.as_ref()
+    }
     pub fn status(&self) -> &str {
         &self.status
     }
@@ -118,6 +131,7 @@ impl ControlsMenu {
     fn close(&mut self, focus: &mut InputFocus) {
         self.open = false;
         self.draft = None;
+        self.options_draft = None;
         self.mode = Mode::Browse;
         focus.captured = false;
         focus.wait_for_release = true;
@@ -173,6 +187,14 @@ const SAVE: usize = 15;
 const DISCARD: usize = 16;
 const ROWS: usize = 17;
 
+/// The row `delta` steps from `selected`, wrapping, skipping the action rows
+/// a page does not use (`used` of them are shown before the commands).
+fn step_row(selected: usize, delta: i32, used: usize) -> usize {
+    let rows: Vec<usize> = (0..used.min(RESTORE)).chain(RESTORE..ROWS).collect();
+    let at = rows.iter().position(|r| *r >= selected).unwrap_or(0) as i32;
+    rows[(at + delta).rem_euclid(rows.len() as i32) as usize]
+}
+
 #[allow(clippy::too_many_arguments)]
 fn drive(
     keys: Res<ButtonInput<KeyCode>>,
@@ -186,6 +208,8 @@ fn drive(
     shortcuts: Res<Shortcuts>,
     pointer: Res<Pointer>,
     hitboxes: Res<Hitboxes<Item>>,
+    mut options: ResMut<ControlsOptions>,
+    tabs: Res<Hitboxes<Page>>,
 ) {
     let selected_pad = pads.iter().min_by_key(|(e, _)| e.to_bits());
     let pad = selected_pad.map(|(_, p)| p);
@@ -217,6 +241,10 @@ fn drive(
     }
     if menu.draft.is_none() {
         menu.draft = Some(bindings.clone());
+        menu.options_draft = Some(options.clone());
+        if options.options.is_empty() {
+            menu.page = Page::Bindings;
+        }
         menu.mode = Mode::Browse;
         menu.status = if store.load_error.is_some() {
             "Saved controls could not be loaded. Defaults kept.".into()
@@ -321,6 +349,40 @@ fn drive(
                 menu.close(&mut focus);
                 return;
             }
+            // Tab, L1/R1 or a click on a tab name turns the page.
+            if !options.options.is_empty() {
+                let tab = pointer.position.and_then(|p| tabs.at(p)).filter(|_| pointer.just_pressed(MouseButton::Left));
+                let flip = keys.just_pressed(KeyCode::Tab)
+                    || pressed(GamepadButton::LeftTrigger)
+                    || pressed(GamepadButton::RightTrigger);
+                let page = tab.or(flip.then_some(match menu.page {
+                    Page::Bindings => Page::Options,
+                    Page::Options => Page::Bindings,
+                }));
+                if let Some(page) = page.filter(|p| *p != menu.page) {
+                    menu.page = page;
+                    if menu.selected < RESTORE {
+                        menu.selected = 0;
+                    }
+                    return;
+                }
+            }
+            if menu.page == Page::Options {
+                browse_options(
+                    &mut menu,
+                    &keys,
+                    pad,
+                    &pointer,
+                    hovered,
+                    clicked,
+                    &defaults,
+                    &mut store,
+                    &mut bindings,
+                    &mut options,
+                    &mut focus,
+                );
+                return;
+            }
             if let Some(item) = hovered.filter(|_| pointer.moved).or(clicked) {
                 menu.selected = item.row;
                 if let Some(device) = item.device {
@@ -355,25 +417,110 @@ fn drive(
             let click = clicked.is_some_and(|item| slot(item).is_some() || item.row >= RESTORE);
             if keys.just_pressed(KeyCode::Enter) || pressed(GamepadButton::South) || click {
                 match menu.selected {
-                    RESTORE => {
-                        menu.draft = Some(defaults.0.clone());
-                        menu.status = "Defaults restored (unsaved).".into();
+                    RESTORE | SAVE | DISCARD => {
+                        command(&mut menu, &defaults, &mut store, &mut bindings, &mut options, &mut focus)
                     }
-                    SAVE => match store.save(menu.draft.as_ref().unwrap()) {
-                        Ok(()) => {
-                            *bindings = menu.draft.as_ref().unwrap().clone();
-                            store.load_error = None;
-                            menu.close(&mut focus);
-                        }
-                        Err(error) => {
-                            warn!("Could not save controls: {error}");
-                            menu.status = "Could not save. Check the settings location.".into();
-                        }
-                    },
-                    DISCARD => menu.close(&mut focus),
                     _ => menu.begin_capture(pad_entity),
                 }
             }
         }
+    }
+}
+
+/// Restore defaults, Save and close, Discard and close: the rows both pages share.
+fn command(
+    menu: &mut ControlsMenu,
+    defaults: &Defaults,
+    store: &mut BindingStore,
+    bindings: &mut ControllerBindings,
+    options: &mut ResMut<ControlsOptions>,
+    focus: &mut InputFocus,
+) {
+    match menu.selected {
+        RESTORE => {
+            menu.draft = Some(defaults.0.clone());
+            if let Some(draft) = menu.options_draft.as_mut() {
+                draft.restore_defaults();
+            }
+            menu.status = "Defaults restored (unsaved).".into();
+        }
+        SAVE => match store.save(menu.draft.as_ref().unwrap()) {
+            Ok(()) => {
+                *bindings = menu.draft.as_ref().unwrap().clone();
+                if let Some(draft) = menu.options_draft.take() {
+                    options.set_if_neq(draft);
+                }
+                store.load_error = None;
+                menu.close(focus);
+            }
+            Err(error) => {
+                warn!("Could not save controls: {error}");
+                menu.status = "Could not save. Check the settings location.".into();
+            }
+        },
+        _ => menu.close(focus),
+    }
+}
+
+/// The options page: up/down select, left/right (or Enter, or a click on the
+/// value) change the choice, Del/West restore its default.
+#[allow(clippy::too_many_arguments)]
+fn browse_options(
+    menu: &mut ControlsMenu,
+    keys: &ButtonInput<KeyCode>,
+    pad: Option<&Gamepad>,
+    pointer: &Pointer,
+    hovered: Option<Item>,
+    clicked: Option<Item>,
+    defaults: &Defaults,
+    store: &mut BindingStore,
+    bindings: &mut ControllerBindings,
+    options: &mut ResMut<ControlsOptions>,
+    focus: &mut InputFocus,
+) {
+    let pressed = |b| pad.is_some_and(|p| p.just_pressed(b));
+    let used = options.options.len();
+    if let Some(item) = hovered.filter(|_| pointer.moved).or(clicked).filter(|i| i.row >= RESTORE || i.row < used) {
+        menu.selected = item.row;
+    }
+    let mut delta = 0;
+    if pointer.wheel > 0.0 {
+        delta -= 1;
+    } else if pointer.wheel < 0.0 {
+        delta += 1;
+    }
+    if keys.just_pressed(KeyCode::ArrowUp) || pressed(GamepadButton::DPadUp) {
+        delta -= 1;
+    }
+    if keys.just_pressed(KeyCode::ArrowDown) || pressed(GamepadButton::DPadDown) {
+        delta += 1;
+    }
+    menu.selected = step_row(menu.selected, delta, used);
+    let enter = keys.just_pressed(KeyCode::Enter) || pressed(GamepadButton::South);
+    let click = clicked.filter(|item| item.row == menu.selected);
+    if menu.selected < RESTORE {
+        let mut step = 0;
+        if keys.just_pressed(KeyCode::ArrowLeft) || pressed(GamepadButton::DPadLeft) {
+            step -= 1;
+        }
+        if keys.just_pressed(KeyCode::ArrowRight)
+            || pressed(GamepadButton::DPadRight)
+            || enter
+            || click.is_some_and(|i| i.device.is_some())
+        {
+            step += 1;
+        }
+        let reset = keys.just_pressed(KeyCode::Delete) || pressed(GamepadButton::West);
+        let Some(option) = menu.options_draft.as_mut().and_then(|d| d.options.get_mut(menu.selected)) else { return };
+        if reset {
+            option.value = option.default;
+        } else if step != 0 {
+            option.step(step);
+        } else {
+            return;
+        }
+        menu.status = format!("{}: {} (unsaved).", option.label, option.choice());
+    } else if enter || click.is_some() {
+        command(menu, defaults, store, bindings, options, focus);
     }
 }

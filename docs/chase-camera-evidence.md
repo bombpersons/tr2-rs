@@ -87,3 +87,11 @@ and angle requests from Lara states, swimming pitch, LOS through room portals
 with different heights, and the render offset path (not exercised for long
 here). Lara herself renders without her braid and, at field 61, about 30 px
 right of the original despite identical eye/target.
+
+## Free camera (port extra)
+
+`CameraOrbit` adds a player-driven yaw/pitch to `B29C`/`B2A0` in the ideal
+eye step, and on input ticks it overrides the default divisor. It is zero
+unless the player turns on mouse look or the right stick, so with the options
+off every check above is unchanged. Behaviour and limits:
+[free-camera.md](free-camera.md).

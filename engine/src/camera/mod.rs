@@ -3,9 +3,13 @@
 //! See docs/camera-evidence.md and docs/chase-camera-evidence.md. Fixed shots
 //! and the chase camera (ideal eye, smart shift, line of sight, movement) are
 //! ported from the executable; the L1 look camera remains provisional.
+//! [`free`] adds an optional player orbit (mouse or right stick), off by default.
 use std::collections::BTreeSet;
 
 pub mod chase;
+pub mod free;
+
+pub use free::{CameraOrbit, FreeCameraMenuPlugin, FreeCameraSettings, FreeCameraTuning};
 
 use bevy::prelude::*;
 
@@ -36,6 +40,20 @@ pub struct CameraCue {
 #[derive(Resource, Default)]
 pub struct CameraCues(pub Vec<CameraCue>);
 
+/// Which view the camera chose this tick.
+#[derive(Reflect, Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraMode {
+    /// The chase camera behind the avatar (the only one [`CameraOrbit`] moves).
+    #[default]
+    Chase,
+    /// The look button's view.
+    Look,
+    /// Framing the avatar's aim.
+    Aim,
+    /// A fixed shot from the level's camera list.
+    Fixed,
+}
+
 #[derive(Resource, Reflect, Default, Debug)]
 #[reflect(Resource)]
 pub struct CameraState {
@@ -47,6 +65,7 @@ pub struct CameraState {
     pub view_offset: f32,
     pub initialized: bool,
     pub fixed_camera: Option<usize>,
+    pub mode: CameraMode,
     /// None means untimed; zero means expired until this trigger is left.
     pub ticks_left: Option<u32>,
     /// Squared horizontal chase distance (0x8008b298): written by the chase
@@ -86,6 +105,7 @@ impl Plugin for CameraRulesPlugin {
                 .in_set(GameSystems::Game)
                 .run_if(simulation_enabled),
         );
+        free::rules(app);
     }
 }
 
@@ -161,7 +181,15 @@ pub fn chase_pose(player: &Avatar, world: Option<&WorldGeometry>, look: bool) ->
 
 /// Chase mode (0x8001a02c..0x8001a1cc then 0x80019214): the look target is
 /// the actor's x/z with the bounds height approached by a quarter per tick.
-fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, animation: Option<&AnimationState>) {
+/// The player's [`CameraOrbit`] adds to the angle and elevation the state
+/// asked for; it is zero (the original) unless the free camera is on.
+fn follow(
+    camera: &mut CameraState,
+    world: &WorldGeometry,
+    player: &Avatar,
+    animation: Option<&AnimationState>,
+    orbit: &CameraOrbit,
+) {
     use chase::Point;
     let wanted = actor_target(&world.data, player, animation);
     let target_y = if camera.initialized { approach_eye(camera.target, wanted, 4).y } else { wanted.y };
@@ -178,7 +206,8 @@ fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, anim
     let elevation =
         player.camera_elevation.map_or(0, |radians| (radians * 65536.0 / std::f32::consts::TAU).round() as i32);
     let distance = player.camera_distance.unwrap_or(chase::CHASE_DISTANCE);
-    let yaw = yaw + i32::from(player.camera_angle);
+    let yaw = yaw + i32::from(player.camera_angle) + orbit.yaw;
+    let elevation = elevation + orbit.pitch;
     let (mut ideal, distance2) = chase::ideal_eye(target, eye.room, yaw, elevation, distance);
     camera.chase_distance2 = Some(distance2);
     if !camera.initialized {
@@ -186,7 +215,8 @@ fn follow(camera: &mut CameraState, world: &WorldGeometry, player: &Avatar, anim
     }
     chase::shift_ideal(space, target, eye, &mut ideal, distance2);
     // 0x8001a22c: divisor 10 for chase unless the state asked otherwise.
-    let offset = chase::move_eye(space, target, &mut eye, ideal, player.camera_speed.unwrap_or(10));
+    let divisor = player.camera_speed.or(orbit.divisor).unwrap_or(10);
+    let offset = chase::move_eye(space, target, &mut eye, ideal, divisor);
     camera.position = eye.world();
     camera.target = target.world();
     camera.room = eye.room;
@@ -245,6 +275,7 @@ fn update_camera(
     mut camera: ResMut<CameraState>,
     pad: Res<ControllerState>,
     time: Res<Time>,
+    orbit: Res<CameraOrbit>,
 ) {
     let Ok((player, animation)) = players.single() else { return };
     let Some(world) = world else { return };
@@ -267,6 +298,15 @@ fn update_camera(
     camera.last_camera = cue.map(|cue| cue.index);
     let shot = cue.filter(|_| camera.ticks_left != Some(0));
     camera.fixed_camera = shot.map(|cue| cue.index);
+    camera.mode = if shot.is_some() {
+        CameraMode::Fixed
+    } else if pad.held(Button::L1) {
+        CameraMode::Look
+    } else if player.aim.is_some() {
+        CameraMode::Aim
+    } else {
+        CameraMode::Chase
+    };
     if let Some(cue) = shot {
         let record = world.data.cameras[cue.index];
         let eye = position(record.position);
@@ -298,7 +338,7 @@ fn update_camera(
     } else if let Some(offset) = player.aim {
         aim(&mut camera, &world, player, animation, offset);
     } else {
-        follow(&mut camera, &world, player, animation);
+        follow(&mut camera, &world, player, animation, &orbit);
     }
     camera.initialized = true;
 }

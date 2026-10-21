@@ -548,3 +548,58 @@ fn profiles_without_mouse_slots_load() {
     assert!(Button::ALL.iter().all(|b| loaded.mouse_button(*b).is_none()));
     assert_eq!(loaded, ControllerBindings::default());
 }
+
+fn options_fixture(path: &Path) -> App {
+    let mut app = fixture(path);
+    let mut options = app.world_mut().resource_mut::<ControlsOptions>();
+    options.title = "CAMERA".into();
+    options.add(ControlOption::toggle("look", "Mouse look", false));
+    options.add(ControlOption::new("speed", "Speed", &["1", "2", "3"], 1));
+    frame(&mut app);
+    app
+}
+
+/// Options are drafted with the bindings: Tab turns the page, left/right and
+/// Enter change a value, Save applies it, Discard and Restore leave it alone.
+#[test]
+fn options_page_drafts_changes_until_save() {
+    let dir = directory("options");
+    let mut app = options_fixture(&dir.join("controls.json"));
+    tap(&mut app, KeyCode::F1);
+    tap(&mut app, KeyCode::Tab);
+    assert_eq!(app.world().resource::<ControlsMenu>().page, Page::Options);
+    tap(&mut app, KeyCode::Enter);
+    tap(&mut app, KeyCode::ArrowDown);
+    tap(&mut app, KeyCode::ArrowLeft);
+    tap(&mut app, KeyCode::ArrowLeft);
+    let draft = app.world().resource::<ControlsMenu>().options_draft().unwrap().clone();
+    assert_eq!((draft.value("look"), draft.value("speed")), (Some(1), Some(2)), "left wraps");
+    assert_eq!(app.world().resource::<ControlsOptions>().value("look"), Some(0), "unsaved");
+    // Down from the last option skips the unused rows to the commands.
+    tap(&mut app, KeyCode::ArrowDown);
+    assert_eq!(app.world().resource::<ControlsMenu>().selected, RESTORE);
+    tap(&mut app, KeyCode::ArrowDown);
+    tap(&mut app, KeyCode::Enter);
+    assert!(!app.world().resource::<ControlsMenu>().is_open());
+    let options = app.world().resource::<ControlsOptions>();
+    assert_eq!((options.enabled("look"), options.value("speed")), (true, Some(2)));
+    // Restore defaults then discard: nothing changes.
+    tap(&mut app, KeyCode::F1);
+    app.world_mut().resource_mut::<ControlsMenu>().selected = RESTORE;
+    tap(&mut app, KeyCode::Enter);
+    assert_eq!(app.world().resource::<ControlsMenu>().options_draft().unwrap().value("speed"), Some(1));
+    tap(&mut app, KeyCode::Escape);
+    assert_eq!(app.world().resource::<ControlsOptions>().value("speed"), Some(2));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// Without registered options there is no second page.
+#[test]
+fn tab_does_nothing_without_options() {
+    let dir = directory("no-options");
+    let mut app = fixture(&dir.join("controls.json"));
+    tap(&mut app, KeyCode::F1);
+    tap(&mut app, KeyCode::Tab);
+    assert_eq!(app.world().resource::<ControlsMenu>().page, Page::Bindings);
+    std::fs::remove_dir_all(dir).unwrap();
+}

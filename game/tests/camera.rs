@@ -4,17 +4,15 @@ use std::sync::Arc;
 
 use bevy::prelude::*;
 use engine::{
-    camera::{CameraRulesPlugin, CameraState, approach_eye},
+    camera::{CameraMode, CameraOrbit, CameraRulesPlugin, CameraState, FreeCameraSettings, approach_eye},
     controller::Button,
-    testing::{TickApp, headless_app},
+    shell::InjectedMouse,
+    testing::{TickApp, TickInput, headless_app},
     world::{Level, WorldGeometry, format::CameraShot, position},
 };
 use game::{
     interactions::InteractionsPlugin,
-    player::{
-        AnimationState, Motion, Player, PlayerAnimations, PlayerMode, PlayerRulesPlugin,
-        SimulationEnabled,
-    },
+    player::{AnimationState, Motion, Player, PlayerAnimations, PlayerMode, PlayerRulesPlugin, SimulationEnabled},
 };
 
 fn wall() -> (App, Entity) {
@@ -238,4 +236,98 @@ fn chase_camera_matches_original_through_turn_climb_and_wall_stop() {
         }
     }
     assert!(failures.is_empty(), "{} ticks differ:\n{}", failures.len(), failures.join("\n"));
+}
+
+/// Lara standing at the climb route's start with the original's settled
+/// chase camera (as in the climb test above).
+fn settled_chase() -> (App, Entity) {
+    let (mut app, player) = wall();
+    app.add_plugins(PlayerRulesPlugin);
+    let clips = PlayerAnimations::from(app.world().resource::<WorldGeometry>().data.as_ref());
+    app.insert_resource(clips);
+    {
+        let mut p = app.world_mut().get_mut::<Player>(player).unwrap();
+        p.position = position([64176, 5376, 26090]);
+        p.room = 35;
+        p.mode = PlayerMode::Idle;
+    }
+    *app.world_mut().get_mut::<AnimationState>(player).unwrap() = AnimationState::at_frame(103, 45.0);
+    app.insert_resource(SimulationEnabled(false));
+    app.run_tick(&[]);
+    app.insert_resource(SimulationEnabled(true));
+    let mut camera = app.world_mut().resource_mut::<CameraState>();
+    camera.position = position([63752, 4787, 25846]);
+    camera.target = position([64176, 4795, 26090]);
+    camera.room = 35;
+    camera.initialized = true;
+    (app, player)
+}
+
+fn mouse(motion: Vec2, buttons: &[Button]) -> TickInput {
+    TickInput { buttons: buttons.to_vec(), mouse: InjectedMouse { motion, ..default() } }
+}
+
+/// Horizontal heading from the target to the eye, radians.
+fn eye_heading(camera: &CameraState) -> f32 {
+    let d = camera.position - camera.target;
+    d.x.atan2(d.z)
+}
+
+#[test]
+fn mouse_motion_leaves_the_original_camera_alone_while_free_camera_is_off() {
+    let (mut plain, _) = settled_chase();
+    let (mut moved, _) = settled_chase();
+    for _ in 0..30 {
+        plain.run_tick(&[]);
+        moved.run_input(&mouse(Vec2::new(40.0, -25.0), &[]));
+        let (a, b) = (plain.world().resource::<CameraState>(), moved.world().resource::<CameraState>());
+        assert_eq!((a.position, a.target), (b.position, b.target));
+    }
+    let orbit = moved.world().resource::<CameraOrbit>();
+    assert!(orbit.is_centred() && orbit.divisor.is_none());
+}
+
+#[test]
+fn mouse_look_orbits_the_chase_camera_and_holds_until_lara_moves() {
+    let (mut app, _) = settled_chase();
+    app.insert_resource(FreeCameraSettings { mouse: true, ..default() });
+    let start = eye_heading(app.world().resource::<CameraState>());
+    // 30 ticks of 80 counts right: 24000 units, about 132 degrees. Lara
+    // stands in a corner, so the original's wall shift keeps the eye nearer
+    // her than that.
+    for _ in 0..30 {
+        app.run_input(&mouse(Vec2::new(80.0, 0.0), &[]));
+    }
+    for _ in 0..30 {
+        app.run_tick(&[]);
+    }
+    let camera = app.world().resource::<CameraState>();
+    assert_eq!(camera.mode, CameraMode::Chase);
+    assert_eq!(app.world().resource::<CameraOrbit>().yaw, 24000);
+    let turned = (eye_heading(camera) - start).rem_euclid(std::f32::consts::TAU);
+    assert!((1.0..1.5).contains(&turned), "the eye swung {turned} rad around Lara");
+    assert!(camera.position.distance(camera.target) <= 1.6, "still at chase distance or nearer");
+    // Standing still well past the delay, the view stays where it was put.
+    app.run_ticks(60, &[]);
+    assert_eq!(app.world().resource::<CameraOrbit>().yaw, 24000);
+    // L1 hands the camera to the look view, which ignores and unwinds the orbit.
+    app.run_ticks(80, &[Button::L1]);
+    assert_eq!(app.world().resource::<CameraState>().mode, CameraMode::Look);
+    assert!(app.world().resource::<CameraOrbit>().is_centred());
+}
+
+#[test]
+fn walking_eases_the_orbit_back_behind_lara_after_the_delay() {
+    let (mut app, _) = settled_chase();
+    app.insert_resource(FreeCameraSettings { mouse: true, ..default() });
+    for _ in 0..10 {
+        app.run_input(&mouse(Vec2::new(-80.0, 30.0), &[]));
+    }
+    let orbit = *app.world().resource::<CameraOrbit>();
+    assert_eq!((orbit.yaw, orbit.pitch), (-8000, -3000), "mouse towards the player looks down");
+    // Turning on the spot counts as moving: nothing for the delay, then easing.
+    app.run_ticks(45, &[Button::Right]);
+    assert_eq!(app.world().resource::<CameraOrbit>().yaw, -8000);
+    app.run_ticks(60, &[Button::Right]);
+    assert!(app.world().resource::<CameraOrbit>().is_centred());
 }

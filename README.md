@@ -69,7 +69,7 @@ desktop GPU driver (or Mesa lavapipe with `--software`).
 cargo run                                # the game (default member: game/)
 cargo run -- --software                  # force a software adapter
 cargo run -- --region pal                # override REGION (display + tick rate)
-cargo run -- --controls                  # open the controls menu (F1 also opens it)
+cargo run -- --controls                  # open the controls menu (F1 also opens it; Tab: CAMERA page)
 cargo run -- --display                   # open the display menu (F2 also opens it)
 cargo run -- --fullscreen                # borderless fullscreen (F11 toggles)
 cargo run -- --aspect window             # screen width follows the window's shape

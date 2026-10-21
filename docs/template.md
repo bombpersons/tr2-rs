@@ -66,6 +66,19 @@ conditional sync and test unless upstream provides equivalent support.
   the game exited when Aspect was switched to match window. Upstream
   candidate: any game that changes a projection on resize hits it.
 
+- `psx-bevy/src/controls/options.rs` (new), `controls/mod.rs`,
+  `controls/view.rs`, `controls/tests.rs`, `README.md`: a second controls-menu
+  page for game settings. `ControlsOptions` holds labelled choice rows, which
+  the menu drafts with the bindings, applies on Save and resets with Restore
+  defaults. Tab, L1/R1 or a click on the title row's tabs turns the page.
+  With no options registered (the template default) the menu is unchanged.
+  The game uses it for the free camera's CAMERA page
+  ([free-camera.md](free-camera.md)). The 240-line screen had no room for
+  more rows, hence a page. Additive: `ControlsMenu` gained `page` and
+  `options_draft()`, and the command rows moved into a shared `command`
+  function. Upstream candidate: any game with a few input settings (invert,
+  sensitivity) needs somewhere to show them.
+
 ## Update 2026-10-18
 
 - Added upstream `PsxDepthBias` and `PsxMaterial::depth_bias`, including the

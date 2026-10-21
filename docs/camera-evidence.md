@@ -82,6 +82,8 @@ eye, look target, room, selected shot and timer through the developer MCP.
 Presentation applies that pose and includes rooms visible from the eye.
 Camera logic now runs on the fixed game tick and freezes with gameplay pause.
 Manual camera edits used for screenshot alignment still override presentation.
+The optional free camera (mouse look and right stick, off by default) is a port
+extra layered on the chase camera, not evidence: see [free-camera.md](free-camera.md).
 
 Chase framing, chase collision, animated
 bounds at shortened final keyframe intervals, fixed-camera obstacle/LOS
