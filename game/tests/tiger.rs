@@ -20,7 +20,7 @@ use engine::{
     world::{Level, WorldGeometry},
 };
 use game::{
-    creature::{CreatureBody, Mood, spawn_components},
+    creature::{ItemBody, Mood, spawn_components},
     interactions::{Enemy, InteractionsPlugin},
     player::{Motion, Player, SimulationEnabled},
     tiger::KIND,
@@ -68,7 +68,7 @@ fn replay(
     mut replayed: ResMut<Replayed>,
     mut random: ResMut<GameRandom>,
     mut players: Query<(&mut Player, &mut Motion)>,
-    mut tigers: Query<(&mut WorldObject, &mut CreatureBody, &mut Enemy)>,
+    mut tigers: Query<(&mut WorldObject, &mut ItemBody, &mut Enemy)>,
 ) {
     if !enabled.0 {
         return;
@@ -202,7 +202,7 @@ fn compare_case_until(csv: &str, shots: bool, ticks: usize) {
     let inputs: Vec<Vec<engine::controller::Button>> = vec![vec![]; ticks];
     let mut last_boxes = (0.0, 0.0);
     let rebuild = Trajectory::record(&mut app, &inputs, &COLUMNS, |world| {
-        let body = world.get::<CreatureBody>(tiger).unwrap();
+        let body = world.get::<ItemBody>(tiger).unwrap();
         let creature = world.get::<game::creature::Creature>(tiger).unwrap();
         let animation = world.get::<ObjectAnimation>(tiger).unwrap();
         let goal = world.get::<AnimationGoal>(tiger).unwrap();

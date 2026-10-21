@@ -22,12 +22,12 @@ use engine::{
     world::WorldGeometry,
 };
 
-use crate::player::{Motion, PLAYER_HEIGHT, PLAYER_RADIUS, Player};
+use crate::player::{PLAYER_HEIGHT, PLAYER_RADIUS, Player};
 
 use crate::presentation::{LEVELS, LevelRequest, Session};
 
 mod usable;
-pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, in_bounds};
+pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, align, in_bounds};
 
 /// The behaviours an object type can have, as `data/object_types.json`
 /// lists them.
@@ -43,8 +43,6 @@ struct ObjectTypeData {
     keyhole: Option<Keyhole>,
     #[serde(default)]
     door: Option<Door>,
-    #[serde(default)]
-    spikes: Option<Spikes>,
     #[serde(default)]
     block: Option<MovableBlock>,
     #[serde(default)]
@@ -122,10 +120,6 @@ pub struct DoorBoxes(pub Vec<usize>);
 #[derive(Component, Debug, Clone, Default)]
 pub struct DoorSectors(pub Vec<(usize, i32, i32)>);
 
-/// Kills on a fall, hurts while running over it.
-#[derive(Component, serde::Deserialize, Debug, Clone, Default)]
-pub struct Spikes {}
-
 #[derive(serde::Deserialize, Debug, Clone, Copy)]
 struct CreatureData {
     health: i32,
@@ -140,9 +134,18 @@ struct CreatureData {
     step: Option<i32>,
     #[serde(default)]
     drop: Option<i32>,
+    /// A flier's climb a tick (InitialiseSlot); 0 walks.
+    #[serde(default)]
+    fly: i32,
+    /// Box flags that bar its path (InitialiseSlot), when not doors'.
+    #[serde(default)]
+    block_mask: Option<u16>,
     /// The joint whose bone flags turn it by the head angle.
     #[serde(default)]
     head_joint: Option<usize>,
+    /// A second flagged joint, turned by the neck angle.
+    #[serde(default)]
+    neck_joint: Option<usize>,
 }
 
 impl CreatureData {
@@ -152,7 +155,10 @@ impl CreatureData {
             radius: self.radius as i32,
             step: self.step.unwrap_or(256),
             drop: self.drop.unwrap_or(-512),
+            fly: self.fly,
+            block_mask: self.block_mask.unwrap_or(engine::world::BLOCKED),
             head_joint: self.head_joint,
+            neck_joint: self.neck_joint,
         }
     }
 }
@@ -248,9 +254,6 @@ fn register_object_types(app: &mut App) {
             }
             if let Some(keyhole) = &hook.keyhole {
                 entity.insert((keyhole.clone(), UsableItem::default()));
-            }
-            if let Some(spikes) = &hook.spikes {
-                entity.insert(spikes.clone());
             }
             if let Some(creature) = hook.creature {
                 entity.insert(Enemy::new(creature));
@@ -460,6 +463,9 @@ impl Plugin for InteractionsPlugin {
         engine::add_once(app, crate::winston::WinstonRulesPlugin);
         engine::add_once(app, crate::tiger::TigerRulesPlugin);
         engine::add_once(app, crate::spider::SpiderRulesPlugin);
+        engine::add_once(app, crate::crow::CrowRulesPlugin);
+        engine::add_once(app, crate::trex::TRexRulesPlugin);
+        engine::add_once(app, crate::traps::TrapsPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
         app.add_message::<crate::player::GunHit>();
@@ -544,7 +550,7 @@ fn trigger_actions(
 fn combat(
     mut hits: MessageReader<crate::player::GunHit>,
     mut progress: ResMut<InteractionProgress>,
-    mut enemies: Query<(&mut Enemy, &mut WorldObject, Option<&mut crate::creature::CreatureBody>)>,
+    mut enemies: Query<(&mut Enemy, &mut WorldObject, Option<&mut crate::creature::ItemBody>)>,
 ) {
     for hit in hits.read() {
         let Ok((mut enemy, mut object, body)) = enemies.get_mut(hit.target) else { continue };
@@ -641,24 +647,13 @@ fn creatures(
 
 #[allow(clippy::type_complexity)]
 fn resolve_objects(
-    time: Res<Time>,
-    objects: Query<(&WorldObject, &Transform, Option<&ObjectCollider>, Has<Spikes>)>,
-    mut players: Query<(&mut Player, &Motion)>,
+    objects: Query<(&WorldObject, &Transform, Option<&ObjectCollider>)>,
+    mut players: Query<&mut Player>,
 ) {
-    for (mut p, motion) in &mut players {
-        for (o, t, collider, spikes) in &objects {
+    for mut p in &mut players {
+        for (o, t, collider) in &objects {
             if o.consumed {
                 continue;
-            }
-            if spikes {
-                let d = p.position - t.translation;
-                if d.with_y(0.0).length() < 0.5 && d.y.abs() < 0.3 {
-                    if !motion.grounded && motion.velocity.y < 0.0 {
-                        p.damage(1000);
-                    } else if motion.velocity.with_y(0.0).length() * 1024.0 / 30.0 >= 30.0 {
-                        p.damage((15.0 * 30.0 * time.delta_secs()).ceil() as i32);
-                    }
-                }
             }
             let Some(c) = collider else {
                 continue;
@@ -754,7 +749,7 @@ fn collide_doors(
     let aim = aim.map_or(&[][..], |a| a.0.as_slice());
     let Some(mut pass) = crate::contact::ContactPass::begin(&world, &player, pose, &collision, aim) else { return };
     for (object, transform, animation) in &doors {
-        pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &[]);
+        pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &[], true);
     }
 }
 

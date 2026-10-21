@@ -27,7 +27,7 @@ fn push(
         if object.consumed {
             continue;
         }
-        let mask = pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &[]);
+        let mask = pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &[], true);
         if mask != 0 {
             actor.contact_mask = mask;
         }

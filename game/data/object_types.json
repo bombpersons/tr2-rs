@@ -72,6 +72,18 @@
    }
   },
   {
+   "id": 38,
+   "name": "crow",
+   "creature": {
+    "health": 15,
+    "radius": 204,
+    "damage": 20,
+    "step": 20480,
+    "drop": -20480,
+    "fly": 16
+   }
+  },
+  {
    "id": 39,
    "name": "tiger",
    "creature": {
@@ -81,11 +93,6 @@
     "pivot": 200,
     "head_joint": 22
    }
-  },
-  {
-   "id": 59,
-   "name": "spikes",
-   "spikes": {}
   },
   {
    "id": 67,
@@ -452,6 +459,19 @@
    "name": "pickup_206",
    "pickup": {
     "message": "Item collected"
+   }
+  },
+  {
+   "id": 214,
+   "name": "t_rex",
+   "creature": {
+    "health": 100,
+    "radius": 341,
+    "damage": 10,
+    "pivot": 1800,
+    "block_mask": 32768,
+    "head_joint": 11,
+    "neck_joint": 12
    }
   },
   {

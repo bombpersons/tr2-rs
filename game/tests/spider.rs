@@ -20,7 +20,7 @@ use engine::{
     world::{Level, WorldGeometry},
 };
 use game::{
-    creature::{Creature, CreatureBody, Mood, spawn_components},
+    creature::{Creature, ItemBody, Mood, spawn_components},
     interactions::{Enemy, InteractionsPlugin},
     player::{Motion, Player, SimulationEnabled},
     spider::KIND,
@@ -46,7 +46,7 @@ fn replay(
     mut replayed: ResMut<Replayed>,
     mut random: ResMut<GameRandom>,
     mut players: Query<(&mut Player, &mut Motion)>,
-    mut spiders: Query<&mut CreatureBody>,
+    mut spiders: Query<&mut ItemBody>,
 ) {
     if !enabled.0 {
         return;
@@ -171,7 +171,7 @@ fn compare_case(csv: &str, ticks: usize, shots: bool) {
     let rebuild = Trajectory::record(&mut app, &inputs, &names, |world| {
         let mut out = vec![];
         for &(n, entity) in &spiders {
-            let body = world.get::<CreatureBody>(entity).unwrap();
+            let body = world.get::<ItemBody>(entity).unwrap();
             let creature = world.get::<Creature>(entity).unwrap();
             let animation = world.get::<ObjectAnimation>(entity).unwrap();
             let goal = world.get::<AnimationGoal>(entity).unwrap();

@@ -250,6 +250,7 @@ impl Plugin for RenderPlugin {
             .add_systems(Startup, spawn_camera)
             .add_systems(Update, (fit_view_to_screen, overlay::place).before(LevelSystems::Meshes))
             .add_systems(Update, (request_level, finish_level).chain().in_set(LevelSystems::Load))
+            .add_systems(Update, dress_created.in_set(LevelSystems::Load).after(finish_level))
             .add_systems(Update, (pose_models, swap_joint_meshes, follow_camera).in_set(LevelSystems::Pose))
             .add_systems(Update, (room_visibility, light_items).chain().in_set(LevelSystems::Visibility))
             .add_systems(Update, rooms::rebuild.in_set(LevelSystems::Meshes))
@@ -459,7 +460,8 @@ fn finish_level(
         ))
         .id();
     let world = WorldGeometry::from(data.clone());
-    let atlas = server.load(atlas_path);
+    let atlas: Handle<Image> = server.load(atlas_path);
+    commands.insert_resource(ObjectDressing { root: render_root, atlas: atlas.clone() });
     let material =
         materials.add(PsxMaterial { texture: Some(atlas.clone()), lit: false, double_sided: true, ..default() });
     let underlay_material = room_policy.as_ref().map(|_| {
@@ -579,18 +581,7 @@ fn finish_level(
         }
         let root = entity.id();
         let (Some((model_index, model)), Some(lit)) = (model, lit) else { continue };
-        commands.entity(root).insert(ItemLighting(lit.clone()));
-        for (joint, &mi) in model.meshes.iter().enumerate() {
-            let part = commands
-                .spawn((
-                    Mesh3d(object_meshes[mi].clone()),
-                    MeshMaterial3d(lit.clone()),
-                    Transform::default(),
-                    Bone { root, model: model_index, joint, mesh: mi },
-                ))
-                .id();
-            commands.entity(root).add_child(part);
-        }
+        add_bones(&mut commands, root, model_index, model, &object_meshes, lit);
     }
     commands.insert_resource(ObjectMeshes(object_meshes));
     commands.insert_resource(AnimationLibrary::from(data.as_ref()));
@@ -599,6 +590,71 @@ fn finish_level(
     commands.insert_resource(ActiveLevel { name: name.clone() });
     commands.remove_resource::<Pending>();
     loaded.write(LevelLoaded { name, data });
+}
+
+/// Give an object entity its model's meshes, one child per joint, lit by
+/// its own item light.
+fn add_bones(
+    commands: &mut Commands,
+    root: Entity,
+    model_index: usize,
+    model: &crate::world::Model,
+    object_meshes: &[Handle<Mesh>],
+    lit: Handle<PsxMaterial>,
+) {
+    commands.entity(root).insert(ItemLighting(lit.clone()));
+    for (joint, &mi) in model.meshes.iter().enumerate() {
+        let part = commands
+            .spawn((
+                Mesh3d(object_meshes[mi].clone()),
+                MeshMaterial3d(lit.clone()),
+                Transform::default(),
+                Bone { root, model: model_index, joint, mesh: mi },
+            ))
+            .id();
+        commands.entity(root).add_child(part);
+    }
+}
+
+/// What drawing an object created in play needs from the level load.
+#[derive(Resource)]
+struct ObjectDressing {
+    root: Entity,
+    atlas: Handle<Image>,
+}
+
+/// Draw objects created in play ([`crate::objects::Created`]) the way
+/// placed ones are drawn: in the level's hierarchy, hidden with their room,
+/// with their model's meshes.
+fn dress_created(
+    mut commands: Commands,
+    world: Option<Res<WorldGeometry>>,
+    dressing: Option<Res<ObjectDressing>>,
+    meshes: Option<Res<ObjectMeshes>>,
+    mut materials: ResMut<Assets<PsxMaterial>>,
+    created: Query<(Entity, &WorldObject), Added<crate::objects::Created>>,
+) {
+    let (Some(world), Some(dressing), Some(meshes)) = (world, dressing, meshes) else { return };
+    for (entity, object) in &created {
+        commands.entity(entity).insert((
+            Visibility::default(),
+            InRoom(object.room),
+            LevelEntity,
+            ChildOf(dressing.root),
+            Name::new(format!("Created{}", object.kind)),
+        ));
+        let Some((model_index, model)) = world.data.models.iter().enumerate().find(|(_, m)| m.id == object.kind) else {
+            continue;
+        };
+        let lit = materials.add(PsxMaterial {
+            texture: Some(dressing.atlas.clone()),
+            lit: true,
+            use_scene_lighting: false,
+            double_sided: true,
+            ..default()
+        });
+        add_bones(&mut commands, entity, model_index, model, &meshes.0, lit);
+    }
 }
 
 /// Per-object material whose lighting follows the item light of

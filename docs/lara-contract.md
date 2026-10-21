@@ -31,7 +31,8 @@ any other reimplementation.
   level's whole animation table (`engine::animation::AnimationLibrary`, built
   from `Level::animations`). So model 0's clips must start at index 0
   (`model.animations[0] == 0`), and the table needs every number the
-  controller names: up to `contract::CLIP_COUNT - 1` = 197.
+  controller enters directly: up to `contract::CLIP_COUNT - 1` = 197. The
+  zip-line's clips (215-217) lie past it; `ZipLine` checks them by number.
 - **A clip's state** is `Animation::state`. The controller compares the
   playing clip's state (`clips.state(n)`) and asks for goal states.
 - **State-change frames are absolute** in the file (`StateChange::first_frame`
@@ -65,6 +66,7 @@ one at a time:
 | `Death` | Death clips. |
 | `Skeleton` | Lara's 15-joint layout, for the arms, guns, head and braid. |
 | `Use` | Picking up, switches, keys and puzzle pieces. |
+| `ZipLine` | Grabbing, riding and dropping off the zip-line. |
 
 ### Which subset spawns, and why
 
@@ -125,6 +127,7 @@ playing clip.
 | Water | `SWIM` 86 (17), `TREAD` 108 (13), `SURFACE_TREAD` 110 (33), `CLIMB_OUT_HIGH` 111 (55), `WATER_ENTRY` 112 (35), `SURFACING` 114 (33), `SURFACE_FORWARD` 116 (34), `DIVE` 119 (35), `SURFACE_BACK` 140 (47), `SURFACE_LEFT` 143 (48), `SURFACE_RIGHT` 144 (49), `WADE_LOOP` 177 (65), `WADE` 186 (65), `STEP_OUT` 190 (55), `CLIMB_OUT_MID` 191 (55), `STAND_UP` 192 (55), `CLIMB_OUT_LOW` 193 (55) | `player.rs:1673`, `:1756-1761`; `surface.rs:30-33`, `:375-388`, `:455-459`; `wading.rs:56-59`, `:98` |
 | Death | `FATAL_LANDING` 25 (8), `DEAD` 87 (18 in the original table) | `player.rs:1749`, `:1764` |
 | Use | `PICKUP` 135 (39; the item is taken on frame 42, `frame::PICKUP_TAKE`), `UNDERWATER_PICKUP` 130 (39; reached from treading's range, ends in tread 108; taken on frame 18, `frame::UNDERWATER_PICKUP_TAKE`), `UNDERWATER_SWITCH` 129 (40; reached from treading's range, ends in tread 108 with EmptyHands), `USE_KEY` 131 (42), `USE_PUZZLE` 134 (43; the piece goes in on frame 80), `SWITCH_OFF` 63 (40), `SWITCH_ON` 64 (41), `BUTTON_OFF` 195 (40), `BUTTON_ON` 196 (41), `LEVER` 197 (40, used both ways). Pickups, keys and puzzles enter through standing's ranges (clip 103 to states 39, 42, 43); the switch clips are set directly, by switch type (`object_types.json` `switch.clips`). Each ends in standing. | `interactions/usable.rs`, `player/using.rs` |
+| ZipLine | `ZIP_GRAB` 215 (19; reached from standing's range for 70, ends 654 forward in the ride), `ZIP_RIDE` 216 (70; the ride loop, whose range for 3 on its first eleven frames enters the drop), `ZIP_DROP` 217 (3; ends 240 lower, frees the hands, links into flight 77) | `player/zipline.rs`, `traps/zipline.rs` |
 
 ## States
 
@@ -148,6 +151,8 @@ Where they matter most:
   (`swimming.rs:84-88`). Surface: 33, 34, 47, 48, 49 (`surface.rs:24-28`).
   Wading: 65, and 55 climbing out (`wading.rs:126`, `:327`).
 - **Roll.** 45 roll and 23 back roll (`rolling.rs:53`, `:130`).
+- **Zip-line.** 70 riding; the grab is 19 (as pulling up) and the drop 3
+  (`player/zipline.rs`).
 - **Slide.** 24 slide and 32 back slide (`player.rs:60`, `:1376`).
 
 ### State changes the controller relies on
@@ -162,6 +167,7 @@ and leads, through end links, to a clip of state `goal`.
 | Sidestep | 103 → 21, 22; 65 and 67 → 2 |
 | Jump | 103 → 15 and 28; 73 → 3; 0 → 3; 77 → 2; 34 → 11 |
 | Climb | 96 → 19 |
+| ZipLine | 103 → 70; 216 → 3 |
 | Slide | 70 → 2 |
 | Water | 110 → 34; 108 → 17 |
 
@@ -177,7 +183,8 @@ frame.
 - 6 into run (1), 20 into walk (0);
 - 2, 3, 53 and 54 back to standing;
 - 88 and 146 back to standing; 76 into forward flight; 24, 50 and 42 back to
-  standing.
+  standing;
+- 215 into the ride (70), 217 into forward flight (3).
 
 `check` also requires every clip's end link and range destination to fall
 inside model 0's clips.
@@ -209,11 +216,11 @@ Other frame literals are clip-relative:
 
 | Command | Clips | Use |
 |---|---|---|
-| `SetPosition` at the clip's end | 50, 42, 97 (`contract::COMMANDS`) | Vault duration and offset (`AnimationLibrary::climb`, `player.rs:1466`). Pull-up end step (`traversal.rs:211`). |
+| `SetPosition` at the clip's end | 50, 42, 97, 215, 217 (`contract::COMMANDS`) | Vault duration and offset (`AnimationLibrary::climb`, `player.rs:1466`). Pull-up end step (`traversal.rs:211`). The zip-line grab's step onto the line and the drop's step down (`player/zipline.rs`). |
 | `JumpVelocity` at the clip's end | 26, 76, 91; also 74/78/80 (back and side takeoffs) and 16/18 (run takeoffs) | Launch velocity (`traversal.rs:216`, `backward.rs:253`). A vertical ledge jump overrides the vertical part. |
 | `Effect { effect: 0 }` | twists 210 and 212, roll 147 | Turn 180 degrees (`traversal.rs:212`, `backward.rs:229`, `rolling.rs:34`). |
 | `Sound` | any | Played by `game/src/audio.rs:55` from the playing clip, filtered by land or water. |
-| `EmptyHands` at the clip's end | the use clips 63, 64, 131, 134, 135, 195, 196, 197 | Frees Lara's hands as the clip ends into standing (`player/using.rs`). |
+| `EmptyHands` at the clip's end | the use clips 63, 64, 131, 134, 135, 195, 196, 197; the zip-line drop 217 | Frees Lara's hands as the clip ends into standing (`player/using.rs`), or into flight (`player/zipline.rs`). |
 | `Kill` | — | Not read by the controller (switches and creatures read their own). |
 
 ## Joints and meshes

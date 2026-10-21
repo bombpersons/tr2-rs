@@ -144,6 +144,10 @@ pub mod clip {
     /// Pulling an underwater switch (type 105, state 40), reached through
     /// treading's range and ending back in [`TREAD`].
     pub const UNDERWATER_SWITCH: usize = 129;
+    /// Death clips traps put Lara in: crushed by a boulder (state 46) and
+    /// impaled on spikes (state 8).
+    pub const CRUSHED: usize = 139;
+    pub const IMPALED: usize = 149;
     /// Type 104 and the others not named below: turning a switch off and on.
     pub const SWITCH_OFF: usize = 63;
     pub const SWITCH_ON: usize = 64;
@@ -152,6 +156,15 @@ pub mod clip {
     pub const BUTTON_ON: usize = 196;
     /// Type 103, used the same way both ways.
     pub const LEVER: usize = 197;
+
+    /// The zip-line (type 102). Standing's range for [`super::state::ZIP_LINE`]
+    /// enters the grab (state 19), whose end steps Lara 654 forward onto
+    /// the line and links into the ride loop (state 70). The ride's range
+    /// for a forward jump enters the drop (state 3), whose end lowers her
+    /// 240, frees her hands and links into forward flight (clip 77).
+    pub const ZIP_GRAB: usize = 215;
+    pub const ZIP_RIDE: usize = 216;
+    pub const ZIP_DROP: usize = 217;
 }
 
 /// Clip states, as clips declare them and as goals the controller asks for.
@@ -164,6 +177,8 @@ pub mod state {
     pub const TURN_RIGHT: usize = 6;
     pub const TURN_LEFT: usize = 7;
     pub const DEATH: usize = 8;
+    /// Crushed by a boulder (`0x8005EFD8` puts her in it).
+    pub const CRUSHED: usize = 46;
     pub const FAST_FALL: usize = 9;
     pub const HANG: usize = 10;
     pub const REACH: usize = 11;
@@ -203,6 +218,8 @@ pub mod state {
     pub const SWITCH_ON: usize = 41;
     pub const USE_KEY: usize = 42;
     pub const USE_PUZZLE: usize = 43;
+    /// Riding the zip-line.
+    pub const ZIP_LINE: usize = 70;
 }
 
 /// Absolute frame windows (across the whole table, not clip-relative) that
@@ -268,7 +285,9 @@ pub mod joint {
     ];
 }
 
-/// One past the highest clip number the controller names.
+/// One past the highest clip number the controller enters directly, which
+/// every table needs. The zip-line's clips lie past it; [`Feature::ZipLine`]
+/// checks them by number.
 pub const CLIP_COUNT: usize = clip::LEVER + 1;
 
 /// A group of moves a character can provide on its own. A model meeting
@@ -295,10 +314,12 @@ pub enum Feature {
     Skeleton,
     /// Picking up, switches, keys and puzzle pieces.
     Use,
+    /// Grabbing, riding and dropping off the zip-line.
+    ZipLine,
 }
 
 impl Feature {
-    pub const ALL: [Feature; 12] = [
+    pub const ALL: [Feature; 13] = [
         Feature::Ground,
         Feature::Steps,
         Feature::Backward,
@@ -311,6 +332,7 @@ impl Feature {
         Feature::Death,
         Feature::Skeleton,
         Feature::Use,
+        Feature::ZipLine,
     ];
 }
 
@@ -398,6 +420,8 @@ pub const CLIPS: &[ClipRule] = {
         rule(Water, clip::CLIMB_OUT_LOW, state::CLIMB_OUT),
         rule(Death, clip::FATAL_LANDING, state::DEATH),
         rule(Death, clip::DEAD, state::GLIDE),
+        rule(Death, clip::CRUSHED, state::CRUSHED),
+        rule(Death, clip::IMPALED, state::DEATH),
         rule(Use, clip::PICKUP, state::PICKUP),
         rule(Use, clip::UNDERWATER_PICKUP, state::PICKUP),
         rule(Use, clip::UNDERWATER_SWITCH, state::SWITCH_OFF),
@@ -408,6 +432,9 @@ pub const CLIPS: &[ClipRule] = {
         rule(Use, clip::BUTTON_OFF, state::SWITCH_OFF),
         rule(Use, clip::BUTTON_ON, state::SWITCH_ON),
         rule(Use, clip::LEVER, state::SWITCH_OFF),
+        rule(ZipLine, clip::ZIP_GRAB, state::PULL_UP),
+        rule(ZipLine, clip::ZIP_RIDE, state::ZIP_LINE),
+        rule(ZipLine, clip::ZIP_DROP, state::FORWARD_JUMP),
     ]
 };
 
@@ -467,6 +494,9 @@ pub const DISPATCHES: &[DispatchRule] = {
         dispatch(Use, clip::STAND_IDLE, state::PICKUP),
         dispatch(Use, clip::STAND_IDLE, state::USE_KEY),
         dispatch(Use, clip::STAND_IDLE, state::USE_PUZZLE),
+        // The grab, and the drop off the ride.
+        dispatch(ZipLine, clip::STAND_IDLE, state::ZIP_LINE),
+        dispatch(ZipLine, clip::ZIP_RIDE, state::FORWARD_JUMP),
     ]
 };
 
@@ -506,6 +536,8 @@ pub const LINKS: &[LinkRule] = {
         link(Use, clip::BUTTON_OFF, state::STAND),
         link(Use, clip::BUTTON_ON, state::STAND),
         link(Use, clip::LEVER, state::STAND),
+        link(ZipLine, clip::ZIP_GRAB, state::ZIP_LINE),
+        link(ZipLine, clip::ZIP_DROP, state::FORWARD_JUMP),
     ]
 };
 
@@ -543,6 +575,9 @@ pub const COMMANDS: &[CommandRule] = &[
     CommandRule { clip: clip::BUTTON_OFF, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::BUTTON_ON, command: CommandKind::EmptyHands, feature: Feature::Use },
     CommandRule { clip: clip::LEVER, command: CommandKind::EmptyHands, feature: Feature::Use },
+    CommandRule { clip: clip::ZIP_GRAB, command: CommandKind::SetPosition, feature: Feature::ZipLine },
+    CommandRule { clip: clip::ZIP_DROP, command: CommandKind::SetPosition, feature: Feature::ZipLine },
+    CommandRule { clip: clip::ZIP_DROP, command: CommandKind::EmptyHands, feature: Feature::ZipLine },
 ];
 
 /// Something a level's player model or table lacks.

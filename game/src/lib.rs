@@ -16,6 +16,8 @@ pub mod braid;
 pub mod caustics;
 mod contact;
 pub mod creature;
+pub mod crow;
+pub mod items;
 pub mod display;
 pub mod interactions;
 pub mod player;
@@ -25,6 +27,8 @@ pub mod sky;
 pub mod spider;
 pub mod subdivision;
 pub mod tiger;
+pub mod traps;
+pub mod trex;
 pub mod water_palette;
 pub mod winston;
 

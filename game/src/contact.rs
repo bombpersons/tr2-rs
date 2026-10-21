@@ -56,10 +56,10 @@ impl ContactPass {
         Some(Self { avatar_bounds, accepted_origin: collision.origin, avatar_overrides: avatar_overrides.to_vec() })
     }
 
-    /// Test one object of type `kind` and push Lara out of it when their
-    /// spheres touch. `overrides` are the object's extra joint turns (a
-    /// creature's head). Returns the object's meshes that touched her (0
-    /// for none, or when the coarse tests fail).
+    /// Test one object of type `kind` and, with `push`, push Lara out of it
+    /// when their spheres touch. `overrides` are the object's extra joint
+    /// turns (a creature's head). Returns the object's meshes that touched
+    /// her (0 for none, or when the coarse tests fail).
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn touch(
         &mut self,
@@ -71,6 +71,7 @@ impl ContactPass {
         transform: &Transform,
         animation: &ObjectAnimation,
         overrides: &[JointPose],
+        push: bool,
     ) -> u32 {
         if (player.position - transform.translation).length_squared() > 16.0 {
             return 0;
@@ -112,8 +113,8 @@ impl ContactPass {
                 mask
             }
         });
-        if mask == 0 {
-            return 0;
+        if mask == 0 || !push {
+            return mask;
         }
         // Exact tie priority: minX,maxX,maxZ,minZ (0x8001C9AC..0x8001CA30).
         let distances = [local[0] - edges[0], edges[1] - local[0], edges[3] - local[1], local[1] - edges[2]];

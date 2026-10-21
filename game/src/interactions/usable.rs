@@ -203,7 +203,7 @@ fn move_lara(lara: &mut IVec3, lara_angles: &mut Angles, item: IVec3, item_angle
 /// AlignLaraPosition 0x8001D070: face the item and stand at `offset` in its
 /// frame, unless that spot's floor is more than a step from Lara's height
 /// or its ceiling is too low. Returns Lara's new position.
-fn align(world: Option<&WorldGeometry>, player: &mut Player, item: IVec3, item_yaw: i16, offset: IVec3) {
+pub fn align(world: Option<&WorldGeometry>, player: &mut Player, item: IVec3, item_yaw: i16, offset: IVec3) {
     player.yaw = engine::world::angle(item_yaw as u16);
     let target = world_point(item, [0, item_yaw, 0], offset);
     let lara = original_units(player.position);

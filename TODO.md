@@ -218,7 +218,28 @@ it off. Record partial progress below without checking the parent item.
   (1960 ticks, three held out) match tick by tick.
   [Evidence](docs/creature-evidence.md), [tiger tests](game/tests/tiger.rs),
   [spider tests](game/tests/spider.rs). The other creature types, effect
-  pieces, blood, flip zones and flying creatures remain.
+  pieces, blood and flip zones remain.
+- [x] The Great Wall's crows and T-Rexes. BirdControl with the fly branch of
+  CreatureAnimation (crows: 676 ticks); TRexControl with its head and neck
+  joints and CreatureKill, which takes Lara into the extra-animation kill
+  clip with the set camera (both T-Rexes: 3500 ticks, one shot dead, one
+  killing Lara). The idle search is replayed visit for visit from the
+  recordings. [Evidence](docs/creature-evidence.md),
+  [crow tests](game/tests/crow.rs), [T-Rex tests](game/tests/trex.rs).
+  The eagle (same routine) has no recording.
+- [x] The Great Wall's traps: falling blocks, spikes, boulders, dart
+  emitters and darts, sliding and wall blades, spiked rollers and the
+  trapdoor, with object floors and ceilings. Eight cases (3434 ticks) from
+  one played run match tick for tick, damage to Lara included.
+  [Evidence](docs/trap-evidence.md), [tests](game/tests/traps.rs).
+  Trap kills (spikes, boulder) have no recording yet; heavy triggers remain.
+- [x] The zip-line (type 102, control `0x8004B824`, collision `0x8004B6CC`)
+  and Lara's ride on it (states 19 and 70, `PlayerMode::ZipLine`): the
+  grab, the ride, the line stopping, letting go and the drop. Two cases
+  (721 ticks, one held out, Action let go mid-ride) match tick for tick
+  with Lara under test. [Evidence](docs/trap-evidence.md#the-zip-line),
+  [tests](game/tests/zipline.rs). Going home on a later trigger is
+  unrecorded.
 - [ ] Pickups, switches, keys, puzzle holes and doors: ported from the
   binary ([evidence](docs/interaction-evidence.md),
   [tests](game/tests/using.rs)). The original bounds and alignment tables,
@@ -245,8 +266,9 @@ it off. Record partial progress below without checking the parent item.
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
   elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,
   `0x80039BC8`, `0x80039CE0`, `0x8003A134`, `0x8003EADC`, `0x8005EFD8`.
-  Only the slide's flags 2 (exact slopes) and the use states' angle,
-  elevation, distance and speed (`Avatar::camera_angle` and friends) are
+  Only the slide's flags 2 (exact slopes), the use states' angle,
+  elevation, distance and speed (`Avatar::camera_angle` and friends), and
+  the crushed and T-Rex death views (`0x80039BC8`, `0x8003A134`) are
   ported. Needs chase-mode recordings. [Notes](docs/chase-camera-evidence.md).
 
 ## Appearance

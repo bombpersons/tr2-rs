@@ -13,21 +13,21 @@
 //! itself is the engine's [`BoxSearch`].
 //!
 //! Positions, angles and speeds are the original's integers (world units,
-//! y down, 65536 to a turn) in [`CreatureBody`]; `Transform` follows them.
+//! y down, 65536 to a turn) in [`ItemBody`]; `Transform` follows them.
 use bevy::prelude::*;
 use engine::{
-    animation::{
-        AnimationCue, AnimationGoal, ObjectAnimation, ObjectAnimationCue, frame_bounds, step_animation_frame_from,
-    },
+    animation::{AnimationCue, AnimationGoal, ObjectAnimation, ObjectAnimationCue, frame_bounds},
     camera::chase::{cos, heading, sin},
     objects::WorldObject,
     random::GameRandom,
     schedule::{InteractionSystems, ItemSystems, LifecycleSystems, WorldSystems, simulation_enabled},
     triggers::TriggerSystems,
-    world::{BoxFlags, BoxSearch, Command, Level, NO_BOX, TargetKind, WorldGeometry},
+    world::{BoxFlags, BoxSearch, Level, NO_BOX, TargetKind, WorldGeometry},
 };
 
 use crate::interactions::Enemy;
+pub use crate::items::{ItemBody, ItemStatus, RoomOrder};
+use crate::items::{NO_HEIGHT, animate_item};
 use crate::player::{Motion, Player};
 
 /// Creature AI slots (`0x8008C1C0`, five of 68 bytes).
@@ -56,9 +56,25 @@ pub struct CreatureSetup {
     pub step: i32,
     #[serde(default = "default_drop")]
     pub drop: i32,
+    /// Flying creatures' climb or dive a tick toward their target; 0
+    /// walks. Fliers search the fly zones.
+    #[serde(default)]
+    pub fly: i32,
+    /// Box flags that bar its path: 0x4000 (doors) for most, 0x8000 for the
+    /// large creatures.
+    #[serde(default = "default_block_mask")]
+    pub block_mask: u16,
     /// The joint its bone flags turn by its head angle (Y).
     #[serde(default)]
     pub head_joint: Option<usize>,
+    /// The next flagged joint, turned by its neck angle (Y): drawing hands
+    /// the angles to flagged bones in order.
+    #[serde(default)]
+    pub neck_joint: Option<usize>,
+}
+
+fn default_block_mask() -> u16 {
+    engine::world::BLOCKED
 }
 
 fn default_step() -> i32 {
@@ -67,80 +83,6 @@ fn default_step() -> i32 {
 
 fn default_drop() -> i32 {
     -512
-}
-
-/// Item status bits 1-2 (`item+0x48`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
-pub enum ItemStatus {
-    /// Placed, not yet triggered.
-    #[default]
-    Inactive,
-    Active,
-    /// Its animation ran a kill command; the AI slot is released.
-    Deactivated,
-    /// Taken out of the world: a collected pickup.
-    Invisible,
-}
-
-/// The original item fields a creature's code reads and writes.
-#[derive(Component, Reflect, Debug, Clone, Default)]
-#[reflect(Component)]
-pub struct CreatureBody {
-    /// World units, y down.
-    pub position: [i32; 3],
-    pub pitch: i16,
-    pub yaw: i16,
-    pub roll: i16,
-    pub room: usize,
-    /// Navigation box under the creature, refreshed by [`ai_info`].
-    pub box_number: i16,
-    pub speed: i16,
-    pub fall_speed: i16,
-    /// Floor height under it, from the last movement.
-    pub floor: i32,
-    /// The state it is in (`item+0x0E`). Usually its clip's, but a
-    /// controller may set it apart (a death it is about to play).
-    pub current_state: usize,
-    /// A state the controller wants played once (`item+0x12`), or 0.
-    pub required_state: usize,
-    pub gravity: bool,
-    /// Shot since its last animation step (status bit 0x10).
-    pub hit: bool,
-    /// Which of its meshes touched Lara in her last collision pass.
-    pub touch_bits: u32,
-    pub status: ItemStatus,
-    /// Lara collides with it (status bit 0x20).
-    pub collidable: bool,
-    /// Taken out of the level (KillItem `0x8003749C`): no longer drawn.
-    pub removed: bool,
-    /// When it last joined its room's item list (see [`RoomOrder`]).
-    pub room_entry: u64,
-}
-
-/// The order items joined their rooms' item lists. The original keeps a
-/// list per room; an item is pushed onto its head when placed (in placement
-/// order) and when it changes room (ItemNewRoom). CreatureCollided walks a
-/// room's list from the head and stops at itself, so a creature only walks
-/// into those that joined the room after it did.
-#[derive(Resource, Debug, Default)]
-pub struct RoomOrder {
-    next: u64,
-}
-
-impl RoomOrder {
-    /// Move `body` into `room`, at the head of its list if it changed room.
-    pub fn enter(&mut self, body: &mut CreatureBody, room: usize) {
-        if body.room != room {
-            body.room = room;
-            body.room_entry = self.next;
-            self.next += 1;
-        }
-    }
-
-    /// Placements take entries up to their index; later moves come after.
-    fn after_placements(&mut self, count: usize) {
-        self.next = self.next.max(count as u64);
-    }
 }
 
 /// A creature's AI slot: its mood, steering target and path search.
@@ -159,19 +101,38 @@ pub struct Creature {
     pub target: [i32; 3],
     /// The path search, present while it holds an AI slot.
     pub search: Option<BoxSearch>,
+    /// Which of the [`SLOTS`] AI slots it holds (meaningful while `search`
+    /// is): the idle search visits them in order.
+    pub slot: usize,
 }
 
 impl Creature {
     pub fn new(setup: CreatureSetup) -> Self {
-        Self { setup, head: 0, neck: 0, max_turn: 0, flags: 0, mood: Mood::Bored, target: [0; 3], search: None }
+        Self {
+            setup,
+            head: 0,
+            neck: 0,
+            max_turn: 0,
+            flags: 0,
+            mood: Mood::Bored,
+            target: [0; 3],
+            search: None,
+            slot: 0,
+        }
     }
 
-    /// The head joint turned by the creature's head angle, as its model's
-    /// bone flags (set per type at load) turn it for drawing and collision.
+    /// The head (and neck) joints turned by the creature's head and neck
+    /// angles, as its model's bone flags (set per type at load) turn them
+    /// for drawing and collision.
     pub fn joint_turns(&self) -> Vec<engine::animation::JointPose> {
-        let Some(joint) = self.setup.head_joint else { return vec![] };
-        let mut turns = vec![engine::animation::JointPose::default(); joint + 1];
-        turns[joint].after = [0, self.head, 0];
+        let joints = [(self.setup.head_joint, self.head), (self.setup.neck_joint, self.neck)];
+        let Some(last) = joints.iter().filter_map(|(j, _)| *j).max() else { return vec![] };
+        let mut turns = vec![engine::animation::JointPose::default(); last + 1];
+        for (joint, angle) in joints {
+            if let Some(joint) = joint {
+                turns[joint].after = [0, angle, 0];
+            }
+        }
         turns
     }
 }
@@ -201,6 +162,10 @@ pub struct EnemyView {
     pub box_number: i16,
     pub health: i32,
     pub speed: i32,
+    /// The top of her collision box above her feet (negative), for fliers.
+    pub top: i32,
+    /// Out of the water (water status 0): fliers then aim at her top.
+    pub above_water: bool,
 }
 
 impl EnemyView {
@@ -215,6 +180,11 @@ impl EnemyView {
             box_number: NO_BOX,
             health: player.health,
             speed,
+            top: 0,
+            above_water: !matches!(
+                player.mode,
+                crate::player::PlayerMode::Swimming | crate::player::PlayerMode::Surface
+            ),
         }
     }
 }
@@ -236,9 +206,12 @@ fn zone_at(zone: &[i16], box_number: i16) -> i16 {
 
 /// InitialiseSlot `0x80048EC8` and CreateZone `0x800490EC`: give a creature
 /// an AI slot. Turn limit 182, bored, a cleared search over its own zone.
-pub fn enable(world: &WorldGeometry, creature: &mut Creature, body: &mut CreatureBody) {
+pub fn enable(world: &WorldGeometry, creature: &mut Creature, body: &mut ItemBody) {
     let setup = creature.setup;
-    let mut search = BoxSearch::new(world.data.boxes.len(), setup.step, setup.drop, 0, zone_tables(setup.step, false));
+    let fly = setup.fly != 0;
+    let mut search =
+        BoxSearch::new(world.data.boxes.len(), setup.step, setup.drop, setup.fly, zone_tables(setup.step, fly));
+    search.block_mask = setup.block_mask;
     body.box_number = box_of(world, body.room, body.position[0], body.position[2]);
     search.create_zone(&world.data, body.box_number);
     creature.head = 0;
@@ -254,7 +227,7 @@ pub fn ai_info(
     world: &WorldGeometry,
     flags: &BoxFlags,
     creature: &Creature,
-    body: &mut CreatureBody,
+    body: &mut ItemBody,
     enemy: &mut EnemyView,
     flipped: bool,
 ) -> AiInfo {
@@ -295,7 +268,7 @@ fn valid_box(
     level: &Level,
     flags: &BoxFlags,
     search: &BoxSearch,
-    body: &CreatureBody,
+    body: &ItemBody,
     zone_number: i16,
     box_number: i16,
     flipped: bool,
@@ -322,7 +295,7 @@ fn quadrant(z_beyond: bool, x_beyond: bool) -> i32 {
 }
 
 /// StalkBox `0x800154B8`: near the enemy, and not on the far side of it.
-fn stalk_box(level: &Level, body: &CreatureBody, enemy: &EnemyView, box_number: i16) -> bool {
+fn stalk_box(level: &Level, body: &ItemBody, enemy: &EnemyView, box_number: i16) -> bool {
     let b = level.boxes[box_number as usize];
     let z = ((b.z_min + b.z_max) << 9) - enemy.position[2];
     let x = ((b.x_min + b.x_max) << 9) - enemy.position[0];
@@ -341,7 +314,7 @@ fn stalk_box(level: &Level, body: &CreatureBody, enemy: &EnemyView, box_number: 
 }
 
 /// EscapeBox `0x80015608`: far from the enemy, on the creature's side.
-fn escape_box(level: &Level, body: &CreatureBody, enemy: &EnemyView, box_number: i16) -> bool {
+fn escape_box(level: &Level, body: &ItemBody, enemy: &EnemyView, box_number: i16) -> bool {
     let b = level.boxes[box_number as usize];
     let z = ((b.z_min + b.z_max) << 9) - enemy.position[2];
     let x = ((b.x_min + b.x_max) << 9) - enemy.position[0];
@@ -361,7 +334,7 @@ pub fn mood(
     world: &WorldGeometry,
     flags: &BoxFlags,
     creature: &mut Creature,
-    body: &CreatureBody,
+    body: &ItemBody,
     info: &AiInfo,
     enemy: Option<&EnemyView>,
     violent: bool,
@@ -436,7 +409,10 @@ pub fn mood(
         (Mood::Attack, Some(enemy)) => {
             search.target = enemy.position;
             search.required_box = enemy.box_number;
-            // Flying creatures aim at the enemy's bounds; none are ported.
+            // Fliers aim at the top of her collision box (0x80015868).
+            if search.fly != 0 && enemy.above_water {
+                search.target[1] += enemy.top;
+            }
         }
         (Mood::Bored, _) => {
             let box_number = random_box(&search, &mut draw);
@@ -492,7 +468,7 @@ pub fn mood(
 /// CreatureTurn `0x800172E0`: turn toward the target by at most
 /// `max_turn`, half that for a target behind inside the turning circle.
 /// Returns the turn made.
-pub fn turn(creature: &Creature, body: &mut CreatureBody, max_turn: i16) -> i16 {
+pub fn turn(creature: &Creature, body: &mut ItemBody, max_turn: i16) -> i16 {
     if creature.search.is_none() || body.speed == 0 || max_turn == 0 {
         return 0;
     }
@@ -511,7 +487,7 @@ pub fn turn(creature: &Creature, body: &mut CreatureBody, max_turn: i16) -> i16 
 }
 
 /// CreatureTilt `0x8001745C`: lean toward `angle * 4`, 546 a tick at most.
-pub fn tilt(body: &mut CreatureBody, angle: i16) {
+pub fn tilt(body: &mut ItemBody, angle: i16) {
     let change = ((i32::from(angle) << 2) - i32::from(body.roll)) as i16;
     body.roll = body.roll.wrapping_add(change.clamp(-546, 546));
 }
@@ -534,7 +510,7 @@ pub struct Obstacle {
     pub room: usize,
     pub position: [i32; 3],
     pub moving: bool,
-    /// Its [`CreatureBody::room_entry`].
+    /// Its [`ItemBody::room_entry`].
     pub entry: u64,
 }
 
@@ -580,50 +556,6 @@ fn heights(level: &Level, search: &BoxSearch, floor_box: Option<usize>) -> (i32,
 /// AnimateItem `0x8001DD98` for a creature: clear contacts and hits, step
 /// one authored frame, run its end commands, then move by its authored
 /// speed (or fall).
-fn animate_item(
-    level: &Level,
-    body: &mut CreatureBody,
-    animation: &mut ObjectAnimation,
-    goal: &mut AnimationGoal,
-) -> Vec<AnimationCue> {
-    body.touch_bits = 0;
-    body.hit = false;
-    let step = step_animation_frame_from(level, animation, goal, &mut body.current_state);
-    if (step.changed || step.ended) && body.required_state == body.current_state {
-        body.required_state = 0;
-    }
-    for cue in step.cues.iter().filter(|c| c.at_end) {
-        match cue.command {
-            Command::SetPosition([dx, dy, dz]) => {
-                let yaw = i32::from(body.yaw);
-                body.position[0] += (cos(yaw) * dx + sin(yaw) * dz) >> 14;
-                body.position[1] += dy;
-                body.position[2] += (cos(yaw) * dz - sin(yaw) * dx) >> 14;
-            }
-            Command::JumpVelocity([vertical, horizontal]) => {
-                body.fall_speed = vertical as i16;
-                body.speed = horizontal as i16;
-                body.gravity = true;
-            }
-            Command::Kill => body.status = ItemStatus::Deactivated,
-            _ => {}
-        }
-    }
-    if let Some(clip) = level.animations.get(animation.animation) {
-        if body.gravity {
-            body.fall_speed += if body.fall_speed < 128 { 6 } else { 1 };
-            body.position[1] += i32::from(body.fall_speed);
-        } else {
-            let frame = animation.frame.floor() as i32;
-            body.speed = (clip.speed.wrapping_add(clip.accel.wrapping_mul(frame)) >> 16) as i16;
-        }
-    }
-    let yaw = i32::from(body.yaw);
-    body.position[0] += (sin(yaw) * i32::from(body.speed)) >> 14;
-    body.position[2] += (cos(yaw) * i32::from(body.speed)) >> 14;
-    step.cues
-}
-
 /// CreatureAnimation `0x800166F8`: animate and move the creature, keeping
 /// it out of boxes its path may not enter by pushing it back from sector
 /// edges, then settle it onto the floor. `angle` is the turn made this
@@ -634,7 +566,7 @@ pub fn animate(
     world: &WorldGeometry,
     flags: &BoxFlags,
     creature: &mut Creature,
-    body: &mut CreatureBody,
+    body: &mut ItemBody,
     animation: &mut ObjectAnimation,
     goal: &mut AnimationGoal,
     angle: i16,
@@ -776,10 +708,69 @@ pub fn animate(
         body.position = old;
         return true;
     }
-    // Walking creatures settle onto the floor, rising at once and dropping
-    // 64 a tick (0x80017198..0x800171FC).
-    room = world.floor_room(body.position[0], body.position[1], body.position[2], room).unwrap_or(room);
-    let floor = world.floor_height(body.position[0], body.position[1], body.position[2], room).unwrap_or(-32512);
+    room = if search.fly != 0 { fly(world, creature, body, old, y, room, top) } else { settle(world, body, room) };
+    // Creatures that are not amphibious drown in water rooms.
+    let room_above = world.floor_room(body.position[0], body.position[1] - 512, body.position[2], room).unwrap_or(room);
+    room = room_above;
+    if level.rooms.get(room).is_some_and(|r| r.water) {
+        *health = 0;
+    }
+    order.enter(body, room);
+    true
+}
+
+/// Flying (0x80016FB4..0x80017194): climb or dive toward the target's
+/// height by at most the search's fly limit, turned back by the floor and
+/// ceiling, and pitch the body toward the climb (by 182 a tick, within
+/// 3640). `top` is the creature's box top, `y` the height its floor and
+/// ceiling are read at. Returns the room found there.
+fn fly(
+    world: &WorldGeometry,
+    creature: &Creature,
+    body: &mut ItemBody,
+    old: [i32; 3],
+    y: i32,
+    room: usize,
+    top: i32,
+) -> usize {
+    let limit = creature.search.as_ref().map_or(0, |s| s.fly);
+    let mut climb = (creature.target[1] - body.position[1]).clamp(-limit, limit);
+    let [x, _, z] = body.position;
+    let floor = world.floor_height(x, y, z, room).unwrap_or(NO_HEIGHT);
+    if floor < body.position[1] + climb {
+        if floor < body.position[1] {
+            // Already below the floor: back where it was, rising.
+            (body.position[0], body.position[2]) = (old[0], old[2]);
+            climb = -limit;
+        } else {
+            body.position[1] = floor;
+            climb = 0;
+        }
+    } else {
+        let ceiling = world.ceiling_height(x, y, z, room).unwrap_or(NO_HEIGHT);
+        if body.position[1] + top + climb < ceiling {
+            climb = 0;
+            if body.position[1] + top < ceiling {
+                (body.position[0], body.position[2]) = (old[0], old[2]);
+                climb = limit;
+            }
+        }
+    }
+    body.position[1] += climb;
+    let [x, _, z] = body.position;
+    let room = world.floor_room(x, y, z, room).unwrap_or(room);
+    body.floor = world.floor_height(x, y, z, room).unwrap_or(NO_HEIGHT);
+    let pitch = if body.speed == 0 { 0 } else { heading(-climb, i32::from(body.speed)).clamp(-3640, 3640) };
+    let change = (pitch - i32::from(body.pitch)).clamp(-182, 182);
+    body.pitch = (i32::from(body.pitch) + change) as i16;
+    room
+}
+
+/// Walking creatures settle onto the floor, rising at once and dropping 64
+/// a tick (0x80017198..0x800171FC). Returns the room under them.
+fn settle(world: &WorldGeometry, body: &mut ItemBody, room: usize) -> usize {
+    let room = world.floor_room(body.position[0], body.position[1], body.position[2], room).unwrap_or(room);
+    let floor = world.floor_height(body.position[0], body.position[1], body.position[2], room).unwrap_or(NO_HEIGHT);
     body.floor = floor;
     let y = body.position[1];
     if floor < y {
@@ -790,18 +781,11 @@ pub fn animate(
         body.position[1] = floor;
     }
     body.pitch = 0;
-    // Walking creatures drown in water rooms.
-    let room_above = world.floor_room(body.position[0], body.position[1] - 512, body.position[2], room).unwrap_or(room);
-    room = room_above;
-    if level.rooms.get(room).is_some_and(|r| r.water) {
-        *health = 0;
-    }
-    order.enter(body, room);
-    true
+    room
 }
 
 /// The level's integer pose as a `Transform`.
-pub fn sync_transform(body: &CreatureBody, transform: &mut Transform) {
+pub fn sync_transform(body: &ItemBody, transform: &mut Transform) {
     let [x, y, z] = body.position;
     transform.translation = Vec3::new(x as f32, -y as f32, z as f32) / 1024.0;
     let angle = |a: i16| f32::from(a) * std::f32::consts::TAU / 65536.0;
@@ -824,11 +808,16 @@ pub struct CreatureContext<'a> {
     pub boxes: &'a BoxFlags,
     pub random: &'a mut GameRandom,
     pub player: &'a mut Player,
+    /// Lara's pose and motion, for a creature that takes her into its kill.
+    pub lara_pose: Option<&'a mut engine::animation::AnimationState>,
+    pub lara_motion: Option<&'a mut Motion>,
     /// Lara as this creature sees her this tick.
     pub enemy: &'a mut EnemyView,
     pub entity: Entity,
+    /// Its object type id, for routines several types share.
+    pub kind: u16,
     pub creature: &'a mut Creature,
-    pub body: &'a mut CreatureBody,
+    pub body: &'a mut ItemBody,
     pub health: &'a mut i32,
     pub animation: &'a mut ObjectAnimation,
     pub goal: &'a mut AnimationGoal,
@@ -856,6 +845,47 @@ impl CreatureContext<'_> {
             self.health,
             self.cues,
         )
+    }
+
+    /// CreatureKill `0x80017978`: the creature goes into its kill clip
+    /// (`clip` on from its model's first, in `state`) and takes Lara with
+    /// it, at its position and facing. She is put on the first clip of
+    /// `lara_object`, an extra-animation object animated on her skeleton,
+    /// with `lara_state` as her goal, and animated once: the clip's state
+    /// change takes her into the kill. Her hands are made busy and object
+    /// collision skipped while she is in it; she is dead, so the port's
+    /// Killed mode does both.
+    pub fn kill(&mut self, clip: usize, state: usize, lara_object: u16, lara_state: usize) {
+        let level = &self.world.data;
+        if let Some(model) = level.model(self.kind) {
+            self.animation.animation = model.animations[0] + clip;
+            self.animation.frame = 0.0;
+        }
+        self.body.current_state = state;
+        let Some(first) = level.model(lara_object).map(|m| m.animations[0]) else { return };
+        let mut extra = ObjectAnimation { animation: first, frame: 0.0 };
+        let mut current = level.animations.get(first).map_or(0, |a| a.state);
+        engine::animation::step_animation_frame_from(
+            level,
+            &mut extra,
+            &mut AnimationGoal { state: lara_state },
+            &mut current,
+        );
+        // Her animation's own advance this tick follows, after the
+        // creatures (recorded: one frame further on).
+        let lara_clip = extra.animation;
+        let [x, y, z] = self.body.position;
+        self.player.position = Vec3::new(x as f32, -y as f32, z as f32) / 1024.0;
+        self.player.yaw = engine::world::angle(self.body.yaw as u16);
+        self.player.room = self.body.room;
+        self.player.mode = crate::player::PlayerMode::Killed { animation: lara_clip, set_camera: true };
+        if let Some(motion) = self.lara_motion.as_deref_mut() {
+            motion.velocity = Vec3::ZERO;
+            motion.pitch = 0.0;
+        }
+        if let Some(pose) = self.lara_pose.as_deref_mut() {
+            pose.enter(lara_clip, extra.frame, lara_clip);
+        }
     }
 
     /// CreatureAIInfo for this creature (see [`ai_info`]).
@@ -915,7 +945,7 @@ fn activate(
     camera: Option<Res<engine::camera::CameraState>>,
     mut activated: MessageReader<engine::triggers::ObjectActivated>,
     mut active: ResMut<ActiveCreatures>,
-    mut creatures: Query<(Entity, &WorldObject, &mut Creature, &mut CreatureBody)>,
+    mut creatures: Query<(Entity, &WorldObject, &mut Creature, &mut ItemBody)>,
 ) {
     let Some(world) = world else { return };
     let camera = camera.map_or([0; 3], |c| {
@@ -935,8 +965,11 @@ fn activate(
         if !object.active || body.status != ItemStatus::Inactive || !controls.0.contains_key(&object.kind) {
             continue;
         }
-        let used = creatures.iter().filter(|(_, _, c, _)| c.search.is_some()).count();
-        if used >= SLOTS {
+        let used: Vec<usize> =
+            creatures.iter().filter(|(_, _, c, _)| c.search.is_some()).map(|(_, _, c, _)| c.slot).collect();
+        // The lowest free slot, else the one released below.
+        let mut slot = (0..SLOTS).find(|s| !used.contains(s));
+        if used.len() >= SLOTS {
             // Release the slot whose creature is farthest from the camera.
             let distance = |p: [i32; 3]| {
                 let d = [0, 1, 2].map(|i| (p[i] - camera[i]) >> 8);
@@ -951,12 +984,14 @@ fn activate(
                 && let Ok((_, _, mut creature, _)) = creatures.get_mut(far)
             {
                 creature.search = None;
+                slot = Some(creature.slot);
             }
         }
         if let Ok((_, _, mut creature, mut body)) = creatures.get_mut(entity) {
             body.status = ItemStatus::Active;
             body.touch_bits = 0;
             enable(&world, &mut creature, &mut body);
+            creature.slot = slot.unwrap_or(0);
             active.0.insert(0, entity);
         }
     }
@@ -968,7 +1003,7 @@ fn adopt(
     mut commands: Commands,
     controls: Res<CreatureControls>,
     world: Option<Res<WorldGeometry>>,
-    added: Query<(Entity, &WorldObject, &CreatureBody), Added<Creature>>,
+    added: Query<(Entity, &WorldObject, &ItemBody), Added<Creature>>,
 ) {
     for (entity, object, body) in &added {
         if controls.0.contains_key(&object.kind) {
@@ -997,12 +1032,17 @@ fn control_creatures(
     mut active: ResMut<ActiveCreatures>,
     mut random: ResMut<GameRandom>,
     mut room_order: ResMut<RoomOrder>,
-    mut players: Query<(&mut Player, Option<&Motion>)>,
+    mut players: Query<(
+        &mut Player,
+        Option<&mut Motion>,
+        Option<&mut engine::animation::AnimationState>,
+        Option<&crate::player::Wading>,
+    )>,
     mut creatures: Query<
         (
             &mut WorldObject,
             &mut Creature,
-            &mut CreatureBody,
+            &mut ItemBody,
             &mut Enemy,
             &mut ObjectAnimation,
             &mut AnimationGoal,
@@ -1013,8 +1053,12 @@ fn control_creatures(
     mut writer: MessageWriter<ObjectAnimationCue>,
 ) {
     let Some(world) = world else { return };
-    let Ok((mut player, motion)) = players.single_mut() else { return };
-    let mut enemy = EnemyView::of(&player, motion);
+    let Ok((mut player, mut motion, mut pose, wading)) = players.single_mut() else { return };
+    let mut enemy = EnemyView::of(&player, motion.as_deref());
+    if let Some(pose) = pose.as_deref() {
+        enemy.top = engine::animation::collision_bounds(&world.data, pose.animation, pose.frame).map_or(0, |b| b[2]);
+    }
+    enemy.above_water &= !wading.is_some_and(|w| w.active);
     room_order.after_placements(world.data.placements.len());
     let mut obstacles: Vec<Obstacle> = active
         .0
@@ -1046,8 +1090,11 @@ fn control_creatures(
             boxes: &boxes,
             random: &mut random,
             player: &mut player,
+            lara_pose: pose.as_deref_mut(),
+            lara_motion: motion.as_deref_mut(),
             enemy: &mut enemy,
             entity,
+            kind: object.kind,
             creature: &mut creature,
             body: &mut body,
             health: &mut hit_points.health,
@@ -1081,13 +1128,42 @@ fn control_creatures(
 /// searches finish within one wait and no fixed budget matches every
 /// recording, so the port completes them; a whole-level search can take the
 /// original two ticks (`docs/creature-evidence.md`).
-fn finish_searches(world: Option<Res<WorldGeometry>>, boxes: Res<BoxFlags>, mut creatures: Query<&mut Creature>) {
+fn finish_searches(
+    world: Option<Res<WorldGeometry>>,
+    boxes: Res<BoxFlags>,
+    mut idle: ResMut<IdleSearch>,
+    mut creatures: Query<&mut Creature>,
+) {
     let Some(world) = world else { return };
-    for mut creature in &mut creatures {
-        if let Some(search) = creature.search.as_mut() {
-            while search.update(&world.data, &boxes, false, 1) {}
+    let Some(steps) = idle.steps else {
+        for mut creature in &mut creatures {
+            if let Some(search) = creature.search.as_mut() {
+                while search.update(&world.data, &boxes, false, 1) {}
+            }
         }
+        return;
+    };
+    for _ in 0..steps {
+        let slot = idle.cursor;
+        if let Some(search) = creatures
+            .iter_mut()
+            .find(|c| c.slot == slot && c.search.is_some())
+            .and_then(|c| c.into_inner().search.as_mut())
+        {
+            search.update(&world.data, &boxes, false, 1);
+        }
+        idle.cursor = (slot + 1) % SLOTS;
     }
+}
+
+/// The idle-time search's budget. By default every search is completed
+/// between ticks; a replay of a recording can instead give the slot visits
+/// the original made in each wait (`steps`), one box for an occupied slot
+/// each, from its round-robin `cursor` (0x80089628).
+#[derive(Resource, Debug, Default, Clone)]
+pub struct IdleSearch {
+    pub steps: Option<usize>,
+    pub cursor: usize,
 }
 
 /// CreatureCollision `0x8001C598`, from Lara's collision pass: a solid,
@@ -1101,7 +1177,7 @@ fn collide(
         &mut crate::player::CollisionFrame,
         Option<&engine::animation::PoseOverrides>,
     )>,
-    mut creatures: Query<(&WorldObject, &Creature, &mut CreatureBody, &Transform, &ObjectAnimation), Without<Player>>,
+    mut creatures: Query<(&WorldObject, &Creature, &mut ItemBody, &Transform, &ObjectAnimation), Without<Player>>,
 ) {
     let (Some(world), Ok((mut player, pose, mut collision, aim))) = (world, players.single_mut()) else { return };
     let aim = aim.map_or(&[][..], |a| a.0.as_slice());
@@ -1111,7 +1187,8 @@ fn collide(
             continue;
         }
         let overrides = creature.joint_turns();
-        let mask = pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &overrides);
+        let mask =
+            pass.touch(&world, &mut player, pose, &mut collision, object.kind, transform, animation, &overrides, true);
         if mask != 0 {
             body.touch_bits = mask;
         }
@@ -1134,8 +1211,9 @@ impl Plugin for CreatureRulesPlugin {
         app.init_resource::<GameRandom>()
             .init_resource::<CreatureControls>()
             .init_resource::<ActiveCreatures>()
-            .init_resource::<RoomOrder>();
-        app.register_type::<Creature>().register_type::<CreatureBody>().register_type::<ActiveCreatures>().add_systems(
+            .init_resource::<RoomOrder>()
+            .init_resource::<IdleSearch>();
+        app.register_type::<Creature>().register_type::<ItemBody>().register_type::<ActiveCreatures>().add_systems(
             FixedUpdate,
             (
                 adopt.in_set(LifecycleSystems::Initialize),
@@ -1150,7 +1228,7 @@ impl Plugin for CreatureRulesPlugin {
 }
 
 /// The creature components for a placed object of a creature type.
-pub fn spawn_components(world: &WorldGeometry, object: &WorldObject, setup: CreatureSetup) -> (Creature, CreatureBody) {
+pub fn spawn_components(world: &WorldGeometry, object: &WorldObject, setup: CreatureSetup) -> (Creature, ItemBody) {
     let placement = world.data.placements.get(object.index);
     let position = placement.map_or([0; 3], |p| p.position);
     let yaw = placement.map_or(0, |p| p.rotation as i16);
@@ -1159,7 +1237,7 @@ pub fn spawn_components(world: &WorldGeometry, object: &WorldObject, setup: Crea
         .model(object.kind)
         .and_then(|m| world.data.animations.get(m.animations[0]))
         .map_or(0, |clip| clip.state);
-    let body = CreatureBody {
+    let body = ItemBody {
         position,
         yaw,
         room: object.room,

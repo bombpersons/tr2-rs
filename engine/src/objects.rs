@@ -87,6 +87,13 @@ impl WorldObject {
     }
 }
 
+/// An object created in play rather than placed by the level (the
+/// original's CreateItem), such as a fired dart. It has no placement; the
+/// renderer draws it from its type's model.
+#[derive(Component, Reflect, Debug, Clone, Copy, Default)]
+#[reflect(Component)]
+pub struct Created;
+
 /// Added once an object's type hooks have run.
 #[derive(Component)]
 pub struct Initialized;
@@ -222,7 +229,9 @@ impl AppObjectTypes for App {
     }
 }
 
-fn initialize_objects(
+/// Run each new object's type hooks. Public so systems that finish an
+/// object's set-up can order themselves after it.
+pub fn initialize_objects(
     mut commands: Commands,
     world: Option<Res<WorldGeometry>>,
     types: Res<ObjectTypes>,

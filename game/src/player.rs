@@ -32,6 +32,7 @@ mod rolling;
 mod surface;
 mod swimming;
 mod wading;
+pub mod zipline;
 pub use swimming::{SubmergedMotion, SurfaceTuning, SwimmingTuning};
 pub use wading::{Wading, WadingTuning};
 pub mod arms;
@@ -65,6 +66,10 @@ pub const PLAYER_RADIUS: f32 = units(100.0);
 /// Inherited Character::stepHeight value; unchanged by contact verification.
 pub const STEP_HEIGHT: f32 = units(256.0);
 pub const MAX_HEALTH: i32 = 1000;
+/// The set view the crushed and T-Rex death states ask for (0x80039BC8,
+/// 0x8003A134).
+const DEATH_CAMERA_ANGLE: i16 = 30940;
+const DEATH_CAMERA_ELEVATION: i32 = -4550;
 /// Original Lara control 0x80038194: state handlers push one turn rate by
 /// 409 yaw units/tick, then it decays 364 toward zero and is added to yaw.
 const TURN_PUSH: i32 = 409;
@@ -190,6 +195,19 @@ pub enum PlayerMode {
     /// place until it ends into standing ([`using`]).
     Using {
         animation: usize,
+    },
+    /// Killed by a trap or creature that put her into its own death clip
+    /// (impaled on spikes, crushed by a boulder, caught by the T-Rex): the
+    /// clip plays out where she is. `set_camera`: the clip's state handler
+    /// holds the camera at a set view every tick.
+    Killed {
+        animation: usize,
+        set_camera: bool,
+    },
+    /// On the zip-line: grabbing it, riding it and dropping off
+    /// ([`zipline`]).
+    ZipLine {
+        stage: zipline::ZipStage,
     },
     /// Submerged: stroke, glide, tread and the dive (water mode 1).
     Swimming,
@@ -810,6 +828,9 @@ fn control(
         motion.camera_angle = 0;
         motion.camera_distance = None;
         motion.camera_speed = None;
+        if zipline::control(&mut player, &mut motion, &mut animation, &mut traversal, clips.as_deref(), &pad) {
+            continue;
+        }
         // LaraControl's water transitions precede the tick's state handler.
         if let Some(world) = world.as_deref() {
             wading::transitions(
@@ -895,6 +916,16 @@ fn control(
             player.health = -1;
         }
         if player.health <= 0 && !matches!(player.mode, PlayerMode::Swimming | PlayerMode::Surface) {
+            if let PlayerMode::Killed { set_camera, .. } = player.mode {
+                // The crushed state's handler (0x80039BC8) and the T-Rex
+                // death's (0x8003A134) ask the camera for a set view every
+                // tick.
+                if set_camera {
+                    motion.camera_angle = DEATH_CAMERA_ANGLE;
+                    motion.camera_elevation = Some(swimming::radians(DEATH_CAMERA_ELEVATION));
+                }
+                continue;
+            }
             if player.mode == PlayerMode::FatalLanding {
                 // LaraControl clamps a dead actor to-1 on its next tick
                 // (0x80042B10), including impact154's initial health0.
@@ -1216,7 +1247,7 @@ fn integrate(
     mut players: Query<(
         &mut Player,
         &mut Motion,
-        &WeaponState,
+        &mut WeaponState,
         &mut AnimationState,
         &mut Traversal,
         &mut SubmergedMotion,
@@ -1226,11 +1257,24 @@ fn integrate(
 ) {
     let dt = time.delta_secs();
     let geometry = world.as_deref();
-    for (mut player, mut motion, weapon, mut animation, mut traversal, mut submerged, mut wading, mut collision) in
+    for (mut player, mut motion, mut weapon, mut animation, mut traversal, mut submerged, mut wading, mut collision) in
         &mut players
     {
-        if let PlayerMode::Using { .. } = player.mode {
-            // The use clips have no speed: Lara stays where her object put her.
+        if zipline::step(
+            &mut player,
+            &mut motion,
+            &mut animation,
+            &mut traversal,
+            &mut weapon,
+            geometry,
+            clips.as_deref(),
+        ) {
+            continue;
+        }
+        let weapon = &*weapon;
+        if let PlayerMode::Using { .. } | PlayerMode::Killed { .. } = player.mode {
+            // The use and trap death clips have no speed: Lara stays where
+            // her object put her.
             motion.velocity = Vec3::ZERO;
             continue;
         }
@@ -1863,7 +1907,9 @@ fn mode_clip(player: &Player, motion: &Motion, pad: &ControllerState) -> usize {
         PlayerMode::WalkStopping => STANDING_CLIP,
         PlayerMode::Climbing { animation, .. }
         | PlayerMode::HitWall { animation, .. }
-        | PlayerMode::Using { animation } => animation,
+        | PlayerMode::Using { animation }
+        | PlayerMode::Killed { animation, .. } => animation,
+        PlayerMode::ZipLine { .. } => clip::ZIP_RIDE,
         PlayerMode::Rolling { .. } => clip::ROLL,
         PlayerMode::Surface => clip::SURFACE_TREAD,
         PlayerMode::Swimming => {
@@ -2023,7 +2069,7 @@ fn collide_after_pushes(
     let dt = time.delta_secs();
     for (mut player, mut motion, mut animation, mut traversal, mut collision) in &mut players {
         let Some(pending) = collision.ground.take() else { continue };
-        if matches!(player.mode, PlayerMode::Using { .. }) {
+        if matches!(player.mode, PlayerMode::Using { .. } | PlayerMode::Killed { .. } | PlayerMode::ZipLine { .. }) {
             continue;
         }
         let old = if collision.origin == pending.origin { pending.old } else { collision.origin.with_y(pending.old.y) };

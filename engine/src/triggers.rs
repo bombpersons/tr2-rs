@@ -12,7 +12,7 @@ use std::collections::BTreeSet;
 use bevy::prelude::*;
 
 use crate::camera::{CameraCue, CameraCues};
-use crate::objects::WorldObject;
+use crate::objects::{CODE_BITS, WorldObject};
 use crate::schedule::{Avatar, InteractionSystems, LifecycleSystems, simulation_enabled};
 use crate::shell::GameSystems;
 pub use crate::world::TriggerKind;
@@ -30,9 +30,12 @@ pub struct TriggerAction {
     pub trigger: TriggerKind,
 }
 
-/// An object a trigger has just activated, in the order its actions ran.
-/// The original adds each to the front of its active-item list then, so
-/// games that keep an update order follow these.
+/// An object a trigger has left with a complete code, in the order its
+/// actions ran: every time, not only when the code completes. The original
+/// then adds the object to the front of its active-item list unless it is
+/// already there (TR2 `0x8001F1E4..0x8001F304`), so an object that took
+/// itself off the list is added back while the trigger keeps firing. Games
+/// that keep an update order follow these.
 #[derive(Message, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ObjectActivated {
     pub entity: Entity,
@@ -188,7 +191,6 @@ fn dispatch_triggers(
                 ACTIVATE => {
                     for (entity, mut o) in &mut objects {
                         if o.index == usize::from(argument) {
-                            let was_active = o.active;
                             // The trigger's timer byte goes to the object
                             // every time, before its code changes: one tick
                             // for 1, else seconds (TR2: 0x8001F160..0x8001F1E0).
@@ -202,7 +204,7 @@ fn dispatch_triggers(
                                 _ => o.flags |= mask,
                             }
                             o.update_active();
-                            if o.active && !was_active {
+                            if o.flags & CODE_BITS == CODE_BITS {
                                 activated.write(ObjectActivated { entity, index: o.index });
                             }
                         }

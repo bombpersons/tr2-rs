@@ -5,22 +5,25 @@
 //! The asset is [`Level`] ([`format`] describes the file and its units).
 //! Rules work in Bevy's level space: y up, metres; [`position`] and
 //! [`units`] convert from the file's integer world units.
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 use bevy::{
     asset::{AssetLoader, LoadContext, io::Reader},
     prelude::*,
 };
 
-pub mod format;
 mod box_search;
+pub mod format;
 mod navigation;
 pub use box_search::{BLOCKABLE, BLOCKED, BoxFlags, BoxFlagsPlugin, BoxSearch, NO_BOX, SearchNode, TargetKind};
-pub use navigation::CorridorLimits;
 pub use format::{
-    Ambient, Animation, Command, FixedCamera, FloorInfo, Level, Light, Mesh as ObjectMesh, Model, NavBox, Placement, Pose, Room,
-    Sector, Sound, StaticMesh, StaticPlacement, Texture, Trigger, TriggerKind,
+    Ambient, Animation, Command, FixedCamera, FloorInfo, Level, Light, Mesh as ObjectMesh, Model, NavBox, Placement,
+    Pose, Room, Sector, Sound, StaticMesh, StaticPlacement, Texture, Trigger, TriggerKind,
 };
+pub use navigation::CorridorLimits;
 
 /// World units per metre (and per sector).
 pub const UNITS_PER_METRE: f32 = 1024.0;
@@ -68,11 +71,51 @@ pub struct WorldGeometry {
     pub data: Arc<Level>,
     /// Sectors a shut door has made solid, as (room, sector index).
     shut: BTreeSet<(usize, usize)>,
+    /// Surfaces objects add where floor data names them, by placement.
+    surfaces: BTreeMap<usize, ObjectSurface>,
 }
 
 impl From<Arc<Level>> for WorldGeometry {
     fn from(data: Arc<Level>) -> Self {
-        Self { data, shut: BTreeSet::new() }
+        Self { data, shut: BTreeSet::new(), surfaces: BTreeMap::new() }
+    }
+}
+
+/// A slab an object lays over the room geometry, such as a tile that has
+/// not fallen yet or a closed trapdoor. Like the original's per-type floor
+/// and ceiling routines, it only counts in sectors whose floor data has a
+/// trigger that activates the object (GetHeight `0x8001E944` and GetCeiling
+/// `0x8001F740` call them for every such action, whatever the trigger's
+/// kind). The object's controller keeps it current.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ObjectSurface {
+    /// World x and z sectors (coordinate >> 10) it covers; `None` for any
+    /// sector whose floor data names it.
+    pub sectors: Option<[[i32; 2]; 2]>,
+    /// Its top, world units (y down): the floor for points at or above it.
+    pub top: i32,
+    /// The ceiling it gives points below its top.
+    pub underside: i32,
+    /// Only raise a lower floor and lower a higher ceiling, rather than
+    /// replace them.
+    pub nearest: bool,
+}
+
+impl ObjectSurface {
+    fn covers(&self, x: i32, z: i32) -> bool {
+        self.sectors.is_none_or(|s| s.contains(&[x >> 10, z >> 10]))
+    }
+
+    fn floor(&self, x: i32, y: i32, z: i32, height: &mut i32) {
+        if self.covers(x, z) && y <= self.top && (!self.nearest || self.top < *height) {
+            *height = self.top;
+        }
+    }
+
+    fn ceiling(&self, x: i32, y: i32, z: i32, height: &mut i32) {
+        if self.covers(x, z) && y > self.top && (!self.nearest || *height < self.top) {
+            *height = self.underside;
+        }
     }
 }
 
@@ -95,6 +138,28 @@ impl WorldGeometry {
         } else {
             self.shut.remove(&(room, index));
         }
+    }
+
+    /// Lay the surface of the object placed at `index` over the level, or
+    /// lift it with `None`.
+    pub fn set_object_surface(&mut self, index: usize, surface: Option<ObjectSurface>) {
+        match surface {
+            Some(surface) => self.surfaces.insert(index, surface),
+            None => self.surfaces.remove(&index),
+        };
+    }
+
+    pub fn object_surface(&self, index: usize) -> Option<&ObjectSurface> {
+        self.surfaces.get(&index)
+    }
+
+    /// The surfaces of objects the floor data's triggers activate, in order.
+    fn named_surfaces<'a>(&'a self, info: &'a FloorInfo) -> impl Iterator<Item = &'a ObjectSurface> + 'a {
+        info.triggers
+            .iter()
+            .flat_map(|t| &t.actions)
+            .filter(|a| a.action == "activate")
+            .filter_map(|a| self.surfaces.get(&usize::from(a.argument)))
     }
 
     pub fn is_shut(&self, room: usize, x: i32, z: i32) -> bool {
@@ -121,8 +186,14 @@ pub struct FloorHit {
     pub death: bool,
 }
 
-static NO_FLOOR_INFO: FloorInfo =
-    FloorInfo { portal: None, floor_slope: [0, 0], ceiling_slope: [0, 0], kill: false, climb: None, triggers: Vec::new() };
+static NO_FLOOR_INFO: FloorInfo = FloorInfo {
+    portal: None,
+    floor_slope: [0, 0],
+    ceiling_slope: [0, 0],
+    kill: false,
+    climb: None,
+    triggers: Vec::new(),
+};
 
 impl Level {
     /// What a sector's floor does besides having a height.
@@ -215,6 +286,13 @@ impl WorldGeometry {
         Some((-hit.height * 1024.0).round() as i32)
     }
 
+    /// The collision ceiling height over (x, y, z) in world units (y down),
+    /// or `None` over solid ground: GetCeiling's answer.
+    pub fn ceiling_height(&self, x: i32, y: i32, z: i32, room: usize) -> Option<i32> {
+        let hit = self.floor_at(Vec3::new(x as f32, -y as f32, z as f32) / 1024.0, room)?;
+        Some((-hit.ceiling * 1024.0).round() as i32)
+    }
+
     /// Sector portal and height rules are documented in docs/format-notes.md.
     pub fn floor_at(&self, pos: Vec3, room: usize) -> Option<FloorHit> {
         self.floor_at_for(pos, room, false)
@@ -275,9 +353,15 @@ impl WorldGeometry {
         let [sx, sz] = ceiling_slopes.map(i32::from);
         let dx = x.rem_euclid(1024);
         let dz = z.rem_euclid(1024);
-        let ceiling = top.ceiling - ((sx * if sx < 0 { dx - 1023 } else { dx }) >> 2) + ((sz * if sz > 0 { dz - 1023 } else { dz }) >> 2);
+        let mut ceiling = top.ceiling - ((sx * if sx < 0 { dx - 1023 } else { dx }) >> 2)
+            + ((sz * if sz > 0 { dz - 1023 } else { dz }) >> 2);
+        let mut floor = s.floor - slant(slope);
+        for surface in self.named_surfaces(info) {
+            surface.floor(x, y, z, &mut floor);
+            surface.ceiling(x, y, z, &mut ceiling);
+        }
         Some(FloorHit {
-            height: -(s.floor - slant(slope)) as f32 / 1024.0,
+            height: -floor as f32 / 1024.0,
             ceiling: -ceiling as f32 / 1024.0,
             room: current_room,
             water,
