@@ -1,115 +1,96 @@
-# Tomb Raider II, native Bevy port
+# Tomb Raider II, native Rust port
 
-A port of Tomb Raider II (PlayStation, USA Rev 3) built as a reusable engine
-plus this game on top of it. The disc is an asset source only: nothing here
-reads it at build or run time.
+A native Rust port of Tomb Raider II (PlayStation, USA Rev 3), built with
+[Bevy](https://bevyengine.org). It is not an emulator: the game is rewritten as
+ordinary Bevy code on top of a separate, reusable engine, with a level editor
+and support for mods.
 
-## Game content is not included
+| As on the PlayStation (368×240) | Widescreen, with the PS1 look off |
+|---|---|
+| ![Lara's Home with the PS1 look](docs/images/home-ps1.png) | ![Lara's Home in widescreen](docs/images/home-widescreen.png) |
 
-This repository has no game data. Levels, textures, sounds, screens and music
-are copyrighted; you bake them from your own copy of the game (bin/cue, one
-`.bin` per track) with the psx toolkit on `PATH`, python3
-with Pillow, and cargo:
+- **Engine, game and editor are separate.** `engine/` knows nothing about
+  Tomb Raider; `game/` is Tomb Raider II on top of it; `editor/` edits the
+  engine's level format and depends only on the engine.
+- **Moddable.** A mod is a crate that builds on the game: it can add
+  levels, object types and trigger actions, replace any of the game's, and
+  swap out whole plugins. [`mods/example`](mods/example) is a small game made
+  from hand-made assets, with its own level and character:
+
+  ![The example mod](docs/images/example-mod.png)
+- **Modern options.** Widescreen and any resolution, an optional free camera
+  with mouse look and analog stick ([docs](docs/free-camera.md)), and the PS1
+  look (wobbling vertices, dither, 15-bit colour) can be switched off.
+
+## Status: a work in progress
+
+The game is not playable from start to finish yet. Every level loads and
+draws from its own baked data, but much of what happens in them is still to
+port. What is ported is checked tick for tick against recordings of the
+original.
+
+| Area | Status |
+|---|---|
+| Lara on land: walk, run, jump, grab, climb, ladders, shimmy, roll, slides | ✅ Ported; three played runs of the Home assault course match exactly |
+| Wading and drowning | ✅ Ported |
+| Swimming and water entry/exit | 🟡 Partly ported |
+| Pistols | ✅ Ported |
+| Shotgun, Uzis, harpoon, grenades, M16, flares | ❌ Not yet |
+| Pickups, switches, keys, puzzle holes, doors, triggers | ✅ Ported |
+| Inventory ring | ❌ Not yet |
+| Lara's Home: assault course, Winston | ✅ Ported |
+| The Great Wall: traps, zip-line, crows, tiger, spiders, T-Rexes | ✅ Ported |
+| Venice: dogs, rats, gunmen, club men | ✅ Ported |
+| Vehicles: motorboat, snowmobile | ❌ Not yet |
+| Later levels' enemies and traps | ❌ Mostly not yet |
+| Rendering: PS1 look, sky, underwater palette, caustics | ✅ Ported |
+| Water surfaces, distance darkening | ❌ Not yet |
+| Widescreen, free camera, PS1 look switches | ✅ Port additions |
+
+The remaining work is tracked in [TODO.md](TODO.md), and the evidence for
+each ported behaviour is indexed in [docs/evidence.md](docs/evidence.md).
+
+## Built with psx
+
+The port is made with [psx](https://github.com/bombpersons/psx), a
+PlayStation reverse-engineering toolkit, which is what keeps it accurate:
+- It extracts the disc's levels, models, textures, sounds and music into
+  standalone files, so the port never reads the disc at run time.
+- It runs the original in an emulator and records exactly what it does,
+  tick by tick: any value in memory, every store to it and the code that
+  wrote it. A person can play a level while it records (`psx handoff`).
+- It disassembles and decompiles the original's code with Ghidra, so each
+  rule in the port cites the routine it came from.
+- It generated this project's Bevy template: the PS1 look, the tick rate
+  and input, trajectory tests that compare the port with those recordings,
+  and a developer MCP for driving and screenshotting the running port.
+
+## Running it
+
+This repository has no game data. Bake the levels, textures, sounds and music
+from your own copy of the game (bin/cue) with psx on `PATH`, python3 with
+Pillow, and Rust 1.97.1+:
 
 ```sh
-tools/bake_assets.sh path/to/game.cue   # writes game/assets/{levels,screens,music} (gitignored)
-cargo test --workspace --all-features   # includes the tests that read baked content
+tools/bake_assets.sh path/to/game.cue   # writes game/assets/ (gitignored)
+cargo run                               # the game
+cargo run -- --level wall               # start at the Great Wall
+cargo run -p example-mod                # the example mod
+cargo run -p editor                     # the level editor (docs/editor.md)
+cargo test --workspace --all-features   # tests, including the recordings
 ```
 
-Without baked content the engine, the sandbox and most tests still build and
-run: `cargo test --workspace --features dev-mcp`. Tests that read the baked
-levels are behind the game crate's `baked-assets` feature.
-
-```sh
-cargo run --features dev-mcp -- --level wall   # start at the Great Wall, no title screen
-python3 tools/port_smoke.py                    # offscreen screenshots vs the original (after a dev-mcp build)
-python3 tools/camera_smoke.py                  # fixed entrance camera through offscreen rendering
-python3 tools/backward_smoke.py                # backward hop/walk against retained PSX motion and cameras
-python3 tools/backward_collision_smoke.py      # backward walls, steps, ledges, slopes and hop-fall recovery
-python3 tools/traversal_smoke.py               # jumps, ledges, pull-ups and authored landing recovery
-python3 tools/airborne_smoke.py                # wall impacts, rolling, walking steps/ledges and authored recovery
-python3 tools/sky_smoke.py                     # camera-relative Home sky, foreground occlusion and PSX views
-python3 tools/item_lighting_smoke.py           # per-object lighting in aligned Home and Wall views
-python3 tools/subdivision_smoke.py             # off/split/filled room meshes at two PSX camera poses
-python3 tools/room_visibility_smoke.py         # Wall/Home room pixels after repeated camera turns
-python3 tools/ceiling_smoke.py                 # forward/vertical/reach ceiling impacts and authored recovery
-python3 tools/swimming_smoke.py --suite drowning # oxygen exhaustion and submerged/surface death poses
-python3 tools/wading_smoke.py                  # shallow-water gait, bank, stand-up and transitions
-python3 tools/screen_size_smoke.py             # Wall view, pause menu and title at 368x240, 16:9 and 2x
-```
-
-Evidence for every ported behaviour is indexed in [docs/evidence.md](docs/evidence.md);
-what the engine treats as data and what as per-type code is in
-[docs/engine-model.md](docs/engine-model.md).
-The remaining work and completed verification milestones are tracked in
-[TODO.md](TODO.md).
-
-## Level editor
-
-```sh
-cargo run -p editor   # hand-authored sandbox; no game data needed
-cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
-```
-
-A full-resolution Bevy editor with standard 3D rendering, searchable file
-browsing, scene shortcuts, an object property inspector, validated edits,
-undo/redo, exact untouched saves, and authored animation playback/stepping
-with isolated model previews. It depends only on the engine. See
-[editor controls and workflow](docs/editor.md).
-Keep it in step with engine formats as the port grows.
-
-## The template workspace
-
-A standalone Rust / **Bevy 0.20.0** workspace for a native port of a
-PlayStation game, created by `psx template create`. It doesn't need an
-emulator, a disc or the psx toolkit at runtime. Requires Rust 1.97.1+ and a
-desktop GPU driver (or Mesa lavapipe with `--software`).
-
-```sh
-cargo run                                # the game (default member: game/)
-cargo run -- --software                  # force a software adapter
-cargo run -- --region pal                # override REGION (display + tick rate)
-cargo run -- --controls                  # open the controls menu (F1 also opens it; Tab: CAMERA page)
-cargo run -- --display                   # open the display menu (F2 also opens it)
-cargo run -- --fullscreen                # borderless fullscreen (F11 toggles)
-cargo run -- --aspect window             # screen width follows the window's shape
-cargo run -p engine --example sandbox    # the engine's own tiny game
-cargo run -p example-mod                 # a mod: a tiny game built on game/
-cargo test --workspace                   # headless tests: engine, game, mod, importers
-cargo run --features dev-mcp -- --mcp --headless --software  # developer MCP, offscreen
-cargo test --workspace --all-features    # routine agent check (dev-mcp everywhere)
-cargo build --release                    # shipping build; developer MCP is excluded
-```
+F1 opens the controls menu and F2 the display menu. Without baked content,
+the engine, editor, example mod and most tests still build and run.
 
 ## Layout
 
-| Path | Owner | Contents |
-|---|---|---|
-| `psx-bevy/` | psx template | PS1 look, ticks and input, controls and display menus, testing, viewers, developer MCP, launcher. Updated by `psx template update`; edit sparingly and keep edits mergeable ([README](psx-bevy/README.md), [template notes](docs/template.md)) |
-| `engine/` | this project | This game's engine family: object type and action registries, update-order sets, level and tuning formats, `examples/sandbox.rs`. No names, numbers or assets from this game ([AGENTS.md](engine/AGENTS.md)) |
-| `editor/` | this project | Engine-format authoring, full-resolution UI and standard 3D preview ([guide](docs/editor.md)) |
-| `game/` | this project | This title: per-type controllers, action handlers, HUD, menus, baked assets in `game/assets/`, trajectory tests ([AGENTS.md](game/AGENTS.md)) |
-| `mods/example/` | this project | An example mod: a small game built on `game` from hand-made assets, proving the game can be extended without editing it ([game/AGENTS.md](game/AGENTS.md), "Mods are crates") |
-| `tools/import/` | this project | Offline importers: files extracted with `psx` → engine formats, with provenance |
-| `tools/*.py` | this project | Evidence recording and smoke scripts |
-| `docs/` | this project | `engine-model.md` (what the original treats as data vs code), `evidence.md`, `template.md`, per-feature evidence notes |
-| `.psx-template.toml` | psx template | Which template version this is and which files it owns |
-
-Level content is data (`game/assets/levels/<name>/level.json`, written by
-`tools/import`) spawned through the engine's object type registry; each object
-type is code registered by id in `game/`; trigger actions run through the
-engine's action registry. `docs/template.md` records where the template's
-files went.
-
-## Template updates
-
-```sh
-psx template update --dry-run   # what would change
-psx template update             # replace unmodified template files
-```
-
-Files under `psx-bevy/` that you edited are left alone and the new version is
-written beside them as `<file>.psx-new`; reapply your change from
-`docs/template.md` to it. Files the template only seeded
-(everything outside `psx-bevy/`) are never touched; when their template
-version changed, the update reports a diff to apply by hand.
+| Path | Contents |
+|---|---|
+| `engine/` | The reusable engine: object type and action registries, update order, level and tuning formats |
+| `game/` | Tomb Raider II: per-type controllers, Lara, creatures, traps, HUD, menus, baked assets, trajectory tests |
+| `editor/` | The level editor |
+| `mods/example/` | An example mod |
+| `psx-bevy/` | The psx template's crate: PS1 look, ticks, input, menus, testing, developer MCP ([README](psx-bevy/README.md)) |
+| `tools/` | Asset importers, recording scripts and smoke tests |
+| `docs/` | Evidence notes per feature, the engine model, Lara's asset contract |
