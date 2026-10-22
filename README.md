@@ -58,7 +58,10 @@ PlayStation reverse-engineering toolkit, which is what keeps it accurate:
   standalone files, so the port never reads the disc at run time.
 - It runs the original in an emulator and records exactly what it does,
   tick by tick: any value in memory, every store to it and the code that
-  wrote it. A person can play a level while it records (`psx handoff`).
+  wrote it. With `psx handoff`, a developer plays the original while it
+  records their input; the port then replays the same input, and the tests
+  compare the two tick by tick, so any difference from the original shows
+  up exactly where it starts.
 - It disassembles and decompiles the original's code with Ghidra, so each
   rule in the port cites the routine it came from.
 - It generated this project's Bevy template: the PS1 look, the tick rate
