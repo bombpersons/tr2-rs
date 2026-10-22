@@ -1,11 +1,51 @@
 # Home attendant: local follow and authored motion
 
-The type260 attendant previously rendered and looped its first clip without
-an object controller. It now follows Lara locally, starts and stops through
-the level's authored dispatch ranges, and turns using the previous tick's
-movement speed. The controller is in `game::winston`; thresholds are editable
-in the existing `game/data/object_types.json` type260 entry. The engine supplies
-clip dispatch, model posing and integer-quantized heading/trigonometry.
+The type 260 attendant (Winston) runs WinstonControl `0x800500A0` on the
+shared creature routines (`game::creature`), as the other creatures do: see
+[On the shared creature routines](#on-the-shared-creature-routines). The
+sections after it record how his local rules were first established with a
+controller of his own, which that change replaced; their recordings still
+pass.
+
+## On the shared creature routines
+
+WinstonControl (decompiled from `0x800500A0`) is a short wrapper:
+CreatureActive, CreatureAIInfo, CreatureMood (violent), CreatureTurn with the
+slot's turn limit, the state choice below, his voice sounds, and
+CreatureAnimation (`0x800166F8`) with no tilt.
+- Stopped (state 1), he asks to move (goal 2) when Lara is more than 1536
+  units away (squared distance above 0x240000) or not ahead. Moving, he
+  asks to stop (goal 1) when she is closer than that and ahead.
+- The sounds 0x158..0x15B (two flag bits in the slot) and a random one when
+  the draw-side random (`0x8006E54C`) is below 256 are not ported. That
+  random is not the control random, so leaving it out changes nothing else.
+- Object table entry 260 (`0x800936D0 + 260 * 48`): hit points −16384, so
+  never a gun target; radius 102; pivot 0. These are his `creature` entry in
+  `game/data/object_types.json`, which replaced the attendant thresholds.
+- A one-time floor trigger (with music 6) activates placement 9; the shared
+  activation then gives him an AI slot.
+- His collision is the generic object push (`0x8001C65C`), which runs
+  whether or not he is active yet, so he carries `creature::OwnCollision`
+  and keeps his own contact system (`game/src/winston/contact.rs`) in place
+  of CreatureCollision.
+
+What this brought: CreatureAnimation's floor handling (he steps up a 256
+riser at once and drops 64 a tick), its box and edge checks, the full box
+search in place of the adjacent-box corridor targets, and the mood's random
+wandering boxes once Lara leaves his zone.
+
+Verification: the walls run (`game/tests/home_lap.rs`) now records him (the
+recorder's item 1 at Home, the level's item 9) and his AI slot. The harness
+starts him where the save has him, with his slot rebuilt from the recorded
+boxes, seeds the control random from the recording and replays the
+original's idle-search visits each tick. His x, y, z, yaw, clip, frame, room
+and the control seed are compared exactly, with Lara's.
+`game/tests/winston.rs` and `game/tests/winston_contact.rs` pass unchanged in
+what they compare (31 tests), with Winston placed through
+`tests/support/winston.rs`: active, holding a slot whose search has
+finished. `tools/winston_smoke.py` was moved to the new components but has
+not been re-run; activating him in the running game gives him a fresh slot,
+whose first target is a random point in his box, unlike the checkpoints'.
 
 ## Sources and observed rules
 

@@ -4,14 +4,17 @@
 use bevy::prelude::*;
 use engine::{
     animation::{AnimationGoal, AnimationState, ObjectAnimation},
-    objects::{Initialized, WorldObject},
     testing::{Alignment, Replay, TickApp, headless_app},
     world::{Level, WorldGeometry, position},
 };
 use game::{
+    creature::{Creature, ItemBody},
     player::{Motion, Player, PlayerAnimations, PlayerMode, PlayerRulesPlugin, Traversal},
-    winston::{Winston, WinstonRulesPlugin},
+    winston::WinstonRulesPlugin,
 };
+
+mod support;
+use support::winston::{Pose, place};
 
 fn compare_case(csv: &str, metadata: &str) {
     let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
@@ -41,27 +44,21 @@ fn compare_case(csv: &str, metadata: &str) {
         app.world_mut().get_mut::<Motion>(lara).unwrap().movement_heading =
             Some(angle(at(start, "lara_movement_heading")));
     }
-    let clip = at(start, "actor_animation") as usize;
-    let actor = app
-        .world_mut()
-        .spawn((
-            Initialized,
-            WorldObject::new(9, 260, at(start, "actor_room") as usize, 0),
-            Transform::from_translation(pos(start, "actor"))
-                .with_rotation(Quat::from_rotation_y(angle(at(start, "actor_yaw")))),
-            Winston {
-                speed: at(start, "actor_speed"),
-                contact_mask: at(start, "actor_contact_mask") as u32,
-                ..default()
-            },
-            ObjectAnimation {
-                animation: clip,
-                frame: (at(start, "actor_animation_frame") - data.animations[clip].frame_start as i32) as f32,
-            },
-            AnimationGoal { state: at(start, "actor_goal") as usize },
-        ))
-        .id();
-    app.insert_resource(WorldGeometry::new(data));
+    let field = |key: &str| at(start, &format!("actor_{key}"));
+    let world = WorldGeometry::new(data);
+    let pose = Pose {
+        position: [field("x"), field("y"), field("z")],
+        yaw: field("yaw") as i16,
+        room: field("room") as usize,
+        state: field("state") as usize,
+        goal: field("goal") as usize,
+        animation: field("animation") as usize,
+        frame: field("animation_frame") as usize,
+        speed: field("speed") as i16,
+        touch_bits: field("contact_mask") as u32,
+    };
+    let actor = place(&mut app, &world, &pose, None);
+    app.insert_resource(world);
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
     let replay = Replay::parse(&metadata["input"].to_string()).unwrap();
     let inputs = replay.tick_inputs(Alignment::new(2, 0), (rows.len() - 1) / 2).unwrap();
@@ -73,13 +70,13 @@ fn compare_case(csv: &str, metadata: &str) {
         let motion = world.get::<Motion>(lara).unwrap();
         let pclip = &world.resource::<WorldGeometry>().data.animations[pose.animation];
         let actor_pose = world.get::<ObjectAnimation>(actor).unwrap();
-        let transform = world.get::<Transform>(actor).unwrap();
-        let actor_state = world.get::<Winston>(actor).unwrap();
+        let body = world.get::<ItemBody>(actor).unwrap();
+        let creature = world.get::<Creature>(actor).unwrap();
         let aclip = &world.resource::<WorldGeometry>().data.animations[actor_pose.animation];
         if metadata["navigation_target_comparison"] == "exact" {
             for (axis, name) in [(0, "target_x"), (1, "target_y"), (2, "target_z")] {
                 if headers.contains(&name) {
-                    let actual = actor_state.target[axis] * if axis == 1 { -1024.0 } else { 1024.0 };
+                    let actual = creature.target[axis] as f32;
                     assert_eq!(actual, at(row, name) as f32, "field{} {name}", at(row, "run_frame"));
                 }
             }
@@ -113,21 +110,17 @@ fn compare_case(csv: &str, metadata: &str) {
                     / 30.0)
                     .round(),
             ),
-            ("actor_x", transform.translation.x * 1024.0),
-            ("actor_y", -transform.translation.y * 1024.0),
-            ("actor_z", transform.translation.z * 1024.0),
-            (
-                "actor_yaw",
-                (transform.rotation.to_euler(EulerRot::YXZ).0 * 65536.0 / std::f32::consts::TAU).round() as i32 as i16
-                    as f32,
-            ),
-            ("actor_speed", actor_state.speed as f32),
-            ("actor_room", world.get::<WorldObject>(actor).unwrap().room as f32),
+            ("actor_x", body.position[0] as f32),
+            ("actor_y", body.position[1] as f32),
+            ("actor_z", body.position[2] as f32),
+            ("actor_yaw", f32::from(body.yaw)),
+            ("actor_speed", f32::from(body.speed)),
+            ("actor_room", body.room as f32),
             ("actor_animation", actor_pose.animation as f32),
             ("actor_animation_frame", aclip.frame_start as f32 + actor_pose.frame),
             ("actor_state", aclip.state as f32),
             ("actor_goal", world.get::<AnimationGoal>(actor).unwrap().state as f32),
-            ("actor_contact_mask", actor_state.contact_mask as f32),
+            ("actor_contact_mask", body.touch_bits as f32),
         ] {
             if name == "actor_contact_mask" && metadata["contact_mask_comparison"] == "presence" {
                 assert_eq!(actual != 0.0, at(row, name) != 0, "field{} contact presence", at(row, "run_frame"));

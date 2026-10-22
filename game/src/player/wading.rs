@@ -143,12 +143,18 @@ pub(super) fn control(
     if player.health <= 0
         || matches!(
             player.mode,
-            PlayerMode::Climbing { .. } | PlayerMode::Using { .. } | PlayerMode::Killed { .. } | PlayerMode::Dead
+            PlayerMode::Climbing { .. }
+                | PlayerMode::Using { .. }
+                | PlayerMode::Killed { .. }
+                | PlayerMode::Dead
+                | PlayerMode::HitWall { .. }
         )
     {
         return false;
     }
-    if state == state::STAND && pad.held(Button::Square) {
+    // The stop handler's wading branch (0x80038A94) stores the jump's goal
+    //15 first, then lets Up or Down replace it.
+    if state == state::STAND && pad.held(Button::Square) && !pad.held(Button::Up) && !pad.held(Button::Down) {
         return false;
     }
     let controls = GroundControls::read(pad);
@@ -274,6 +280,8 @@ pub(super) fn step(
     wading: &Wading,
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
+    pad: &ControllerState,
+    hands_free: bool,
     dt: f32,
 ) -> bool {
     let (Some(world), Some(clips)) = (world, clips) else {
@@ -281,7 +289,11 @@ pub(super) fn step(
     };
     if matches!(
         player.mode,
-        PlayerMode::Climbing { .. } | PlayerMode::Using { .. } | PlayerMode::Killed { .. } | PlayerMode::Dead
+        PlayerMode::Climbing { .. }
+            | PlayerMode::Using { .. }
+            | PlayerMode::Killed { .. }
+            | PlayerMode::Dead
+            | PlayerMode::HitWall { .. }
     ) {
         return false;
     }
@@ -352,7 +364,33 @@ pub(super) fn step(
         bad_neg: if matches!(state, state::STEP_RIGHT | state::STEP_LEFT) { -128 } else { -384 },
         bad_ceiling: 0,
     };
-    let info = collision::info(world, at, old, player.room, 762, facing, &limits);
+    // The wade's collision 0x8003C028 counts slopes above her as walls: the
+    // fountain's sloped rim is no vault.
+    let slopes = collision::Slopes { walls: state == state::WADE, pits: false };
+    let info = collision::info_with_slopes(world, at, old, player.room, 762, facing, &limits, slopes);
+    let mut hit_wall = false;
+    // Wade collision 0x8003C028 runs the vault test (0x8003C084).
+    if state == state::WADE && vault(player, motion, animation, clips, pad, hands_free, &info, at) {
+        return true;
+    }
+    if state == state::WADE
+        && super::ladder::vault_onto_wall(
+            player,
+            motion,
+            animation,
+            traversal,
+            world,
+            pad,
+            hands_free,
+            &info,
+            at,
+            wading.active,
+            dt,
+        )
+    {
+        motion.velocity = Vec3::ZERO;
+        return true;
+    }
     at += info.shift;
     motion.velocity = Vec3::new(swimming::radians(heading).sin(), 0.0, swimming::radians(heading).cos()) * speed;
     match info.contact {
@@ -361,13 +399,21 @@ pub(super) fn step(
             motion.velocity = Vec3::ZERO;
             traversal.goal = state::STAND;
             if matches!(prior, Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)) {
-                *animation = step_animation(&previous, STANDING_CLIP, None, Some(clips), original_frames(dt));
+                super::collide_stop(&previous, clips, pad, dt, traversal, animation);
             } else {
+                // A wall (front floor over 640 above her) is a hit, state 12
+                // (0x8003C0C0); lower, LaraCollideStop only stands her.
                 animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
+                hit_wall = info.front.floor < -640;
             }
         }
-        Contact::Left if state == state::WADE => player.yaw += swimming::radians(910),
-        Contact::Right if state == state::WADE => player.yaw -= swimming::radians(910),
+        // The side steps' collision 0x8003B5BC deflects off its sides too.
+        Contact::Left if matches!(state, state::WADE | state::STEP_RIGHT | state::STEP_LEFT) => {
+            player.yaw += swimming::radians(910)
+        }
+        Contact::Right if matches!(state, state::WADE | state::STEP_RIGHT | state::STEP_LEFT) => {
+            player.yaw -= swimming::radians(910)
+        }
         Contact::Clamp | Contact::Top | Contact::TopFront => {
             at = old;
             motion.velocity = Vec3::ZERO;
@@ -380,6 +426,21 @@ pub(super) fn step(
     player.position = collision::level(at);
     player.room = body_room(world, player.position, player.room, 381.0);
     motion.grounded = true;
+    if clips.state(animation.animation) == Some(state::JUMP_PREPARE) {
+        // Already dispatched here, not by the dry stand's entry.
+        traversal.enter = None;
+    }
+    if hit_wall {
+        // Wade collision leaves state 12 on the stop clip until its natural
+        // end (0x8003C0F4..0x8003C124): its handler (0x8003909C) neither
+        // steers nor stops the turn.
+        let clip = &clips.clips[animation.animation];
+        player.mode = PlayerMode::HitWall {
+            animation: animation.animation,
+            frames_left: (clip.frame_end + 1 - clip.frame_start) as f32 - animation.frame,
+        };
+        return true;
+    }
     player.mode = match clips.state(animation.animation) {
         Some(state::WADE) => PlayerMode::Wade,
         Some(state::WALK) => PlayerMode::Walk,
@@ -388,7 +449,61 @@ pub(super) fn step(
         Some(state::STEP_RIGHT) => PlayerMode::StepRight { stopping: traversal.goal == state::STAND },
         Some(state::STEP_LEFT) => PlayerMode::StepLeft { stopping: traversal.goal == state::STAND },
         Some(state::CLIMB_OUT) => PlayerMode::PullingUp,
+        // Stop+Jump in the water dispatches compression 73 too; its own
+        // control takes over from the next tick.
+        Some(state::JUMP_PREPARE) => PlayerMode::JumpingForward,
         _ => PlayerMode::Idle,
     };
+    true
+}
+
+/// TestLaraVault 0x8003D924's step vaults: a front contact with Action held
+/// and hands free, facing within 5460 of a wall's axis, a front floor 384
+/// to 640 (clip50) or 641 to 896 (clip42) above her with the sides even
+/// and room under all three ceilings. She snaps to the axis, rises by the
+/// step less the clip's climb, and the collision shift applies.
+#[allow(clippy::too_many_arguments)]
+fn vault(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    clips: &PlayerAnimations,
+    pad: &ControllerState,
+    hands_free: bool,
+    info: &collision::CollisionInfo,
+    at: IVec3,
+) -> bool {
+    if info.contact != Contact::Front || !pad.held(Button::Cross) || !hands_free {
+        return false;
+    }
+    let snapped = match (swimming::angle(player.yaw) & 0xffff) as u16 {
+        a if a.wrapping_add(0x1554) < 0x2aa9 => 0,
+        a if a.wrapping_add(0xd554) < 0x2aa9 => 0x4000,
+        a if a.wrapping_add(0x6aaa) > 0xd554 => 0x8000,
+        a if a.wrapping_add(0x5554) < 0x2aa9 => 0xc000,
+        _ => return false,
+    };
+    let front = info.front.floor;
+    let (clip, climb) = match front {
+        -640..=-384 => (clip::VAULT_TWO, 512),
+        -896..=-641 => (clip::VAULT_THREE, 768),
+        _ => return false,
+    };
+    let room = |p: &collision::Probe| p.floor - p.ceiling >= 0;
+    if (info.left.floor - info.right.floor).abs() >= 60 || !(room(&info.front) && room(&info.left) && room(&info.right))
+    {
+        return false;
+    }
+    let mut at = at + info.shift;
+    at.y += climb + front;
+    player.position = collision::level(at);
+    *animation = AnimationState::at_frame(clip, 0.0);
+    player.mode = super::climbing(Some(clips), clip);
+    // The vault leaves the turn rate alone: it goes on decaying and turning
+    // her from the next tick. This tick's turn came before the snap in the
+    // original, and comes after it here.
+    player.yaw = swimming::radians(snapped - motion.turn_rate);
+    motion.velocity = Vec3::ZERO;
+    motion.grounded = true;
     true
 }

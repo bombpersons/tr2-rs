@@ -547,13 +547,10 @@
   {
    "id": 260,
    "name": "winston",
-   "attendant": {
-    "follow_distance": 1536,
-    "max_turn": 182,
-    "path_margin": 512,
-    "max_step": 256,
-    "max_drop": 512,
-    "ground_zone": 0
+   "creature": {
+    "health": -16384,
+    "radius": 102,
+    "damage": 0
    }
   }
  ]

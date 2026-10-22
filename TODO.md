@@ -73,11 +73,22 @@ it off. Record partial progress below without checking the parent item.
   [Evidence](docs/forward-walk-evidence.md), [tests](game/tests/airborne.rs).
   Angular/static/ceiling/slope and walk/run transition branches remain.
 
+- [x] The assault course at Home: three played runs match tick for tick
+  (4921 ticks, a held-out lap of 10312 from the house, and 6520 on the
+  ladders' edges, ending in a fatal dive): climbable walls
+  (catching, climbing up, down and sideways, dropping off, jumping back off),
+  the shimmy, tilted bridges, swan and fast dives into the pool, rolls,
+  vaults, sidesteps, run step-ups, slides and wall stops.
+  [Evidence](docs/assault-course-evidence.md), [tests](game/tests/home_lap.rs).
+  The reach's swing-in and jumping up to an out-of-reach ladder are ported
+  but unrecorded: Home's lattice wall always took the ledge jump, and the
+  swing-in only fits cramped tunnels in other levels. The walls run
+  matches every tick, with Winston on the shared creature routines.
 - [ ] Jump, grab and hang: original grab conditions, alignment, animation and
   collision behavior; climb from a hang and release to drop. Include a complete
   recorded route and an independently recorded validation route.
-  Ordinary vertical/forward routes are done; static obstruction, angular
-  boundaries and climbable-wall/alternate-catch variants remain.
+  Ordinary vertical/forward routes are done, and climbable walls with the
+  assault course; static obstruction and angular boundaries remain.
 - [x] Three-click climbs: ordinary entry, authored timing and final offset;
   original and independent release/turn routes pass. See
   [evidence](docs/traversal-evidence.md) and [tests](game/tests/traversal.rs).

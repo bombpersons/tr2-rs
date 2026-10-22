@@ -29,6 +29,7 @@ pub mod boulder;
 pub mod darts;
 pub mod floors;
 pub mod spikes;
+pub mod window;
 pub mod zipline;
 
 pub use crate::items::NO_HEIGHT;
@@ -503,5 +504,6 @@ impl Plugin for TrapsPlugin {
         spikes::register(app);
         boulder::register(app);
         zipline::register(app);
+        window::register(app);
     }
 }

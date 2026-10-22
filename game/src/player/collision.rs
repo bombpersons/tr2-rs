@@ -3,8 +3,8 @@
 //! integer, y-down units. Callers convert at this boundary and then apply
 //! their state's own response.
 //!
-//! Static-mesh collision (0x8001BA24) and the slope/lava pit flags are not
-//! ported; the callers here clear those flags.
+//! Static-mesh collision (0x8001BA24) and the lava pit flag are not ported;
+//! the slope flags are [`Slopes`].
 use super::units;
 use bevy::prelude::*;
 use engine::{
@@ -20,6 +20,7 @@ pub(crate) struct CollisionFrame {
     pub origin: Vec3,
     pub(super) roll_heading: Option<f32>,
     pub(super) ground: Option<GroundMove>,
+    pub(super) walk: Option<WalkMove>,
 }
 
 /// A ground move waiting for its state collision until object pushes have
@@ -36,11 +37,23 @@ pub(super) struct GroundMove {
     pub stepped: bool,
 }
 
+/// A walk step waiting for the walk collision (0x8003A62C) until object
+/// pushes have run.
+pub(super) struct WalkMove {
+    /// Lara's position before the move.
+    pub old: Vec3,
+    /// `CollisionFrame::origin` before the pushes; a push advances it.
+    pub origin: Vec3,
+    /// The pose before this tick's animation step.
+    pub previous: AnimationState,
+}
+
 pub(super) fn remember(mut players: Query<(&super::Player, &mut CollisionFrame)>) {
     for (player, mut frame) in &mut players {
         frame.origin = player.position;
         frame.roll_heading = None;
         frame.ground = None;
+        frame.walk = None;
     }
 }
 
@@ -87,8 +100,11 @@ pub(super) struct Limits {
     pub bad_ceiling: i32,
 }
 
-pub(super) struct CollisionInfo {
+pub(crate) struct CollisionInfo {
     pub mid: Probe,
+    pub front: Probe,
+    pub left: Probe,
+    pub right: Probe,
     pub contact: Contact,
     /// Applied to the item by ShiftItem 0x8001C09C.
     pub shift: IVec3,
@@ -128,21 +144,54 @@ pub(super) fn info(
     facing: i32,
     limits: &Limits,
 ) -> CollisionInfo {
+    info_with_slopes(world, at, old, room, height, facing, limits, Slopes::default())
+}
+
+/// The caller's slope flags (coll+0x6C bits 1 and 2): a probe that meets a
+/// big slope (GetHeight's type 2, a tilt over 2) above her reads as a wall
+/// (-32767), and one below her as a pit (512) (0x8001B310..0x8001B37C, the
+/// same for each of front, left and right).
+#[derive(Clone, Copy, Default)]
+pub(super) struct Slopes {
+    pub walls: bool,
+    pub pits: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn info_with_slopes(
+    world: &WorldGeometry,
+    at: IVec3,
+    old: IVec3,
+    room: usize,
+    height: i32,
+    facing: i32,
+    limits: &Limits,
+    slopes: Slopes,
+) -> CollisionInfo {
     let top = at.y - height;
     // Rooms are resolved 160 above the body; each probe starts from the room
     // the previous one resolved to.
     let mut room = room;
-    let mut probe = |x: i32, z: i32| match world
-        .floor_at(Vec3::new(units(x as f32), units((160 - top) as f32), units(z as f32)), room)
-    {
-        Some(hit) => {
-            room = hit.room;
-            Probe {
-                floor: (-hit.height * 1024.0).round() as i32 - at.y,
-                ceiling: (-hit.ceiling * 1024.0).round() as i32 - top,
+    let mut probe = |x: i32, z: i32, flagged: bool| {
+        let point = Vec3::new(units(x as f32), units((160 - top) as f32), units(z as f32));
+        match world.floor_at(point, room) {
+            Some(hit) => {
+                room = hit.room;
+                let mut floor = (-hit.height * 1024.0).round() as i32 - at.y;
+                if flagged && (slopes.walls || slopes.pits) {
+                    let [tx, tz] = world.slope_at(point, hit.room);
+                    if tx.unsigned_abs() > 2 || tz.unsigned_abs() > 2 {
+                        if slopes.walls && floor < 0 {
+                            floor = -32767;
+                        } else if slopes.pits && floor > 0 {
+                            floor = 512;
+                        }
+                    }
+                }
+                Probe { floor, ceiling: (-hit.ceiling * 1024.0).round() as i32 - top }
             }
+            None => Probe { floor: NO_HEIGHT, ceiling: NO_HEIGHT },
         }
-        None => Probe { floor: NO_HEIGHT, ceiling: NO_HEIGHT },
     };
     let r = limits.radius;
     let quadrant = ((facing + 8192) & 0xffff) >> 14;
@@ -155,13 +204,13 @@ pub(super) fn info(
         2 => [[across(sin(facing)), -r], [r, -r], [-r, -r]],
         _ => [[-r, across(cos(facing))], [-r, -r], [-r, r]],
     };
-    let mid = probe(at.x, at.z);
-    let front = probe(at.x + front_at[0], at.z + front_at[1]);
-    let left = probe(at.x + left_at[0], at.z + left_at[1]);
-    let right = probe(at.x + right_at[0], at.z + right_at[1]);
+    let mid = probe(at.x, at.z, false);
+    let front = probe(at.x + front_at[0], at.z + front_at[1], true);
+    let left = probe(at.x + left_at[0], at.z + left_at[1], true);
+    let right = probe(at.x + right_at[0], at.z + right_at[1], true);
     let mut shift = IVec3::ZERO;
     let undo = old - at;
-    let done = |contact, shift| CollisionInfo { mid, contact, shift };
+    let done = |contact, shift| CollisionInfo { mid, front, left, right, contact, shift };
     if mid.floor == NO_HEIGHT {
         return done(Contact::Front, undo);
     }

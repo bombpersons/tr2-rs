@@ -7,7 +7,13 @@ off on purpose (`.psx/handoffs/wall_traps`), and `trex`, from the cave
 before the zip-line, down into the T-Rex valley (`.psx/handoffs/wall_trex`),
 and `venice`, from the same Wall state through the level-skip cheat into
 Venice, its dogs, gunmen, club man and rats fought on foot
-(`.psx/handoffs/venice_enemies`).
+(`.psx/handoffs/venice_enemies`); and `home`, a lap of the assault course
+at Lara's Home from `.psx/contact_home` (`.psx/handoffs/home_lap`), whose
+`lap` case follows Lara alone, and `home2`, a second lap held out from the
+port's work on the first (`.psx/handoffs/home_lap2`, case `lap2`), and
+`home3`, ladder edges and wall brushes (`.psx/handoffs/home_ladders`,
+case `ladders`), and `home4`, jump-ups onto the lattice wall and walks along
+walls (`.psx/handoffs/home_walls`, case `walls`).
 Replaying a run's input reproduces it exactly; this tool replays it once
 with checkpoints every 1000 fields, then records each case from the
 checkpoint before it, sampling Lara, the case's items (and the item slots
@@ -19,7 +25,9 @@ end of every tick; the inventory adds to it too (0x80031774) while the
 world stands still, and a slow frame runs two ticks in one field. So the
 tool watches every store to the sampled memory and replays them in order
 from one sample at the start: the memory at each control-loop store of
-the game time is that tick's row.
+the game time is that tick's row. At Home the game time is the assault
+course's timer, so a Home run can close ticks at the control loop's
+countdown store (0x80089428, at 0x8001DD20) instead.
 
 The Wall's cases but `zipline` were recorded after the routines were
 written from the disassembly (docs/trap-evidence.md); `zipline` was
@@ -62,6 +70,10 @@ class Run(NamedTuple):
     # and open.
     boxes: int = 0x80194D1C
     level_file: str = 'wall'
+    # Close ticks at the control loop's countdown store instead of the game
+    # time's: at Home the game time is the assault course's timer, which
+    # stands still until Lara leaves its start and after she finishes.
+    countdown: bool = False
 
 
 RUNS = {
@@ -77,10 +89,34 @@ RUNS = {
     'venice': Run('.psx/use_wall_game/state.bin', '.psx/handoffs/venice_enemies/input.json', 29264,
                   '.psx/venice_enemies_survey', 'venice', 0x801C19C4, 0x801C9174, 0, 'venice',
                   'validation/venice_enemies', 10, 0x801BCDC4, 'boat'),
+    # Lara's Home (level file `assault`), from the house out to the
+    # assault course and one lap of it (`.psx/handoffs/home_lap`).
+    'home': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_lap/input.json', 12126,
+                '.psx/home_lap_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_lap',
+                level_file='assault'),
+    # A second, held-out lap from the same state (`.psx/handoffs/home_lap2`):
+    # down a ladder to its foot, jumps back off and up onto the ladders.
+    'home2': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_lap2/input.json', 20625,
+                 '.psx/home_lap2_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_lap2',
+                 level_file='assault', countdown=True),
+    # Ladder edges, walks brushing walls at the side and a fatal swan dive onto
+    # the ground (`.psx/handoffs/home_ladders`), from the same state.
+    'home3': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_ladders/input.json', 13041,
+                 '.psx/home_ladders_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_ladders',
+                 level_file='assault', countdown=True),
+    # Running and walking into the lattice wall with Up+Action (its climbable
+    # jump-up), and walks along walls (`.psx/handoffs/home_walls`).
+    'home4': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_walls/input.json', 12919,
+                 '.psx/home_walls_survey', 'home', 0x8017C87C, 0x801826F4, 0, 'home', 'validation/home_walls',
+                 level_file='assault', countdown=True),
 }
 GAME_TIME = 0x800DE670
 # The store that counts a control tick (ControlPhase 0x8001D7FC).
 CONTROL_TICK_PC = 0x8001DD54
+# The countdown the control loop takes one from every tick, unconditionally,
+# just before the game time's add (which the course timer can skip).
+COUNTDOWN = 0x80089428
+COUNTDOWN_PC = 0x8001DD20
 
 ITEM = [
     (0x00, 'i32', 'floor'), (0x04, 'x32', 'touch'), (0x0E, 'i16', 'state'), (0x10, 'i16', 'goal'),
@@ -138,10 +174,22 @@ CASES = {
     'rats': ('venice', 26350, 28000, [36, 37, 45]),
     # A gunman shot dead among the rats.
     'gunman_rats': ('venice', 27200, 27650, [49]),
+    # Home: Lara alone, the whole run, for her movement through the course.
+    'lap': ('home', 0, 12125, []),
+    # The held-out lap, played after the port matched the first.
+    'lap2': ('home2', 0, 20624, []),
+    'ladders': ('home3', 0, 13040, []),
+    # Winston (the recorder's item 1 at Home: the level's item 9, as Home's
+    # item base here is Lara's, item 8) follows her through the house.
+    'walls': ('home4', 0, 12918, [1]),
 }
 # Cases whose items are creatures: their AI slots and the idle search too.
 CREATURE_CASES = {'crows', 'trex_shot', 'trex_kill', 'dogs', 'gunman', 'club_man', 'dog_shot', 'gunman_long', 'rats',
                   'gunman_rats'}
+# Cases that note the creature AI slots and the idle search, but not the
+# boxes: Winston, who never leaves his slot, in a house whose doors the
+# port runs itself.
+SLOT_CASES = {'walls'}
 # Cases that also note the control random seed as the control loop
 # dispatches the type's control: creatures not recorded draw from it
 # earlier in the same tick. The loop reads the type's control pointer
@@ -153,13 +201,13 @@ SEED = 0x80089D54
 # Cases that note Lara's gun status and flags without being creature cases,
 # and the input word (0x8008AAD4) the tick's control read: the zip-line's
 # grab and Lara's ride both test Action (0x40).
-LARA_GLOBAL_CASES = {'zipline', 'zipline_release'}
+LARA_GLOBAL_CASES = {'zipline', 'zipline_release', 'lap', 'lap2', 'ladders', 'walls'}
 # Cases whose input is the run's with Action (CROSS) let go from this
 # field on: no longer a person's play, but still no pokes.
 ACTION_RELEASED = {'zipline_release': 25200}
 # Cases recorded before the port's rules for them were written (from the
 # disassembly, but not yet ported).
-RECORDED_BEFORE_IMPLEMENTATION = {'zipline', 'dogs', 'gunman', 'club_man', 'dog_shot', 'gunman_long', 'rats',
+RECORDED_BEFORE_IMPLEMENTATION = {'lap', 'lap2', 'ladders', 'walls', 'zipline', 'dogs', 'gunman', 'club_man', 'dog_shot', 'gunman_long', 'rats',
                                   'gunman_rats'}
 INPUT = '8008aad4:x32:input'
 # Lara's fields the creatures read, noted again as CreatureAIInfo first
@@ -170,6 +218,11 @@ SEEN = {'x', 'y', 'z', 'yaw', 'room', 'speed', 'health'}
 AI_READ_PC = 0x80014EB0
 # Lara's gun status and her flags word (bit 0x40000: no object collision).
 LARA_GLOBALS = ['8008c4ea:i16:lara_gun_status', '8008c510:x32:lara_flags']
+# The rest of Lara's own state, for cases that follow her movement: her
+# water mode and air, turn rate and movement heading.
+LARA_MOVEMENT = {'lap', 'lap2', 'ladders', 'walls'}
+LARA_MOVEMENT_GLOBALS = ['8008c4f4:i16:lara_water_mode', '8008c4fe:i16:lara_air', '8008c570:i16:lara_turn_rate',
+                         '8008c572:i16:lara_heading']
 
 
 def item(run, index, prefix, fields):
@@ -177,8 +230,12 @@ def item(run, index, prefix, fields):
     return [f'{base + offset:08x}:{fmt}:{prefix}_{name}' for offset, fmt, name in fields]
 
 
-def samples(run, items, darts, creatures, lara_globals):
+def samples(run, items, darts, creatures, lara_globals, movement=False):
     columns = [f'{GAME_TIME:08x}:u32:game_time', '80089d54:x32:seed'] + item(run, run.lara, 'lara', ITEM)
+    if run.countdown:
+        columns.insert(1, f'{COUNTDOWN:08x}:i32:countdown')
+    if movement:
+        columns += LARA_MOVEMENT_GLOBALS
     for index in items:
         columns += item(run, index, f'i{index}', ITEM)
     if creatures or lara_globals:
@@ -290,6 +347,8 @@ def idle_steps(run_name, checkpoint, checkpoint_field, fields):
     if cache.exists():
         return [tuple(t) for t in json.loads(cache.read_text())]
     ticks, cursor, count = [], 0, 0
+    # The store that closes a tick, as `record` reads them.
+    tick_address, tick_pc = (COUNTDOWN, COUNTDOWN_PC) if run.countdown else (GAME_TIME, CONTROL_TICK_PC)
     for start in [0] + starts:
         length = min(chunk, fields - start)
         state = checkpoint if start == 0 else f'{chunks}/states/state_f{start:06d}.bin'
@@ -298,7 +357,7 @@ def idle_steps(run_name, checkpoint, checkpoint_field, fields):
         out = f'{chunks}/part'
         command = ['psx', 'run', DISC, '--from-state', state, '--replay', str(part.relative_to(ROOT)),
                    '--frames', str(length), '--timeout', '1200', '--max-events', '2000000', '--out', out, '--summary',
-                   '--watch', f'{SEARCH_CURSOR:08x}:4', '--watch', f'{GAME_TIME:08x}:4']
+                   '--watch', f'{SEARCH_CURSOR:08x}:4', '--watch', f'{tick_address:08x}:4']
         subprocess.run(capped(command), cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
         assert json.loads((ROOT / out / 'report.json').read_text())['watch']['complete']
         path = ROOT / out / 'writes.jsonl'
@@ -312,7 +371,7 @@ def idle_steps(run_name, checkpoint, checkpoint_field, fields):
                         if not ticks:
                             cursor = w['old_signed']
                         count += 1
-                elif w['pc'] & 0x1FFFFFFF == CONTROL_TICK_PC & 0x1FFFFFFF:
+                elif (w['address'], w['pc'] & 0x1FFFFFFF) == (tick_address & 0x1FFFFF, tick_pc & 0x1FFFFFFF):
                     if ticks:
                         ticks[-1][2] = count
                         cursor = (ticks[-1][1] + count) % 5
@@ -331,7 +390,7 @@ def record(name):
     darts = name == 'darts'
     creatures = name in CREATURE_CASES
     checkpoint_field = first // 1000 * 1000
-    checkpoint = f'{run.survey}/state_f{checkpoint_field:06d}.bin'
+    checkpoint = run.start if checkpoint_field == 0 else f'{run.survey}/state_f{checkpoint_field:06d}.bin'
     if not (ROOT / checkpoint).exists():
         survey(run)
     fields = last_field - checkpoint_field + 1
@@ -340,7 +399,8 @@ def record(name):
     replay.parent.mkdir(parents=True, exist_ok=True)
     replay.write_text(json.dumps(inputs))
     out = f'{run.validation}/{name}'
-    columns = samples(run, items, darts, creatures, name in LARA_GLOBAL_CASES)
+    columns = samples(run, items, darts, creatures or name in SLOT_CASES, name in LARA_GLOBAL_CASES,
+                      name in LARA_MOVEMENT)
     # One sample at the start gives every value; the watches give every
     # store after it.
     command = ['psx', 'run', DISC, '--from-state', checkpoint, '--replay', str(replay.relative_to(ROOT)),
@@ -380,6 +440,8 @@ def record(name):
     # count closes a tick, and the watched memory then is that tick's row.
     # A read of the control pointer notes the seed as the control starts.
     rows, control_seeds, control_seed = [], [], -1
+    tick_address, tick_pc = (COUNTDOWN, COUNTDOWN_PC) if run.countdown else (GAME_TIME, CONTROL_TICK_PC)
+    tick_store = (tick_address & 0x1FFFFF, tick_pc & 0x1FFFFFFF)
     # Lara as the type's control starts: an item earlier in the active list
     # (a boat she drives) can move her before the creatures think.
     seen_fields = [(a, f, n) for a, f, n in parsed if n.removeprefix('lara_') in SEEN]
@@ -401,7 +463,7 @@ def record(name):
             if w['address'] + i in memory:
                 memory[w['address'] + i] = byte
         field = w['run_frame'] + checkpoint_field
-        if w['address'] == GAME_TIME & 0x1FFFFF and w['pc'] & 0x1FFFFFFF == CONTROL_TICK_PC & 0x1FFFFFFF:
+        if (w['address'], w['pc'] & 0x1FFFFFFF) == tick_store:
             if field >= first:
                 rows.append([str(field)] + [decode(memory, a, f) for a, f, _ in parsed])
                 control_seeds.append(control_seed)
@@ -412,7 +474,7 @@ def record(name):
                     blocked = now
             control_seed = -1
             seen, at_control = None, None
-    if creatures:
+    if creatures or name in SLOT_CASES:
         ticks = [t for t in idle_steps(run_name, checkpoint, checkpoint_field, fields) if t[0] >= first]
         assert [t[0] for t in ticks] == [int(r[0]) for r in rows], 'idle pass ticks differ'
     # Trajectory CSV: one row per control tick; `field` is the run field
@@ -421,12 +483,13 @@ def record(name):
     # run).
     target = ROOT / f'game/tests/data/original/{run.prefix}_{name}.csv'
     out_csv = io.StringIO()
-    header = ['tick', 'field'] + (['search_cursor', 'idle_steps'] if creatures else [])
+    idle = creatures or name in SLOT_CASES
+    header = ['tick', 'field'] + (['search_cursor', 'idle_steps'] if idle else [])
     header += (['control_seed'] if control is not None else []) + [n for _, _, n in parsed]
     header += [f'seen_{n}' for _, _, n in seen_fields] if control is not None else []
     out_csv.write(','.join(header) + '\n')
     for tick, row in enumerate(rows):
-        extra = [str(ticks[tick][1]), str(ticks[tick][2])] if creatures else []
+        extra = [str(ticks[tick][1]), str(ticks[tick][2])] if idle else []
         extra += [str(control_seeds[tick])] if control is not None else []
         seen_columns = seen_rows[tick] if control is not None else []
         out_csv.write(','.join([str(tick), row[0]] + extra + row[1:] + seen_columns) + '\n')

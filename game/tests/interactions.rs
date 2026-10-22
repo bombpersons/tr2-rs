@@ -219,15 +219,13 @@ fn a_door_retargets_its_animation_on_the_tick_after_activation() {
 }
 
 #[test]
-fn registered_attendant_gets_its_controller_and_authored_goal_once() {
+fn registered_attendant_is_a_creature_with_its_own_collision() {
     let mut app = app();
     let actor = app.world_mut().spawn(WorldObject::new(9, game::winston::KIND, 0, 0)).id();
     app.run_tick(&[]);
-    assert!(app.world().get::<game::winston::Winston>(actor).is_some());
-    assert_eq!(app.world().get::<engine::animation::AnimationGoal>(actor).unwrap().state, 2);
-    app.world_mut().get_mut::<game::winston::Winston>(actor).unwrap().speed = 7;
-    app.run_tick(&[]);
-    assert_eq!(app.world().get::<game::winston::Winston>(actor).unwrap().speed, 7);
+    assert!(app.world().get::<game::creature::OwnCollision>(actor).is_some());
+    assert_eq!(app.world().get::<game::interactions::Enemy>(actor).unwrap().health, -16384);
+    assert!(game::creature::is_ported(app.world().resource(), game::winston::KIND));
 }
 
 /// Wall's shut doors and placed blocks block exactly the boxes the original's

@@ -14,7 +14,7 @@ use super::{
 };
 use bevy::prelude::*;
 use engine::{
-    animation::advance,
+    animation::{AnimationGoal, ObjectAnimation, advance, advance_authored_animation},
     camera::chase::{cos, sin},
     controller::{Button, ControllerState},
     world::WorldGeometry,
@@ -127,14 +127,30 @@ pub(super) fn enter_water(
     let fall_speed = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
     player.mode = PlayerMode::Swimming;
     player.position.y -= units(100.0);
-    animation.enter(ENTRY_CLIP, 0.0, ENTRY_CLIP);
-    traversal.goal = state::SWIM;
-    motion.pitch = swimming::radians(-8190);
+    let dive = world.data.animations.get(animation.animation).map(|c| c.state);
+    let speed = if let Some(dive @ (state::SWAN_DIVE | state::FAST_DIVE)) = dive {
+        // A dive goes in head first (0x80042690..0x800426D8): pitched -8190,
+        // or -15470 from the fast dive, toward the dive's own entry (goal
+        // 35, one AnimateLara pass, which with gravity off takes the entry
+        // clip's speed of 0), at twice the fall speed.
+        motion.pitch = swimming::radians(if dive == state::FAST_DIVE { -15470 } else { -8190 });
+        traversal.goal = state::DIVE;
+        let mut a = ObjectAnimation { animation: animation.animation, frame: animation.frame };
+        let mut goal = AnimationGoal { state: state::DIVE };
+        advance_authored_animation(&world.data, &mut a, &mut goal, 1.0);
+        *animation = AnimationState::at_frame(a.animation, a.frame);
+        fall_speed * 2
+    } else {
+        animation.enter(ENTRY_CLIP, 0.0, ENTRY_CLIP);
+        traversal.goal = state::SWIM;
+        motion.pitch = swimming::radians(-8190);
+        fall_speed * 3 / 2
+    };
     motion.grounded = false;
     motion.velocity = Vec3::ZERO;
     motion.air_animation = 0;
     *water = SubmergedMotion {
-        speed: from_quarters(fall_speed * 3 / 2),
+        speed: from_quarters(speed),
         bank: water.bank,
         air_ticks: tuning.max_air_ticks,
         dive_hold: 0,

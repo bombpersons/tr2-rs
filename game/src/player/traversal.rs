@@ -19,11 +19,24 @@ pub struct Traversal {
     /// A clip (and frame within it) the next animation pass starts at
     /// instead of advancing.
     pub(super) enter: Option<(usize, f32)>,
+    /// Lara's climb flag (0x8008C4F6): she faces a climbable wall. Set at
+    /// the end of each tick, read by the next tick's collision.
+    pub climb: bool,
+    /// She wades (water mode 4, 0x8008C4F4) as this tick's movement runs.
+    #[reflect(ignore)]
+    pub(super) wading: bool,
 }
 
 impl Default for Traversal {
     fn default() -> Self {
-        Self { goal: state::STAND, run_jump_ready: false, animation_stepped: false, enter: None }
+        Self {
+            goal: state::STAND,
+            run_jump_ready: false,
+            animation_stepped: false,
+            enter: None,
+            climb: false,
+            wading: false,
+        }
     }
 }
 
@@ -58,7 +71,7 @@ fn front(world: &WorldGeometry, position: Vec3, yaw: f32, room: usize) -> Option
     Some([probe(offsets[0])?, probe(offsets[1])?, probe(offsets[2])?])
 }
 
-fn apply_offset(player: &mut Player, offset: [i32; 3]) {
+pub(super) fn apply_offset(player: &mut Player, offset: [i32; 3]) {
     let (sin, cos) = player.yaw.sin_cos();
     let [x, y, z] = offset.map(|n| n as f32);
     // Recorded traversal offsets follow a snapped cardinal heading. Round
@@ -92,13 +105,16 @@ pub(super) fn step(
     traversal: &mut Traversal,
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
-    weapon: &WeaponState,
+    weapon: &mut WeaponState,
     pad: &ControllerState,
     dt: f32,
 ) -> bool {
     let mut mode = player.mode;
     // A back-flight handoff into fast fall ran back-jump control this tick.
-    let fast_fall_control = matches!(mode, PlayerMode::FastFalling) && traversal.enter.is_none();
+    let fast_fall_control = (matches!(mode, PlayerMode::FastFalling)
+        || (matches!(mode, PlayerMode::JumpingForward)
+            && clips.is_some_and(|c| c.state(animation.animation) == Some(state::FAST_DIVE))))
+        && traversal.enter.is_none();
     if !matches!(
         mode,
         PlayerMode::JumpingUp { .. }
@@ -122,6 +138,7 @@ pub(super) fn step(
                 // the first clear one: goal3, 27, 26 or25, with the movement
                 // heading turned that way (0x800390F0..0x8003923C). With
                 // none, the request stays and compression ends in jump28.
+                // Wading, it tries none (0x800390E4): the jump is straight up.
                 use std::f32::consts::{FRAC_PI_2, PI};
                 let requests = [
                     (Button::Up, 0.0, state::FORWARD_JUMP),
@@ -129,9 +146,10 @@ pub(super) fn step(
                     (Button::Right, FRAC_PI_2, state::JUMP_RIGHT),
                     (Button::Down, PI, state::JUMP_BACK),
                 ];
-                if let Some(&(_, turn, goal)) = requests
-                    .iter()
-                    .find(|&&(button, turn, _)| pad.held(button) && jump_ahead_clear(world, player, player.yaw + turn))
+                if !traversal.wading
+                    && let Some(&(_, turn, goal)) = requests.iter().find(|&&(button, turn, _)| {
+                        pad.held(button) && jump_ahead_clear(world, player, player.yaw + turn)
+                    })
                 {
                     traversal.goal = goal;
                     motion.movement_heading = Some(player.yaw + turn);
@@ -140,6 +158,18 @@ pub(super) fn step(
             // Reach control0x80039070 requests fast fall9 at fall speed132.
             Some(state::REACH) if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED => {
                 traversal.goal = state::FAST_FALL
+            }
+            // Swan dive control 0x80039C04: at fall speed 132 the dive
+            // steepens (goal 53) unless it is entering water (35).
+            Some(state::SWAN_DIVE)
+                if -motion.velocity.y * 1024.0 / ORIGINAL_FPS >= FAST_FALL_SPEED && traversal.goal != state::DIVE =>
+            {
+                traversal.goal = state::FAST_DIVE
+            }
+            // Fast dive control 0x80039C48: Roll twists (goal 68); the dive
+            // brakes speed by 95/100 below.
+            Some(state::FAST_DIVE) if pad.held(Button::Circle) && traversal.goal == state::FAST_DIVE => {
+                traversal.goal = state::TWIST
             }
             Some(state::FORWARD_JUMP) => {
                 // Forward-flight control0x80038B88 resets reach/dive requests,
@@ -170,9 +200,11 @@ pub(super) fn step(
             _ => {}
         }
     }
-    if matches!(mode, PlayerMode::Recovering) {
+    if matches!(mode, PlayerMode::Recovering) && clips.state(animation.animation) == Some(state::STAND) {
         // State2 handles input while the landing clip is still playing;
         // its authored ranges decide when that request can take effect.
+        // A landing still in the fall clips (34, 35) keeps the landing's
+        // goal: the forward jump's handler runs there (home_lap2).
         let controls = GroundControls::read(pad);
         traversal.goal = if pad.held(Button::Square) {
             state::JUMP_PREPARE
@@ -209,6 +241,9 @@ pub(super) fn step(
     for cue in cues {
         match cue.command {
             Command::SetPosition(offset) if cue.at_end => apply_offset(player, offset),
+            // The climb off a wall's top frees the hands (clip 174), and so
+            // does effect 12 (0x8002ADF0) in a pull-up (clip 97).
+            Command::EmptyHands | Command::Effect { effect: 12, .. } => weapon.status = GunStatus::HandsFree,
             Command::Effect { effect: 0, .. } => {
                 // Effect0 turns yaw180 degrees (twist210's last frame).
                 player.yaw = (player.yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU);
@@ -337,6 +372,8 @@ fn impact_motion(
 fn pull_up(player: &mut Player, motion: &mut Motion, world: &WorldGeometry, state: usize) -> bool {
     motion.velocity = Vec3::ZERO;
     player.mode = PlayerMode::PullingUp;
+    // UpdateLaraRoom 0x8001C0E8 each tick, 381 above the feet.
+    player.room = body_room(world, player.position, player.room, 381.0);
     // Clip97 raises by its authored735, then102 moves forward200.
     // Only after102 chains into standing does collision settle the feet.
     if state == state::STAND {
@@ -494,12 +531,31 @@ pub(super) fn stop_collision(
         motion.velocity.y = 0.0;
         return true;
     }
+    if test_slide(player, motion, animation, traversal, world, info.shift) {
+        return true;
+    }
     player.position += collision::level(info.shift);
-    let [tx, tz] = world.slope_at(player.position - collision::level(info.shift), player.room).map(i32::from);
+    player.position.y -= units(info.mid.floor as f32);
+    false
+}
+
+/// TestLaraSlide 0x8003DD30, after a ground collision probed the body
+/// (`shift` is that probe's): on a floor tilted 3 or more under Lara, the
+/// shift applies and she enters a slide with no speed; true if she did.
+pub(super) fn test_slide(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    world: &WorldGeometry,
+    shift: IVec3,
+) -> bool {
+    let yaw = (player.yaw * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let [tx, tz] = world.slope_at(player.position, player.room).map(i32::from);
     if tx.abs() < 3 && tz.abs() < 3 {
-        player.position.y -= units(info.mid.floor as f32);
         return false;
     }
+    player.position += collision::level(shift);
     let downhill = if tz.abs() > tx.abs() {
         if tz > 0 { -32768 } else { 0 }
     } else if tx > 0 {
@@ -608,6 +664,14 @@ fn jump_motion(
         units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * ticks),
     );
     let proposed = old + displacement;
+    let reaching = matches!(mode, PlayerMode::JumpingForward) && state == state::REACH;
+    let mut stepped = IVec3::ZERO;
+    if reaching || matches!(mode, PlayerMode::JumpingUp { .. }) {
+        match super::ladder::catch(player, motion, weapon, animation, traversal, world, pad, old, proposed, reaching) {
+            super::ladder::Catch::Hung => return true,
+            super::ladder::Catch::Missed(step) => stepped = step,
+        }
+    }
     // Forward collision0x8003AB00 refreshes its probe heading after
     // animation motion. Fast-fall0x8003AEEC keeps the rebound heading.
     let collision_yaw = player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0;
@@ -625,9 +689,11 @@ fn jump_motion(
     motion.movement_heading = Some(movement_heading);
     let direction = Vec3::new(movement_heading.sin(), 0.0, movement_heading.cos());
     motion.velocity = (direction * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
-    let (quadrant, forward, delta) = cardinal(player.yaw);
+    let (quadrant, _, delta) = cardinal(player.yaw);
     let hits = front(world, proposed, collision_heading, player.room);
-    let forward_jump = matches!(mode, PlayerMode::JumpingForward) && state == state::FORWARD_JUMP;
+    // The dives' collisions (0x8003BE64, 0x8003BF14) are the forward jump's.
+    let forward_jump = matches!(mode, PlayerMode::JumpingForward)
+        && matches!(state, state::FORWARD_JUMP | state::SWAN_DIVE | state::FAST_DIVE);
     let reach = matches!(mode, PlayerMode::JumpingForward) && state == state::REACH;
     // Jump-up collision uses870 rather than the ordinary762-unit body
     // probe (0x8003B828). Jump/reach handlers allow192 at the front ceiling
@@ -646,7 +712,10 @@ fn jump_motion(
     // jump but none for reach (bad_neg0: a landing reach meets its front
     // floor as a wall). The shift (0x8001C09C) precedes either deflection.
     let facing = (collision_heading * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32;
-    let deflection = (forward_jump || reach).then(|| {
+    // Fast-fall collision 0x8003AEEC probes the same way, with the reach's
+    // slide along edges (0x8003C7F4).
+    let fast_fall = matches!(mode, PlayerMode::FastFalling);
+    let deflection = (forward_jump || reach || fast_fall).then(|| {
         let limits = collision::Limits {
             radius: 100,
             bad_pos: -collision::NO_HEIGHT,
@@ -665,7 +734,9 @@ fn jump_motion(
     });
     let mut blocked = false;
     if let Some(info) = &deflection {
-        let shift = collision::level(info.shift);
+        // A failed hold on a climbable wall left its step, and ShiftItem
+        // adds the shift on top (0x8003CB68, 0x8001C09C).
+        let shift = collision::level(info.shift + stepped);
         player.position.x = proposed.x + shift.x;
         player.position.z = proposed.z + shift.z;
         blocked = matches!(info.contact, Contact::Front | Contact::TopFront);
@@ -729,8 +800,13 @@ fn jump_motion(
             player.position.y = ledge.y + units(top as f32);
             player.yaw = quadrant as f32 * std::f32::consts::FRAC_PI_2;
             player.mode = PlayerMode::Hanging { ledge };
-            motion.velocity =
-                if reaching { forward * units(2.0 * ORIGINAL_FPS) - Vec3::Y * units(ORIGINAL_FPS) } else { Vec3::ZERO };
+            // The catch snaps her yaw but not her move angle: the settling
+            // pass moves the retained speed2 along the reach's heading.
+            motion.velocity = if reaching {
+                direction * units(2.0 * ORIGINAL_FPS) - Vec3::Y * units(ORIGINAL_FPS)
+            } else {
+                Vec3::ZERO
+            };
             motion.grounded = !reaching;
             motion.turn_rate = 0;
             traversal.goal = state::HANG;
@@ -740,7 +816,7 @@ fn jump_motion(
     player.position.y = proposed.y;
     if let Some(info) = &deflection {
         player.position.y += collision::level(info.shift).y;
-        deflect(player, motion, info.contact, facing, reach);
+        deflect(player, motion, info.contact, facing, reach || fast_fall);
     } else if ceiling_contact && !blocked {
         player.position.y = centre.unwrap().ceiling - height;
         if vertical_jump {
@@ -753,14 +829,19 @@ fn jump_motion(
             motion.velocity.y = motion.velocity.y.min(-units(ORIGINAL_FPS));
         }
     }
+    // DeflectEdgeJump 0x8003C648..0x8003C668: dropping from a climbable
+    // wall at speed 2, Lara slides down it without a rebound.
+    let beside_ladder = traversal.climb && speed == 2;
+    let mut rebounded = false;
     if blocked
-        && matches!(mode, PlayerMode::JumpingForward)
-        && state == 3
+        && !beside_ladder
+        && forward_jump
         && let Some(floor) = world.floor_at(proposed, player.room)
     {
         // Reach uses0x8003C7F4 and deliberately keeps its speed/pose.
         let clearance = ((proposed.y - floor.height) * 1024.0).round() as i32;
         rebound(player, motion, animation, traversal, clearance, collision_heading, speed);
+        rebounded = true;
     }
     if vertical_jump {
         let speed = if blocked || ceiling_contact {
@@ -784,10 +865,15 @@ fn jump_motion(
         };
         motion.velocity = (player.forward() * units(speed as f32 * ORIGINAL_FPS)).with_y(motion.velocity.y);
     }
-    if let Some(hit) = world.floor_at(player.position, player.room) {
+    // GetCollisionInfo asks for the floor from 160 under the body's top, so
+    // a bridge between that and her feet catches a falling Lara (home_lap2).
+    if let Some(hit) = super::body_floor(Some(world), player.position, player.room) {
         // Water entry is LaraControl's depth test at the start of a tick.
         player.room = super::body_room(world, player.position, hit.room, 381.0);
-        if !motion.grounded && motion.velocity.y <= 0.0 && player.position.y <= hit.height {
+        // The landing test is fall speed above0 on the floor
+        // (0x8003ABC4): the rebound's fall speed1 lands a take-off too.
+        if (!motion.grounded || rebounded) && motion.velocity.y <= 0.0 && player.position.y <= hit.height {
+            let fall = (-motion.velocity.y * 1024.0 / ORIGINAL_FPS).round() as i32;
             landing_damage(player, motion.velocity);
             player.position.y = hit.height;
             motion.velocity.y = 0.0;
@@ -804,11 +890,23 @@ fn jump_motion(
                 }
                 return true;
             }
-            traversal.goal = if state == state::FORWARD_JUMP && pad.held(Button::Up) && !pad.held(Button::R1) {
-                state::RUN
-            } else {
-                state::STAND
-            };
+            if state == state::FAST_DIVE && fall >= 134 {
+                // The fast dive's collision 0x8003BF14 lands a dive this
+                // fast head first: goal 8, which its clip dispatches to 155.
+                // The death collision (0x8003AEC0) then sets her health to
+                // -1, as the clamp for a dead Lara does.
+                player.health = 0;
+                traversal.goal = state::DEATH;
+                player.mode = PlayerMode::FatalLanding;
+                return true;
+            }
+            // Wading, a landing always stops (0x8003ABA4..0x8003ABD8).
+            traversal.goal =
+                if state == state::FORWARD_JUMP && !traversal.wading && pad.held(Button::Up) && !pad.held(Button::R1) {
+                    state::RUN
+                } else {
+                    state::STAND
+                };
             if matches!(mode, PlayerMode::FastFalling) {
                 // Fast-fall collision0x8003AF64 forces heavy landing24
                 // on this tick, retaining horizontal speed until control
@@ -838,6 +936,9 @@ fn jump_motion(
                     let speed = clips.speed(animation).unwrap_or(0.0);
                     motion.velocity = player.forward() * speed;
                     let speed = (speed * 1024.0 / ORIGINAL_FPS).round() as i32;
+                    // This second pass moves along the heading the collision
+                    // just refreshed from her turned yaw (home_lap2).
+                    let angle = (movement_heading * 65536.0 / std::f32::consts::TAU).round() as i32;
                     player.position.x += units(((engine::camera::chase::sin(angle) * speed) >> 14) as f32 * ticks);
                     player.position.z += units(((engine::camera::chase::cos(angle) * speed) >> 14) as f32 * ticks);
                 } else {

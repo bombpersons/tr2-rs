@@ -1,159 +1,50 @@
-//! Home's attendant: authored local follow, turn, start and stop.
+//! Home's attendant (type 260): WinstonControl `0x800500A0` on the shared
+//! creature routines in [`crate::creature`]. A one-time floor trigger
+//! activates him, and he then follows Lara through the house: he sets off
+//! when she is more than 1536 units away or behind him, and stops once
+//! she is closer than that and ahead. He is violent in the mood's sense
+//! (he heads straight for her whenever she is in his zone), never a target
+//! (hit points -16384 in the object table) and never attacks.
 //!
-//! State decisions and free-space motion come from PSX0x800500A0 and
-//! 0x800166F8. Same-box and directly adjacent corridor targets are verified,
-//! including a lower-floor target. Multi-box search, physical height
-//! transitions and obstacle avoidance remain pending.
+//! His collision is the generic object push (`0x8001C65C`), not
+//! CreatureCollision: [`contact`]. His voice sounds (0x158..0x15B, picked
+//! with the draw-side random) are not ported.
 use bevy::prelude::*;
-use engine::{
-    animation::{AnimationGoal, ObjectAnimation},
-    camera::chase::{cos, heading, sin},
-    objects::WorldObject,
-    schedule::{ItemSystems, WorldSystems, simulation_enabled},
-    world::{CorridorLimits, WorldGeometry},
-};
 
-use crate::player::Player;
+use crate::creature::{AppCreatures, CreatureContext, turn};
 
 mod contact;
 
 pub const KIND: u16 = 260;
 
-/// Moddable local follow thresholds. The authored clip table supplies speeds.
-#[derive(Resource, Reflect, serde::Deserialize, Debug, Clone)]
-#[reflect(Resource)]
-pub struct WinstonTuning {
-    pub follow_distance: i32,
-    /// Creature slot initialization0x80048F40:182 angle units/tick.
-    pub max_turn: i32,
-    /// Navigation target clearance0x80015DD4: half a sector.
-    pub path_margin: i32,
-    /// Creature initialization0x80048F68/0x80048F48: rise256/drop512.
-    /// Reverse search tests their signed counterparts at0x80015204..0x80015224.
-    pub max_step: i32,
-    pub max_drop: i32,
-    /// The ordinary ground-zone array selected through0x8008B4A0.
-    /// Its complete Home runtime contents match baked zones[0] (and[5]).
-    pub ground_zone: usize,
-}
+/// Winston's states (his clips' state numbers).
+pub const STOP: usize = 1;
+pub const MOVE: usize = 2;
 
-#[derive(Component, Reflect, Debug, Clone, Default)]
-#[reflect(Component)]
-pub struct Winston {
-    /// Previous authored movement speed, in source units per 30Hz tick.
-    pub speed: i32,
-    /// Mesh contacts from the avatar collision pass; read by the next item tick.
-    pub contact_mask: u32,
-    /// Current local path target, in ordinary level-space coordinates.
-    pub target: Vec3,
-}
+/// Squared distance beyond which he follows (`0x80050128`: 1536 units).
+const FOLLOW_RANGE: i32 = 0x24_0000;
 
 pub struct WinstonRulesPlugin;
 
 impl Plugin for WinstonRulesPlugin {
     fn build(&self, app: &mut App) {
-        engine::add_once(app, engine::EngineRulesPlugin);
+        app.register_creature(KIND, control);
         contact::install(app);
-        app.insert_resource(crate::interactions::winston_tuning());
-        app.register_type::<Winston>().add_systems(
-            FixedUpdate,
-            (
-                follow.in_set(ItemSystems::Control),
-                move_authored.in_set(WorldSystems::Items).after(ItemSystems::Animation),
-            )
-                .run_if(simulation_enabled),
-        );
     }
 }
 
-fn yaw(transform: &Transform) -> i32 {
-    (transform.rotation.to_euler(EulerRot::YXZ).0 * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32
-}
-
-fn follow(
-    world: Option<Res<WorldGeometry>>,
-    tuning: Res<WinstonTuning>,
-    players: Query<&Player>,
-    mut attendants: Query<
-        (&mut Winston, &WorldObject, &mut Transform, &ObjectAnimation, &mut AnimationGoal),
-        Without<Player>,
-    >,
-) {
-    let (Some(world), Ok(player)) = (world, players.single()) else { return };
-    for (mut actor, object, mut transform, animation, mut goal) in &mut attendants {
-        if object.consumed {
-            continue;
+/// WinstonControl `0x800500A0`. The state decision follows the turn, and
+/// both read where Lara stood before this tick.
+pub fn control(c: &mut CreatureContext) {
+    let info = c.ai_info();
+    c.mood(&info, true);
+    let angle = turn(c.creature, c.body, c.creature.max_turn);
+    if c.body.current_state == STOP {
+        if (info.distance > FOLLOW_RANGE || !info.ahead) && c.goal.state != MOVE {
+            c.goal.state = MOVE;
         }
-        let delta = ((player.position - transform.translation) * 1024.0).round();
-        let (dx, dz) = (delta.x as i32, delta.z as i32);
-        let distance = i64::from(dx).pow(2) + i64::from(dz).pow(2);
-        let old_yaw = yaw(&transform);
-        let angle = (heading(dx, dz) - old_yaw) as i16 as i32;
-        let ahead = angle.abs() < 16384;
-        // Awareness is evaluated before turning. Moving starts beyond1536
-        // or when Lara is behind; stopping requires strictly less1536 ahead.
-        let Some(clip) = world.data.animations.get(animation.animation) else { continue };
-        if clip.state == 1 {
-            if distance > i64::from(tuning.follow_distance).pow(2) || !ahead {
-                goal.state = 2;
-            }
-        } else if distance < i64::from(tuning.follow_distance).pow(2) && ahead {
-            goal.state = 1;
-        }
-        actor.target = world
-            .adjacent_path_target_with_limits(
-                transform.translation,
-                object.room,
-                player.position,
-                player.room,
-                CorridorLimits {
-                    margin: tuning.path_margin,
-                    max_step: tuning.max_step,
-                    max_drop: tuning.max_drop,
-                    zone: Some(tuning.ground_zone),
-                },
-            )
-            .unwrap_or(player.position);
-        if actor.speed == 0 || tuning.max_turn == 0 {
-            continue;
-        }
-        let target_delta = ((actor.target - transform.translation) * 1024.0).round();
-        let (dx, dz) = (target_delta.x as i32, target_delta.z as i32);
-        let angle = (heading(dx, dz) - old_yaw) as i16 as i32;
-        let distance = i64::from(dx).pow(2) + i64::from(dz).pow(2);
-        let mut cap = tuning.max_turn;
-        let turn_radius = actor.speed * 16384 / cap;
-        if angle.abs() > 16384 && distance < i64::from(turn_radius).pow(2) {
-            cap /= 2;
-        }
-        let next = (old_yaw + angle.clamp(-cap, cap)) as i16;
-        transform.rotation = Quat::from_rotation_y(f32::from(next) * std::f32::consts::TAU / 65536.0);
+    } else if info.distance < FOLLOW_RANGE && info.ahead {
+        c.goal.state = STOP;
     }
-}
-
-fn move_authored(
-    world: Option<Res<WorldGeometry>>,
-    mut attendants: Query<(&mut Winston, &mut WorldObject, &mut Transform, &ObjectAnimation)>,
-) {
-    let Some(world) = world else { return };
-    for (mut actor, mut object, mut transform, animation) in &mut attendants {
-        if object.consumed {
-            continue;
-        }
-        let Some(clip) = world.data.animations.get(animation.animation) else { continue };
-        // AnimateItem0x8001DDC8 clears last tick's mesh contacts.
-        actor.contact_mask = 0;
-        actor.speed = ((i64::from(clip.speed) + i64::from(clip.accel) * animation.frame.floor() as i64) >> 16) as i32;
-        let yaw = yaw(&transform);
-        let delta = Vec3::new(((sin(yaw) * actor.speed) >> 14) as f32, 0.0, ((cos(yaw) * actor.speed) >> 14) as f32);
-        let proposed = transform.translation + delta / 1024.0;
-        // The measured local paths stay on one flat floor. Keep unverified
-        // stair/ledge navigation bounded rather than walking through geometry.
-        if let Some(hit) = world.floor_at(proposed, object.room)
-            && (hit.height - transform.translation.y).abs() < 0.0001
-        {
-            transform.translation = proposed;
-            object.room = hit.room;
-        }
-    }
+    c.animate(angle, 0);
 }

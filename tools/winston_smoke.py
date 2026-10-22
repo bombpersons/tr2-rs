@@ -40,14 +40,16 @@ def main():
                 # The bootstrap tick used the level spawn's old heading; seed
                 # the checkpoint's preceding collision pass before replaying.
                 client.edit('Player','Motion',{'movement_heading':int(start['lara_movement_heading'])*math.tau/65536})
-            yaw = int(start['actor_yaw']) * math.tau / 65536
-            client.edit('Object260_9', 'Transform', {'translation': convert([int(start[f'actor_{c}']) for c in 'xyz']),
-                        'rotation': [0, math.sin(yaw / 2), 0, math.cos(yaw / 2)]})
+            # Winston is a creature: his item body is his pose, and activating
+            # him gives him an AI slot (a fresh one, unlike the checkpoint's).
+            client.edit('Object260_9', 'WorldObject', {'active': True, 'room': int(start['actor_room'])})
+            client.edit('Object260_9', 'ItemBody', {'position': [int(start[f'actor_{c}']) for c in 'xyz'],
+                        'yaw': int(start['actor_yaw']), 'room': int(start['actor_room']),
+                        'current_state': int(start['actor_state']), 'speed': int(start['actor_speed']),
+                        'touch_bits': int(start.get('actor_contact_mask', 0))})
             clip = int(start['actor_animation'])
             client.edit('Object260_9', 'ObjectAnimation', {'animation': clip, 'frame': int(start['actor_animation_frame']) - level['animations'][clip]['frame_start']})
             client.edit('Object260_9', 'AnimationGoal', {'state': int(start['actor_goal'])})
-            client.edit('Object260_9', 'Winston', {'speed': int(start['actor_speed']),
-                        'contact_mask': int(start.get('actor_contact_mask', 0))})
             samples = [2,102,148,174,180,198,212,224,226,228,230,240,256,260,280] if name.startswith('wall_') else [2,8,16,36,38,40,42,78,88,90,94,96,98] if name.startswith('contact') else ([2,102,158,160,162,164,360,548,550,592,594,616,618,644,646,650] if name.startswith('nav') else [2,58,64,102,160,240,360])
             if name.startswith('contact_vertical'):
                 samples = [2,28,40,50,60,88,98,100,102,112,114,116,118,120,128,160]
@@ -66,14 +68,14 @@ def main():
                     client.call('game_step', {'frames': count, 'buttons': buttons})
                     tick += count
                 row = rows[field]
-                state = client.query(name='Object260_9', components=['Winston', 'Transform', 'ObjectAnimation', 'AnimationGoal', 'WorldObject'])
+                state = client.query(name='Object260_9', components=['ItemBody', 'Creature', 'Transform', 'ObjectAnimation', 'AnimationGoal', 'WorldObject'])
                 c = next(e for e in state['entities'] if e['name']=='Object260_9')['components']
                 t, a = c['Transform'], c['ObjectAnimation']
                 got = [round(t['translation'][0]*1024), round(-t['translation'][1]*1024), round(t['translation'][2]*1024)]
                 assert got == [int(row[f'actor_{k}']) for k in 'xyz'], (name, field, got, row)
                 assert a['animation'] == int(row['actor_animation']), (name, field, a, row)
                 assert level['animations'][a['animation']]['frame_start'] + a['frame'] == int(row['actor_animation_frame'])
-                assert c['Winston']['speed'] == int(row['actor_speed'])
+                assert c['ItemBody']['speed'] == int(row['actor_speed'])
                 assert c['AnimationGoal']['state'] == int(row['actor_goal'])
                 qx,qy,qz,qw=t['rotation']
                 yaw=round(math.atan2(2*(qw*qy+qx*qz),1-2*(qy*qy+qz*qz))*65536/math.tau)
@@ -82,12 +84,12 @@ def main():
                     for i, axis in enumerate('xyz'):
                         key = f'target_{axis}'
                         if key in row:
-                            assert round(c['Winston']['target'][i]*(-1024 if i==1 else 1024))==int(row[key]),(name,field,key,c,row)
+                            assert c['Creature']['target'][i]==int(row[key]),(name,field,key,c,row)
                 if 'actor_contact_mask' in row:
                     if meta.get('contact_mask_comparison') == 'presence':
-                        assert bool(c['Winston']['contact_mask'])==bool(int(row['actor_contact_mask'])),(name,field,c,row)
+                        assert bool(c['ItemBody']['touch_bits'])==bool(int(row['actor_contact_mask'])),(name,field,c,row)
                     else:
-                        assert c['Winston']['contact_mask']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
+                        assert c['ItemBody']['touch_bits']==int(row['actor_contact_mask']),(name,field,c,row,client.query(components=['Player','Motion','AnimationState','Traversal']))
                 if name.startswith(('contact','wall_','nav')):
                     player=client.query(components=['Player','AnimationState'])['entities'][0]['components']
                     pos=player['Player']['position']

@@ -48,8 +48,6 @@ struct ObjectTypeData {
     #[serde(default)]
     creature: Option<CreatureData>,
     #[serde(default)]
-    attendant: Option<crate::winston::WinstonTuning>,
-    #[serde(default)]
     swimming: Option<crate::player::SwimmingTuning>,
     #[serde(default)]
     pistols: Option<crate::player::GunTuning>,
@@ -213,11 +211,6 @@ fn object_types() -> Vec<ObjectTypeData> {
     table.types
 }
 
-/// The local attendant thresholds live with the existing per-type tuning data.
-pub(crate) fn winston_tuning() -> crate::winston::WinstonTuning {
-    object_types().into_iter().find_map(|entry| entry.attendant).expect("attendant tuning is registered")
-}
-
 pub(crate) fn swimming_tuning() -> crate::player::SwimmingTuning {
     object_types().into_iter().find_map(|entry| entry.swimming).expect("swimming tuning is registered")
 }
@@ -240,7 +233,7 @@ fn register_object_types(app: &mut App) {
         let hook = data.clone();
         object_type = object_type.on_init(move |entity, object, world| {
             if hook.id == crate::winston::KIND {
-                entity.insert((crate::winston::Winston::default(), AnimationGoal { state: 2 }));
+                entity.insert(crate::creature::OwnCollision);
             }
             if let Some(pickup) = &hook.pickup {
                 entity.insert((pickup.clone(), UsableItem::default()));

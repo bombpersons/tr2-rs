@@ -7,7 +7,7 @@ use bevy::prelude::*;
 use engine::{
     objects::WorldObject,
     schedule::{ItemSystems, simulation_enabled},
-    world::{ObjectSurface, WorldGeometry},
+    world::{ObjectSurface, Ramp, WorldGeometry},
 };
 
 use super::{AppTraps, TrapContext, TrapType};
@@ -30,8 +30,51 @@ pub(super) fn register(app: &mut App) {
         .register_trap(TRAPDOOR, TrapType::new("trapdoor").with_control(trapdoor))
         .add_systems(
             FixedUpdate,
-            lay_surfaces.in_set(ItemSystems::Control).after(super::control).run_if(simulation_enabled),
+            (lay_bridges, lay_surfaces).in_set(ItemSystems::Control).after(super::control).run_if(simulation_enabled),
         );
+}
+
+/// Bridges: a flat one and ramps that drop a quarter and a half click across
+/// each sector. Each has only floor and ceiling routines (object table
+/// 0x800936D0: 117 0x8004D0B4/0x8004D0D4, 118 0x8004D144/0x8004D1A4, 119
+/// 0x8004D204/0x8004D264).
+pub const BRIDGE_FLAT: u16 = 117;
+pub const BRIDGE_TILT_QUARTER: u16 = 118;
+pub const BRIDGE_TILT_HALF: u16 = 119;
+
+/// A bridge's walkable top: its origin's height, dropping along its facing
+/// by the distance into the sector, a quarter or a half (GetOffset
+/// `0x8004D0F4`); a ceiling 256 under it.
+pub fn bridge_surface(kind: u16, position: [i32; 3], yaw: i16) -> Option<ObjectSurface> {
+    let shift = match kind {
+        BRIDGE_FLAT => None,
+        BRIDGE_TILT_QUARTER => Some(2),
+        BRIDGE_TILT_HALF => Some(1),
+        _ => return None,
+    };
+    Some(ObjectSurface {
+        sectors: None,
+        top: position[1],
+        underside: position[1] + 256,
+        nearest: false,
+        ramp: shift.map(|shift| Ramp { yaw, shift }),
+    })
+}
+
+/// Lay every bridge the level places; they never move.
+fn lay_bridges(world: Option<ResMut<WorldGeometry>>) {
+    let Some(mut world) = world else { return };
+    let missing: Vec<_> = world
+        .data
+        .placements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, p)| Some((index, bridge_surface(p.kind, p.position, p.rotation as i16)?)))
+        .filter(|(index, surface)| world.object_surface(*index) != Some(surface))
+        .collect();
+    for (index, surface) in missing {
+        world.set_object_surface(index, Some(surface));
+    }
 }
 
 /// How far the tile's walkable top is above its origin.
@@ -44,7 +87,7 @@ fn height(kind: u16) -> i32 {
 /// FallingBlockCeiling `0x8005FBAC`), wherever floor data names it.
 pub fn falling_block_surface(kind: u16, y: i32, state: usize) -> Option<ObjectSurface> {
     let top = y - height(kind);
-    (state < FALLING).then_some(ObjectSurface { sectors: None, top, underside: top + 256, nearest: false })
+    (state < FALLING).then_some(ObjectSurface { sectors: None, top, underside: top + 256, nearest: false, ramp: None })
 }
 
 /// FallingBlock `0x8005F97C`. Triggered while Lara stands on it, it waits
@@ -97,6 +140,7 @@ pub fn trapdoor_surface(position: [i32; 3], yaw: i16, state: usize) -> Option<Ob
         top: position[1],
         underside: position[1] + 256,
         nearest: true,
+        ramp: None,
     })
 }
 

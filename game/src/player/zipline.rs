@@ -102,7 +102,9 @@ pub fn grab(
     clips: &PlayerAnimations,
 ) -> bool {
     let mut a = animation.clone();
-    for _ in 0..8 {
+    // Bounded only against a table with no way in; a walk's foot stop
+    // (clip 3) takes a few dozen frames.
+    for _ in 0..256 {
         match clips.dispatch(&a, state::ZIP_LINE) {
             Some((clip, frame)) => a.enter(clip, frame, clip),
             None => advance(&mut a, Some(clips), 1.0),

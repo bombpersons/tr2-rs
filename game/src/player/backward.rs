@@ -49,11 +49,11 @@ pub(super) fn step(
     // original. apply_turn_rate commits that yaw later in this schedule.
     let heading = player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0 + std::f32::consts::PI;
     motion.movement_heading = Some(heading);
-    let Some(centre) = world.floor_at(proposed, player.room) else { return true };
+    let Some(centre) = body_floor(Some(world), proposed, player.room) else { return true };
     let probes = probes(proposed, heading);
     let down_limit = if state == Some(state::WALK_BACK) { 384.0 } else { 32512.0 };
     let blocked = |position: Vec3| {
-        let Some(hit) = world.floor_at(position, player.room) else { return true };
+        let Some(hit) = body_floor(Some(world), position, player.room) else { return true };
         let relative = (old.y - hit.height) * 1024.0;
         let steep = world.slope_at(position, player.room).iter().any(|s| s.unsigned_abs() > 2);
         // GetCollisionInfo0x8001B2E0: uphill steep slopes are walls;
@@ -105,6 +105,8 @@ pub(super) fn step(
         player.mode = PlayerMode::FallingBack;
         motion.grounded = false;
         motion.velocity.y = 0.0;
+        // UpdateLaraRoom still runs at the end of the tick (home_lap2).
+        player.room = super::body_room(world, player.position, player.room, 381.0);
         return true;
     }
     if state == Some(state::WALK_BACK) && (129.0..384.0).contains(&drop) {
@@ -136,14 +138,18 @@ pub(super) fn grid_shift(probe: f32, reference: f32) -> f32 {
     units(delta as f32)
 }
 
+/// AnimateLara 0x80043248's ground move: the integral speed along the
+/// move's binary angle, through the sine table with an arithmetic shift.
 pub(super) fn ground_displacement(velocity: Vec3, dt: f32) -> Vec3 {
-    let mut displacement = velocity * dt;
-    for axis in [0, 2] {
-        let n = displacement[axis] * 1024.0;
-        let stable = if (n - n.round()).abs() < 0.0001 { n.round() } else { n };
-        displacement[axis] = units(stable.floor());
-    }
-    displacement
+    use engine::camera::chase::{cos, sin};
+    let speed = (velocity.with_y(0.0).length() * 1024.0 / ORIGINAL_FPS).round() as i32;
+    let angle = (velocity.x.atan2(velocity.z) * 65536.0 / std::f32::consts::TAU).round() as i32;
+    let ticks = original_frames(dt);
+    Vec3::new(
+        units(((sin(angle) * speed) >> 14) as f32 * ticks),
+        velocity.y * dt,
+        units(((cos(angle) * speed) >> 14) as f32 * ticks),
+    )
 }
 
 /// GetCollisionInfo's front/left/right cardinal probes, radius100; the front
@@ -250,12 +256,15 @@ pub(super) fn fall(
         motion.velocity = back * clips.speed(animation).unwrap_or(0.0);
     }
     for cue in cues {
-        if let Command::JumpVelocity([vertical, horizontal]) = cue.command
-            && cue.at_end
-        {
-            motion.velocity =
-                back * units(horizontal as f32 * ORIGINAL_FPS) + Vec3::Y * units(-vertical as f32 * ORIGINAL_FPS);
-            motion.grounded = false;
+        match cue.command {
+            // The ladder push-off183 ends 256 back from the wall.
+            Command::SetPosition(offset) if cue.at_end => super::traversal::apply_offset(player, offset),
+            Command::JumpVelocity([vertical, horizontal]) if cue.at_end => {
+                motion.velocity =
+                    back * units(horizontal as f32 * ORIGINAL_FPS) + Vec3::Y * units(-vertical as f32 * ORIGINAL_FPS);
+                motion.grounded = false;
+            }
+            _ => {}
         }
     }
     if motion.grounded && state == Some(state::STAND) {

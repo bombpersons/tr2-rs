@@ -99,6 +99,33 @@ pub struct ObjectSurface {
     /// Only raise a lower floor and lower a higher ceiling, rather than
     /// replace them.
     pub nearest: bool,
+    /// A ramp: the top falls away across each sector (see [`Ramp`]).
+    pub ramp: Option<Ramp>,
+}
+
+/// A ramp's slant: across each sector, along the object's facing, its top
+/// drops by the distance from the sector's high edge shifted right by
+/// `shift` (2 for a quarter-click ramp, 1 for a half). The underside stays
+/// 256 under the top.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ramp {
+    /// The object's facing, binary angle.
+    pub yaw: i16,
+    pub shift: u8,
+}
+
+impl Ramp {
+    /// How far the top has dropped at (x, z): the distance into the sector
+    /// along the facing, from 0 to 1023 (GetOffset `0x8004D0F4`).
+    fn drop(&self, x: i32, z: i32) -> i32 {
+        let along = match self.yaw {
+            0 => 1024 - x,
+            i16::MIN => x,
+            16384 => z,
+            _ => 1024 - z,
+        };
+        (along & 1023) >> self.shift
+    }
 }
 
 impl ObjectSurface {
@@ -106,15 +133,21 @@ impl ObjectSurface {
         self.sectors.is_none_or(|s| s.contains(&[x >> 10, z >> 10]))
     }
 
+    fn top_at(&self, x: i32, z: i32) -> i32 {
+        self.top + self.ramp.map_or(0, |ramp| ramp.drop(x, z))
+    }
+
     fn floor(&self, x: i32, y: i32, z: i32, height: &mut i32) {
-        if self.covers(x, z) && y <= self.top && (!self.nearest || self.top < *height) {
-            *height = self.top;
+        let top = self.top_at(x, z);
+        if self.covers(x, z) && y <= top && (!self.nearest || top < *height) {
+            *height = top;
         }
     }
 
     fn ceiling(&self, x: i32, y: i32, z: i32, height: &mut i32) {
-        if self.covers(x, z) && y > self.top && (!self.nearest || *height < self.top) {
-            *height = self.underside;
+        let top = self.top_at(x, z);
+        if self.covers(x, z) && y > top && (!self.nearest || *height < top) {
+            *height = top + (self.underside - self.top);
         }
     }
 }

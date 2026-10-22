@@ -102,10 +102,10 @@ fn collide_body(
     state: usize,
 ) {
     let proposed = player.position;
-    let Some(centre) = world.floor_at(proposed, player.room) else { return };
+    let Some(centre) = body_floor(Some(world), proposed, player.room) else { return };
     let probes = probes(proposed, collision_heading);
     let blocked = |point: Vec3| {
-        let Some(hit) = world.floor_at(point, player.room) else { return true };
+        let Some(hit) = body_floor(Some(world), point, player.room) else { return true };
         // Roll permits drops, but rejects steps above384 and any front head
         // obstruction (0x8003BC8C..0x8003BCA8 and0x8003BD58..0x8003BD74).
         hit.height > old.y + units(384.0) || hit.ceiling < old.y + PLAYER_HEIGHT

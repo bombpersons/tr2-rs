@@ -5,14 +5,17 @@
 use bevy::prelude::*;
 use engine::{
     animation::{AnimationGoal, ObjectAnimation},
-    objects::{Initialized, WorldObject},
     testing::{TickApp, headless_app},
     world::{Level, WorldGeometry, position},
 };
 use game::{
+    creature::{Creature, ItemBody},
     player::Player,
-    winston::{Winston, WinstonRulesPlugin},
+    winston::WinstonRulesPlugin,
 };
+
+mod support;
+use support::winston::{Pose, place};
 
 fn compare_case(csv: &str) {
     let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
@@ -25,59 +28,59 @@ fn compare_case(csv: &str) {
         position([at(row, &format!("{prefix}_x")), at(row, &format!("{prefix}_y")), at(row, &format!("{prefix}_z"))])
     };
     let first = &rows[0];
-    let clip = at(first, "actor_animation") as usize;
-    let rotation = |v: i32| Quat::from_rotation_y(v as f32 * std::f32::consts::TAU / 65536.0);
-    let actor = app
-        .world_mut()
-        .spawn((
-            Initialized,
-            WorldObject::new(9, 260, at(first, "actor_room") as usize, 0),
-            Transform::from_translation(pos(first, "actor")).with_rotation(rotation(at(first, "actor_yaw"))),
-            Winston { speed: at(first, "actor_speed"), ..default() },
-            ObjectAnimation {
-                animation: clip,
-                frame: (at(first, "actor_animation_frame") - data.animations[clip].frame_start as i32) as f32,
-            },
-            AnimationGoal { state: at(first, "actor_goal") as usize },
-        ))
-        .id();
+    let world = WorldGeometry::new(data);
+    let actor = place(&mut app, &world, &pose(first, &at), None);
     let player = app.world_mut().spawn(Player::at(pos(first, "lara"), 0.0, at(first, "lara_room") as usize)).id();
-    app.insert_resource(WorldGeometry::new(data));
+    app.insert_resource(world);
     let mut previous = first;
     for row in rows.iter().skip(2).step_by(2) {
         let mut avatar = app.world_mut().get_mut::<Player>(player).unwrap();
         avatar.position = pos(previous, "lara");
         avatar.room = at(previous, "lara_room") as usize;
         app.run_tick(&[]);
-        let transform = app.world().get::<Transform>(actor).unwrap();
+        let body = app.world().get::<ItemBody>(actor).unwrap();
         let a = app.world().get::<ObjectAnimation>(actor).unwrap();
         let goal = app.world().get::<AnimationGoal>(actor).unwrap();
-        let w = app.world().get::<Winston>(actor).unwrap();
+        let creature = app.world().get::<Creature>(actor).unwrap();
         let clip = &app.world().resource::<WorldGeometry>().data.animations[a.animation];
-        let yaw = (transform.rotation.to_euler(EulerRot::YXZ).0 * 65536.0 / std::f32::consts::TAU).round() as i32 as i16
-            as i32;
         let actual = [
-            (transform.translation.x * 1024.0).round() as i32,
-            (-transform.translation.y * 1024.0).round() as i32,
-            (transform.translation.z * 1024.0).round() as i32,
-            yaw,
+            body.position[0],
+            body.position[1],
+            body.position[2],
+            i32::from(body.yaw),
             a.animation as i32,
             clip.frame_start as i32 + a.frame as i32,
             clip.state as i32,
             goal.state as i32,
-            w.speed,
-            app.world().get::<WorldObject>(actor).unwrap().room as i32,
+            i32::from(body.speed),
+            body.room as i32,
         ];
         let expected = ["x", "y", "z", "yaw", "animation", "animation_frame", "state", "goal", "speed", "room"]
             .map(|k| at(row, &format!("actor_{k}")));
         assert_eq!(actual, expected, "native field {}", at(row, "run_frame"));
         assert_eq!(
-            ((w.target.x * 1024.0).round() as i32, (w.target.z * 1024.0).round() as i32),
+            (creature.target[0], creature.target[2]),
             (at(row, "target_x"), at(row, "target_z")),
             "navigation target at field{}",
             at(row, "run_frame")
         );
         previous = row;
+    }
+}
+
+/// Winston's recorded item fields in `row`.
+fn pose(row: &[i32], at: &dyn Fn(&[i32], &str) -> i32) -> Pose {
+    let field = |key: &str| at(row, &format!("actor_{key}"));
+    Pose {
+        position: [field("x"), field("y"), field("z")],
+        yaw: field("yaw") as i16,
+        room: field("room") as usize,
+        state: field("state") as usize,
+        goal: field("goal") as usize,
+        animation: field("animation") as usize,
+        frame: field("animation_frame") as usize,
+        speed: field("speed") as i16,
+        touch_bits: 0,
     }
 }
 

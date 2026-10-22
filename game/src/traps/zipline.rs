@@ -114,7 +114,7 @@ fn go_home(c: &mut TrapContext) {
 /// held and free hands takes hold, and it goes on the active list.
 fn zip_line_collision(c: &mut TrapCollision) {
     let Some(clips) = c.clips else { return };
-    let lara_state = clips.state(c.pose.animation);
+    let lara_state = crate::player::current_state(c.player, clips, c.pose);
     if !c.action
         || !zipline::can_grab(c.player, c.motion, c.weapon, lara_state)
         || c.body.status != ItemStatus::Inactive

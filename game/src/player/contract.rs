@@ -60,6 +60,10 @@ pub mod clip {
     pub const HIT_WALL_EARLY: usize = 53;
     pub const HIT_WALL_LATE: usize = 54;
     /// Walking a click up or down (state 0), by foot.
+    /// Running up a step (129 to 384): on the left foot (run frames 3 to
+    /// 14), else the right.
+    pub const RUN_STEP_UP_LEFT: usize = 56;
+    pub const RUN_STEP_UP_RIGHT: usize = 55;
     pub const STEP_UP_LEFT: usize = 57;
     pub const STEP_UP_RIGHT: usize = 58;
     pub const STEP_DOWN_LEFT: usize = 59;
@@ -157,6 +161,16 @@ pub mod clip {
     /// Type 103, used the same way both ways.
     pub const LEVER: usize = 197;
 
+    /// On a climbable wall: the stance, a step up, a step down, and a hang
+    /// pulled up onto the wall or let down a step.
+    pub const CLIMB_STANCE: usize = 164;
+    pub const CLIMB_UP: usize = 161;
+    pub const CLIMB_DOWN: usize = 168;
+    pub const HANG_CLIMB_UP: usize = 187;
+    pub const HANG_CLIMB_DOWN: usize = 188;
+    /// A reach caught with nothing under the feet: the swing in.
+    pub const HANG_SWING: usize = 150;
+
     /// The zip-line (type 102). Standing's range for [`super::state::ZIP_LINE`]
     /// enters the grab (state 19), whose end steps Lara 654 forward onto
     /// the line and links into the ride loop (state 70). The ride's range
@@ -199,6 +213,9 @@ pub mod state {
     pub const JUMP_LEFT: usize = 27;
     pub const JUMP_UP: usize = 28;
     pub const FALL_BACK: usize = 29;
+    /// Shimmying along a ledge, hanging.
+    pub const HANG_LEFT: usize = 30;
+    pub const HANG_RIGHT: usize = 31;
     pub const BACK_SLIDE: usize = 32;
     pub const SURFACE_TREAD: usize = 33;
     pub const SURFACE_FORWARD: usize = 34;
@@ -209,7 +226,18 @@ pub mod state {
     pub const SURFACE_LEFT: usize = 48;
     pub const SURFACE_RIGHT: usize = 49;
     pub const SWAN_DIVE: usize = 52;
+    pub const FAST_DIVE: usize = 53;
+    /// From a hang with walk held: the handstand pull-up.
+    pub const HANDSTAND: usize = 54;
     pub const CLIMB_OUT: usize = 55;
+    /// On a climbable wall: holding on, climbing up, left, (the unused
+    /// end state), right and down.
+    pub const CLIMB_STANCE: usize = 56;
+    pub const CLIMBING: usize = 57;
+    pub const CLIMB_LEFT: usize = 58;
+    pub const CLIMB_END: usize = 59;
+    pub const CLIMB_RIGHT: usize = 60;
+    pub const CLIMB_DOWN: usize = 61;
     pub const WADE: usize = 65;
     pub const TWIST: usize = 68;
     pub const PICKUP: usize = 39;

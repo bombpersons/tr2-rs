@@ -1,6 +1,7 @@
 //! Forward walking's room probes, authored step clips and collision stops.
 //! PSX walk collision0x8003A62C; shared room deflection0x8003C544.
 use super::backward::{grid_shift, ground_displacement, probes};
+use super::collision::WalkMove;
 use super::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -12,6 +13,7 @@ pub(super) fn step(
     world: Option<&WorldGeometry>,
     clips: Option<&PlayerAnimations>,
     pad: &ControllerState,
+    collision: &mut CollisionFrame,
     dt: f32,
 ) -> bool {
     let (Some(world), Some(clips)) = (world, clips) else { return false };
@@ -44,13 +46,18 @@ pub(super) fn step(
         return true;
     }
     let old = player.position;
-    let proposed = old + ground_displacement(motion.velocity, dt);
+    // The move angle was written before the last tick's side turn.
+    let velocity = Quat::from_rotation_y(-motion.edge_turn as f32 * std::f32::consts::TAU / 65536.0) * motion.velocity;
+    motion.edge_turn = 0;
+    let proposed = old + ground_displacement(velocity, dt);
     let heading = player.yaw + motion.turn_rate as f32 * std::f32::consts::TAU / 65536.0;
     motion.movement_heading = Some(heading);
-    let Some(centre) = world.floor_at(proposed, player.room) else { return true };
+    if body_floor(Some(world), proposed, player.room).is_none() {
+        return true;
+    }
     let probes = probes(proposed, heading);
     let blocked = |position: Vec3| {
-        let Some(hit) = world.floor_at(position, player.room) else { return true };
+        let Some(hit) = body_floor(Some(world), position, player.room) else { return true };
         let relative = (old.y - hit.height) * 1024.0;
         let steep = world.slope_at(position, player.room).iter().any(|s| s.unsigned_abs() > 2);
         // +/-384 floor bounds, zero head margin, slopes as walls/pits and
@@ -67,8 +74,46 @@ pub(super) fn step(
         *animation = previous;
         return false;
     }
-    let axis = if heading.sin().abs() > heading.cos().abs() { 0 } else { 2 };
+    // Object pushes come between this move and the walk collision
+    // (ItemPushLara 0x8001CA78 before 0x8003A62C): `collide`.
+    collision.walk = Some(WalkMove { old, origin: collision.origin, previous });
     player.position = proposed;
+    true
+}
+
+/// The walk collision `step` held back, from where object pushes left Lara.
+/// A push that could not clear put her back on the origin it last accepted,
+/// which the probes start from.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn collide(
+    player: &mut Player,
+    motion: &mut Motion,
+    animation: &mut AnimationState,
+    traversal: &mut Traversal,
+    world: Option<&WorldGeometry>,
+    clips: Option<&PlayerAnimations>,
+    pad: &ControllerState,
+    pending: WalkMove,
+    origin: Vec3,
+    dt: f32,
+) {
+    let (Some(world), Some(clips)) = (world, clips) else { return };
+    let WalkMove { old, previous, .. } = pending;
+    let old = if origin == pending.origin { old } else { origin.with_y(old.y) };
+    let proposed = player.position;
+    let Some(centre) = body_floor(Some(world), proposed, player.room) else { return };
+    let heading = motion.movement_heading.unwrap_or(player.yaw);
+    let probes = probes(proposed, heading);
+    let blocked = |position: Vec3| {
+        let Some(hit) = body_floor(Some(world), position, player.room) else { return true };
+        let relative = (old.y - hit.height) * 1024.0;
+        let steep = world.slope_at(position, player.room).iter().any(|s| s.unsigned_abs() > 2);
+        !(-384.0..=384.0).contains(&relative)
+            || (steep && relative != 0.0)
+            || hit.death
+            || hit.ceiling < old.y + PLAYER_HEIGHT
+    };
+    let axis = if heading.sin().abs() > heading.cos().abs() { 0 } else { 2 };
     if blocked(probes[0]) {
         player.position = old;
         player.position[axis] = proposed[axis] + grid_shift(probes[0][axis], proposed[axis]);
@@ -87,23 +132,28 @@ pub(super) fn step(
             player.mode = PlayerMode::WalkStopping;
         } else {
             player.mode = PlayerMode::Idle;
-            if matches!(
-                clips.state(previous.animation),
-                Some(state::STAND | state::TURN_RIGHT | state::TURN_LEFT | state::FAST_TURN)
-            ) {
-                *animation = step_animation(&previous, STANDING_CLIP, None, Some(clips), original_frames(dt));
-            } else {
-                animation.enter(STANDING_CLIP, 0.0, STANDING_CLIP);
-            }
+            collide_stop(&previous, clips, pad, dt, traversal, animation);
         }
     } else {
-        for (index, sign) in [(1, 1.0), (2, -1.0)] {
-            if blocked(probes[index]) {
-                let side = 2 - axis;
-                player.position[side] += grid_shift(probes[index][side], probes[0][side]);
-                player.yaw += sign * 910.0 * std::f32::consts::TAU / 65536.0;
-                break;
-            }
+        // GetCollisionInfo's side contact (walls and pits, 384 either way):
+        // LaraDeflectEdge shifts her out and turns her 910 away.
+        let limits = collision::Limits { radius: 100, bad_pos: 384, bad_neg: -384, bad_ceiling: 0 };
+        let slopes = collision::Slopes { walls: true, pits: true };
+        let facing = (heading * 65536.0 / std::f32::consts::TAU).round() as i32 as i16 as i32;
+        let at = collision::original(proposed);
+        let info =
+            collision::info_with_slopes(world, at, collision::original(old), player.room, 762, facing, &limits, slopes);
+        let turn = match info.contact {
+            collision::Contact::Left => 910,
+            collision::Contact::Right => -910,
+            _ => 0,
+        };
+        if turn != 0 {
+            let shifted = collision::level(at + info.shift);
+            player.position.x = shifted.x;
+            player.position.z = shifted.z;
+            player.yaw += turn as f32 * std::f32::consts::TAU / 65536.0;
+            motion.edge_turn = turn;
         }
         let drop = ((old.y - centre.height) * 1024.0).round();
         let absolute = clips.clips[animation.animation].frame_start as f32 + animation.frame;
@@ -130,5 +180,4 @@ pub(super) fn step(
     }
     player.position.y = centre.height;
     player.room = world.floor_at(player.position, player.room).map_or(player.room, |hit| hit.room);
-    true
 }

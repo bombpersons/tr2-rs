@@ -85,6 +85,13 @@ fn default_drop() -> i32 {
     -512
 }
 
+/// A creature whose type has its own collision routine in place of
+/// CreatureCollision `0x8001C598` (Home's attendant pushes Lara as plain
+/// objects do).
+#[derive(Component, Reflect, Debug, Clone, Copy, Default)]
+#[reflect(Component)]
+pub struct OwnCollision;
+
 /// A creature's AI slot: its mood, steering target and path search.
 #[derive(Component, Reflect, Debug, Clone)]
 #[reflect(Component)]
@@ -1226,6 +1233,8 @@ pub struct IdleSearch {
 /// CreatureCollision `0x8001C598`, from Lara's collision pass: a solid,
 /// active creature's meshes that touch her become its contacts for its next
 /// control (the tiger's bite reads them), and she is pushed out of it.
+/// Types with [`OwnCollision`] run their own routine instead.
+#[allow(clippy::type_complexity)]
 fn collide(
     world: Option<Res<WorldGeometry>>,
     mut players: Query<(
@@ -1234,7 +1243,10 @@ fn collide(
         &mut crate::player::CollisionFrame,
         Option<&engine::animation::PoseOverrides>,
     )>,
-    mut creatures: Query<(&WorldObject, &Creature, &mut ItemBody, &Transform, &ObjectAnimation), Without<Player>>,
+    mut creatures: Query<
+        (&WorldObject, &Creature, &mut ItemBody, &Transform, &ObjectAnimation),
+        (Without<Player>, Without<OwnCollision>),
+    >,
 ) {
     let (Some(world), Ok((mut player, pose, mut collision, aim))) = (world, players.single_mut()) else { return };
     let aim = aim.map_or(&[][..], |a| a.0.as_slice());
