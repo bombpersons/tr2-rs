@@ -7,10 +7,14 @@
 #   game/          this title: controllers, rules, HUD, menus, baked assets
 #   tools/import/  offline importers: extracted disc data -> engine formats
 #   mods/example/  a mod: a small game built on game/ from hand-made assets
+#   vendor/        psx-media and psx-assets, vendored by the template
 [workspace]
 resolver = "3"
 members = ["psx-bevy", "engine", "game", "editor", "tools/import", "mods/example"]
 default-members = ["game"]
+# Template-owned copies of psx crates: dependencies, not members (their tests
+# run in the psx repository).
+exclude = ["vendor"]
 
 [workspace.package]
 version = "0.1.0"

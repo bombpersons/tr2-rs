@@ -6,7 +6,7 @@ template commit `53b1eac` (merged from `99dae8d`).
 
 It now uses the template's workspace layout and is tracked by
 `.psx-template.toml`, written by `psx template adopt`. The current template build is
-psx `0.3.4+src-b72afc8e8efe891f-release`. Package `tomb-raider-ii`, region
+psx `0.3.8+src-0b26c73b885b1004-release`. Package `tomb-raider-ii`, region
 NTSC, 2 fields per tick.
 
 ## Updating
@@ -174,6 +174,39 @@ From psx `0.3.0+src-a3beb4f814bc417d-release` to
 Validation: `cargo test --workspace --all-features` and the mod's ignored
 GPU/MCP test (`cargo test -p example-mod --features dev-mcp --test dev_mcp
 -- --ignored`) passed.
+
+## Update 2026-10-23
+
+From psx `0.3.4+src-b72afc8e8efe891f-release` to
+`0.3.8+src-0b26c73b885b1004-release`.
+
+- Template changes: the controls and display menus are split into logic
+  (`mod.rs`) and a replaceable built-in view (`view.rs`), with `ControlsUi` /
+  `DisplayUi` to turn the view and shortcuts off and a public API for a game's
+  own view (`ControlsMenu::{shown, mode, hint}`, `row_label`, `ROWS`...). The
+  material shader keeps the perspective weight positive for vertices behind
+  the camera, and `DistanceFog` is now per pixel. New `examples/corridor.rs`.
+  New `vendor/` (`psx-media`, `psx-assets`), excluded from the workspace.
+- Conflicts:
+  - `controls/mod.rs`, `view.rs`, `tests.rs`: merged three ways against the
+    0.3.4 files. The options page is kept; its Browse hint moved with the
+    others into `ControlsMenu::hint`, and the view's hint test checks both
+    pages through it. Both sides' tests are kept.
+  - `material.rs`: took upstream's fog doc line; `use_scene_lighting` kept.
+  - `psx/mod.rs`: no upstream change; kept as is.
+  - `README.md`: took the new version (layout rows, "Making the menus the
+    game's own") with the per-object lighting and options-page paragraphs
+    reapplied.
+- Seeded files: added the `vendor/` exclusion to the workspace, and the menu
+  view and `vendor/` guidance to `game/AGENTS.md` and `AGENTS.md`. Not
+  adopted yet:
+  - importing from the player's disc on first start (`game/src/disc.rs`, a
+    `GameData` state, `tools/import` as a library on the vendored crates).
+    This project still bakes with `tools/bake_assets.sh` (Python and psx);
+  - "One Bevy build" (`engine/` depending on `bevy_egui` so the game and
+    editor resolve the same Bevy features);
+  - the seeded egui editor shell, `game/src/demo/` and the template's
+    `tools/import`, which this project's editor and importer replace.
 
 ## Where the template's files live
 

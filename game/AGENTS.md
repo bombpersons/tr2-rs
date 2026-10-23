@@ -82,6 +82,12 @@ Evidence-recording scripts and importers live in the workspace's `tools/`.
   The screen can change size at runtime, so anchor 2D HUD elements with
   `PsxAnchor` rather than positions computed from `PsxScreen` at startup.
   See `psx-bevy/README.md`, "Screen size".
+- Both menus come with a plain built-in view. Once the port has its own
+  front end, give them the game's look: turn the built-in views off
+  (`ControlsUi`, `DisplayUi` in `src/main.rs`'s `add`), copy the views into
+  `game/` and restyle or merge them into the options screen. Never restyle
+  them inside `psx-bevy/`. See `psx-bevy/README.md`, "Making the menus the
+  game's own".
 - Explicitly import `engine::controller::Button` when using Bevy and engine
   preludes together: Bevy UI also exports a `Button` type.
 - Split each feature into a *rules* plugin (state, physics, decisions; no

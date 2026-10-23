@@ -1,6 +1,8 @@
 //! Ordinary Bevy UI rendered into the PS1 canvas, before its screen pass.
 //! Labels use the bitmap font in `psx::font`: vector text at this size breaks up.
-use super::{BindingDevice, Button, ControlsMenu, ControlsOptions, DISCARD, Item, Mode, Page, RESTORE, SAVE};
+use super::{
+    BindingDevice, Button, ControlsMenu, ControlsOptions, ControlsUi, DISCARD, Item, Page, RESTORE, SAVE, row_label,
+};
 use crate::{
     controller::ControllerBindings,
     pointer::{Hitboxes, node_rect},
@@ -57,7 +59,8 @@ const CHOICE_CHARS: usize = (BINDING_W / GLYPH_W) as usize - 4;
 const HEADERS: [[&str; 4]; 2] = [["ACTION", "KEYBOARD", "GAMEPAD", "MOUSE"], ["SETTING", "VALUE", "", ""]];
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Startup, spawn).add_systems(Update, (refresh, collect_hitboxes));
+    let shown = |ui: Res<ControlsUi>| ui.view;
+    app.add_systems(Startup, spawn.run_if(shown)).add_systems(Update, (refresh, collect_hitboxes).run_if(shown));
 }
 fn label(text: &str, color: Color, images: &mut Assets<Image>) -> impl Bundle {
     let image = text_image(text);
@@ -136,8 +139,7 @@ fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
                     }
                 });
             }
-            for (row, text) in [(RESTORE, "Restore defaults"), (SAVE, "Save and close"), (DISCARD, "Discard and close")]
-            {
+            for (row, text) in [RESTORE, SAVE, DISCARD].map(|row| (row, row_label(row))) {
                 root.spawn((
                     Row(row),
                     Node { height: px(LINE_H), flex_shrink: 0.0, ..default() },
@@ -149,22 +151,6 @@ fn spawn(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
             root.spawn(Node { margin: UiRect::top(px(2)), flex_shrink: 0.0, overflow: Overflow::clip(), ..default() })
                 .with_child((Hint, label("", CYAN, &mut images)));
         });
-}
-
-fn hint(mode: &Mode, device: BindingDevice, page: Page) -> &'static str {
-    match mode {
-        Mode::Browse if page == Page::Options => {
-            "Up/down: select  Left/right/Enter: change\nDel/West: default  Esc/East: discard"
-        }
-        Mode::Listen { .. } if device == BindingDevice::Mouse => {
-            "Click any mouse button; the next row follows.\nEsc: cancel this binding"
-        }
-        Mode::Browse => "Arrows/D-pad/mouse: select  Enter/click: edit\nDel/West: clear  Esc/East/right click: discard",
-        Mode::Listen { .. } => {
-            "Press one key or button; the next row follows.\nEsc or right click: cancel this binding"
-        }
-        Mode::Conflict(_) => "Enter/click: swap  Esc/East/right click: keep\nNothing changes until Save and close.",
-    }
 }
 
 /// Rows, then the binding columns inside them, as screen rectangles.
@@ -179,7 +165,7 @@ fn collect_hitboxes(
 ) {
     hitboxes.0.clear();
     tab_boxes.0.clear();
-    if !menu.open {
+    if !menu.is_open() {
         return;
     }
     // The options page hides the action rows it does not use, and its value
@@ -219,12 +205,12 @@ fn refresh(
         return;
     }
     for mut root in &mut roots {
-        root.display = if menu.open { Display::Flex } else { Display::None };
+        root.display = if menu.is_open() { Display::Flex } else { Display::None };
     }
     for mut camera in &mut cameras {
-        camera.is_active = menu.open;
+        camera.is_active = menu.is_open();
     }
-    if !menu.open {
+    if !menu.is_open() {
         return;
     }
     let mut set = |label: &mut Label, node: &mut ImageNode, layout: &mut Node, text: String| {
@@ -235,7 +221,7 @@ fn refresh(
             label.0 = text;
         }
     };
-    let draft = menu.draft.as_ref().unwrap_or(&bindings);
+    let draft = menu.shown(&bindings);
     let page = if options.options.is_empty() { Page::Bindings } else { menu.page };
     let choices = menu.options_draft.as_ref().unwrap_or(&options);
     for mut node in &mut tabs {
@@ -285,14 +271,14 @@ fn refresh(
         }
     }
     for (mut label, mut node, mut layout) in &mut hints {
-        let text = format!("{}\n{}", menu.status, hint(&menu.mode, menu.device, page));
-        set(&mut label, &mut node, &mut layout, text);
+        set(&mut label, &mut node, &mut layout, format!("{}\n{}", menu.status(), menu.hint()));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::controls::Mode;
     use crate::psx::font::text_width;
 
     #[test]
@@ -309,7 +295,8 @@ mod tests {
         ] {
             for device in BindingDevice::ALL {
                 for page in [Page::Bindings, Page::Options] {
-                    assert!(text_width(hint(&mode, device, page)) <= INNER, "{}", hint(&mode, device, page));
+                    let menu = ControlsMenu { mode: mode.clone(), device, page, ..default() };
+                    assert!(text_width(menu.hint()) <= INNER, "{}", menu.hint());
                 }
             }
         }
