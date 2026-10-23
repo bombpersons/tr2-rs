@@ -1,0 +1,89 @@
+{
+  "build": {
+    "id": "src-74805a2fd038122d-release",
+    "profile": "release",
+    "source_sha256": "74805a2fd038122dd7585ef41b975c6498b528d2233457265827c3b19c2225e3",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.5"
+  },
+  "continue": {
+    "arguments": {
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue"
+    },
+    "tool": "run"
+  },
+  "files": {
+    "input.json": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/input.json",
+      "sha256": "432be958427192203d87d0322072973d2b4c42991b2777bca19ec520151a71a7"
+    },
+    "screen.png": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/screen.png"
+    },
+    "state.bin": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/state.bin",
+      "sha256": "e116ca17c55cba146d5cf9561eaefc4c106f4edb9cfcc6de61522bbaa3fa3f66"
+    }
+  },
+  "frames": {
+    "end": 208128,
+    "reached": 16831,
+    "start": 191297,
+    "unit": "vsync"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.5",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/rec_opera_puzzle_hole/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9
+  },
+  "input": {
+    "file": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/input.json",
+    "frame_origin": "handoff_start",
+    "note": "Complete pad states at run frames from the handoff start, in run --replay format.",
+    "recorded_events": 213
+  },
+  "note": "I think it's the first button in the rig level actually. I'm standing right in front of it. It opens the door that exits Lara's jail cell, and closes if you aren't fast enough.",
+  "pad": {
+    "analog": false,
+    "buttons": [],
+    "kind": "digital",
+    "locked": false,
+    "motors": [
+      0,
+      0
+    ],
+    "sticks": [
+      128,
+      128,
+      128,
+      128
+    ]
+  },
+  "report": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/report.json",
+  "reproduce": {
+    "arguments": {
+      "frames": 16831,
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/rec_opera_puzzle_hole/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "replay": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch/input.json",
+      "save_state": true
+    },
+    "note": "Replays the person's input from the handoff start; ends in the same state when emulation is deterministic (verify=true checks).",
+    "tool": "run"
+  },
+  "request": "Offshore Rig timed button: you start in the Opera House with the Relay Box just placed. Finish the Opera House (level-skip cheat works) and play into the Offshore Rig. Find the wall button that opens a door only for a short time (you'd have to race through before it shuts). Stand right in front of the button, facing it, guns away. Do NOT press it. Press F12.",
+  "run_dir": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch",
+  "status": "done",
+  "summary": "The person says the request is done. Continue from state.bin.",
+  "verify": null,
+  "warnings": []
+}

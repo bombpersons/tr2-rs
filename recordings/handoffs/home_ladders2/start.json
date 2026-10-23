@@ -1,0 +1,218 @@
+{
+ "start": ".psx/contact_home/state.bin",
+ "start_sha256": "2cfa6e42a9e00dd71ce18cb8416661432cfce9cf8632773b373f2ff7a48bc263",
+ "kept": "recordings/states/contact_home/state.bin",
+ "frames": 131,
+ "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+ "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+ "chain": [
+  {
+   "from": null,
+   "frames": 7800,
+   "events": [],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/contact_boot/state.bin",
+   "state_sha256": "76547a70b527455a65b51c5561c50dc5634ce903ff62b664ec86d313556db1d4"
+  },
+  {
+   "from": ".psx/contact_boot/state.bin",
+   "frames": 3840,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 0,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 10,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 3600,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 3610,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/contact_title/state.bin",
+   "state_sha256": "f3a88203f7ef6cd5c8752fb8174456312be06d33715b35b9492ee1f13f7c83b0"
+  },
+  {
+   "from": ".psx/contact_title/state.bin",
+   "frames": 3240,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 0,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 10,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 120,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 130,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/contact_home_start/state.bin",
+   "state_sha256": "48bd2ac7b1a71838dea39e803605a8fd11c30bb7822afc788aff1c3c994db24e"
+  },
+  {
+   "from": ".psx/contact_home_start/state.bin",
+   "frames": 300,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 0,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 10,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/contact_menu/state.bin",
+   "state_sha256": "f7b2f4a7e1fb3552175d31726c5583e8d8b7acff8a0ac162774a11d66ff2688d"
+  },
+  {
+   "from": ".psx/contact_menu/state.bin",
+   "frames": 3240,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 0,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 10,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 120,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 130,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/contact_home/state.bin",
+   "state_sha256": "2cfa6e42a9e00dd71ce18cb8416661432cfce9cf8632773b373f2ff7a48bc263"
+  }
+ ]
+}

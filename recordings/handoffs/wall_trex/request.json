@@ -1,0 +1,12 @@
+{
+  "request": "T-Rex recording. You start in the cave just before the zip-line. Without using the zip-line, find the way down to the valley below it where the T-Rexes are (one may only appear once you're down there). Wake a T-Rex and let it chase you for a while, running around it so it turns and walks/runs after you. Shoot it with the pistols until it dies (one is enough; both if it's easy). If you can, finish by letting the other T-Rex (or a fresh one) catch Lara so we see its kill animation. Please don't open the inventory or pause mid-fight if you can avoid it. Close the window when done, and leave a note with roughly what happened (which T-Rex died, whether Lara was eaten).",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/wall_before_zipline/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_trex",
+  "verify": true,
+  "detach": true
+}

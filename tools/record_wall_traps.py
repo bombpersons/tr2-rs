@@ -13,7 +13,9 @@ at Lara's Home from `.psx/contact_home` (`.psx/handoffs/home_lap`), whose
 port's work on the first (`.psx/handoffs/home_lap2`, case `lap2`), and
 `home3`, ladder edges and wall brushes (`.psx/handoffs/home_ladders`,
 case `ladders`), and `home4`, jump-ups onto the lattice wall and walks along
-walls (`.psx/handoffs/home_walls`, case `walls`).
+walls (`.psx/handoffs/home_walls`, case `walls`). The runs' inputs are
+read from their tracked copies in `recordings/handoffs/`, whose start states
+`tools/recordings.py rebuild` makes again from power-on.
 Replaying a run's input reproduces it exactly; this tool replays it once
 with checkpoints every 1000 fields, then records each case from the
 checkpoint before it, sampling Lara, the case's items (and the item slots
@@ -78,35 +80,35 @@ class Run(NamedTuple):
 
 RUNS = {
     # Traps set off on purpose, and the crows.
-    'traps': Run('.psx/use_wall_game/state.bin', '.psx/handoffs/wall_traps/input.json', 27183,
+    'traps': Run('.psx/use_wall_game/state.bin', 'recordings/handoffs/wall_traps/input.json', 27183,
                  '.psx/wall_traps_survey'),
     # From the cave before the zip-line (field 24240 of the traps run): down
     # into the valley, the far T-Rex shot dead, the hidden one kills Lara.
-    'trex': Run('.psx/wall_before_zipline/state.bin', '.psx/handoffs/wall_trex/input.json', 16738,
+    'trex': Run('.psx/wall_before_zipline/state.bin', 'recordings/handoffs/wall_trex/input.json', 16738,
                 '.psx/wall_trex_survey'),
     # Venice (level file `boat`), from the Wall by the level-skip cheat: dogs,
     # the gunmen, a club man and rats fought on foot and shot dead.
-    'venice': Run('.psx/use_wall_game/state.bin', '.psx/handoffs/venice_enemies/input.json', 29264,
+    'venice': Run('.psx/use_wall_game/state.bin', 'recordings/handoffs/venice_enemies/input.json', 29264,
                   '.psx/venice_enemies_survey', 'venice', 0x801C19C4, 0x801C9174, 0, 'venice',
                   'validation/venice_enemies', 10, 0x801BCDC4, 'boat'),
     # Lara's Home (level file `assault`), from the house out to the
     # assault course and one lap of it (`.psx/handoffs/home_lap`).
-    'home': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_lap/input.json', 12126,
+    'home': Run('.psx/contact_home/state.bin', 'recordings/handoffs/home_lap/input.json', 12126,
                 '.psx/home_lap_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_lap',
                 level_file='assault'),
     # A second, held-out lap from the same state (`.psx/handoffs/home_lap2`):
     # down a ladder to its foot, jumps back off and up onto the ladders.
-    'home2': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_lap2/input.json', 20625,
+    'home2': Run('.psx/contact_home/state.bin', 'recordings/handoffs/home_lap2/input.json', 20625,
                  '.psx/home_lap2_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_lap2',
                  level_file='assault', countdown=True),
     # Ladder edges, walks brushing walls at the side and a fatal swan dive onto
     # the ground (`.psx/handoffs/home_ladders`), from the same state.
-    'home3': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_ladders/input.json', 13041,
+    'home3': Run('.psx/contact_home/state.bin', 'recordings/handoffs/home_ladders/input.json', 13041,
                  '.psx/home_ladders_survey', 'home', 0x8017C87C, 0, 0, 'home', 'validation/home_ladders',
                  level_file='assault', countdown=True),
     # Running and walking into the lattice wall with Up+Action (its climbable
     # jump-up), and walks along walls (`.psx/handoffs/home_walls`).
-    'home4': Run('.psx/contact_home/state.bin', '.psx/handoffs/home_walls/input.json', 12919,
+    'home4': Run('.psx/contact_home/state.bin', 'recordings/handoffs/home_walls/input.json', 12919,
                  '.psx/home_walls_survey', 'home', 0x8017C87C, 0x801826F4, 0, 'home', 'validation/home_walls',
                  level_file='assault', countdown=True),
 }

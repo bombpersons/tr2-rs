@@ -1,0 +1,263 @@
+{
+ "start": ".psx/card_wall/state.bin",
+ "start_sha256": "1a0d915d2cbc30c788df574e71cbd8b0512d138e315fb946a371e268d4258381",
+ "kept": "recordings/states/card_wall/state.bin",
+ "frames": 72028,
+ "media": "rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+ "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+ "chain": [
+  {
+   "from": null,
+   "frames": 7800,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 7700,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 7706,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": "new",
+   "pad": "digital",
+   "state": ".psx/runs/card_boot/state.bin",
+   "state_sha256": "de9486002555c37549430c3a6ddd4bf7cda973669b02c0f92f4898d5a59e5393"
+  },
+  {
+   "from": ".psx/runs/card_boot/state.bin",
+   "frames": 5400,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 3600,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 3606,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/card_title/state.bin",
+   "state_sha256": "938928b68af58a95281b6833d227a2da0fe5b6d7417d83cc4cd757187d3691fa"
+  },
+  {
+   "from": ".psx/card_title/state.bin",
+   "frames": 500,
+   "events": [
+    {
+     "buttons": [
+      "LEFT"
+     ],
+     "frame": 20,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 26,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 200,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 206,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/runs/title_passport_nosave/state.bin",
+   "state_sha256": "bfef2cc5218287196830b553e779e6c4800f076c24e3cdbf88590ebc0ffbde88"
+  },
+  {
+   "from": ".psx/runs/title_passport_nosave/state.bin",
+   "frames": 400,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 20,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 26,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/runs/title_load_nosave/state.bin",
+   "state_sha256": "5eb913a2a92681bfdb44245aeb04c6f30dd222a2f16b645a033d1bab048baeef"
+  },
+  {
+   "from": ".psx/runs/title_load_nosave/state.bin",
+   "frames": 6000,
+   "events": [
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 20,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 26,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "RIGHT"
+     ],
+     "frame": 300,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 306,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "CROSS"
+     ],
+     "frame": 480,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 486,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [
+      "START"
+     ],
+     "frame": 1100,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    },
+    {
+     "buttons": [],
+     "frame": 1106,
+     "sticks": [
+      128,
+      128,
+      128,
+      128
+     ]
+    }
+   ],
+   "pokes": [],
+   "memcard1": null,
+   "pad": "digital",
+   "state": ".psx/card_wall/state.bin",
+   "state_sha256": "1a0d915d2cbc30c788df574e71cbd8b0512d138e315fb946a371e268d4258381"
+  }
+ ]
+}

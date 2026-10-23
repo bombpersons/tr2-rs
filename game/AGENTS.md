@@ -167,6 +167,9 @@ than one field per tick, input may only change on tick boundaries
 (`tick_inputs` refuses anything else). Use tolerance 0 where the rule is exact.
 Keep recording commands in the workspace's `tools/`, and include at least one scenario that was
 recorded after the rules were written and never used to fit them.
+After every `psx handoff`, run `tools/recordings.py save`: it keeps the
+person's input and the chain that rebuilds its start state from power-on in
+`recordings/` (see its README), since `.psx/` is local and can be wiped.
 
 ## From evidence to idiomatic code
 

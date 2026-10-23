@@ -1,0 +1,12 @@
+{
+  "request": "Held-out assault-course lap. From the house, run out to the assault course and play a lap again, differently from last time where you can. Please include these moves on the climbable walls:\n1. Climb a climbable wall all the way DOWN to the ground at its foot (hold Down until Lara steps off onto the floor).\n2. While hanging on a climbable wall, press Jump to jump back off it.\n3. Stand a step or two back from a climbable wall (not touching it), face it and jump straight up to grab it.\n4. Running jump at a climbable wall, holding Action mid-air to grab it.\n5. Grab a ledge from a jump, pull up, and shimmy along a ledge both ways.\nFinish however you like (the zip-line is fine). Falls and mistakes are fine; just keep playing. In the note, list roughly which of 1-5 you managed.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_lap2",
+  "verify": false,
+  "detach": true
+}

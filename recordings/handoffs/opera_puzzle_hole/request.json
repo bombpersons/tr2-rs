@@ -1,0 +1,12 @@
+{
+  "request": "Opera House puzzle hole: you start in Venice with the underwater switch just pulled. Play on through Bartoli's Hideout to the Opera House (level-skip cheat works per level). Pick up the item that goes in the puzzle hole in room 183 (near x78336 z43520). Stand one body length in front of the hole, facing it, guns away, carrying the item. Do NOT use it. Press F12.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/rec_venice_uw_switch/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/opera_puzzle_hole",
+  "verify": false,
+  "detach": true
+}

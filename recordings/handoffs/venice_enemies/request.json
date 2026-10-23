@@ -1,0 +1,12 @@
+{
+  "request": "Venice enemies. Skip the Great Wall with the level-skip cheat: put the guns away, hold Walk and sidestep left, right, left, step back, step forward; let go of Walk, turn three full circles, then jump forward and press Circle in mid-air. Venice starts with Lara by the motorboat. Leave the boat where it is and play on foot. Fight every enemy you meet: the dogs, the rats in the water and the men (with guns, clubs or knives). For each kind, let it attack you for a few seconds before you shoot it dead with the pistols. Use medipacks if you need them. Keep going until you have met dogs, rats and at least two different-looking men. Then let one of them kill Lara, and press F12 once she is dead. Try to keep it under about 6 minutes of play.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/use_wall_game/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies",
+  "verify": false,
+  "detach": true
+}

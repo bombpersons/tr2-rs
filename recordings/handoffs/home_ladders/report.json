@@ -1,0 +1,93 @@
+{
+  "build": {
+    "id": "src-995945bd2111bf0e-release",
+    "profile": "release",
+    "source_sha256": "995945bd2111bf0eac8b498f47b6769ed8780073843a4114e84a615eac973952",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.7"
+  },
+  "continue": {
+    "arguments": {
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue"
+    },
+    "tool": "run"
+  },
+  "files": {
+    "input.json": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/input.json",
+      "sha256": "c8b32072d512f3fcd354ed9e9bf28d76dd24506e46ee0ce4cc776691f3884da0"
+    },
+    "note.txt": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/note.txt",
+      "sha256": "2f2d38c8449b73c58e15cef97136745d537fef68d8c002fffbcda0726c9ab70f"
+    },
+    "screen.png": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/screen.png"
+    },
+    "state.bin": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/state.bin",
+      "sha256": "8b07e155e5dd04c8bf38e918f3a93a34b862ebdd80d4a39fa5e65d6e1fc42d82"
+    }
+  },
+  "frames": {
+    "end": 31461,
+    "reached": 13041,
+    "start": 18420,
+    "unit": "vsync"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.7",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9
+  },
+  "input": {
+    "file": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/input.json",
+    "frame_origin": "handoff_start",
+    "note": "Complete pad states at run frames from the handoff start, in run --replay format.",
+    "recorded_events": 274
+  },
+  "note": "So I could only do 3 and 4, there weren't any spots I could jump to grab onto a climbable surface with no space underneath and I couldn't find any climbable walls with non climable bits underneath. We'll have to find some in another level. I did a dive onto the ground and died at the end too.",
+  "pad": {
+    "analog": false,
+    "buttons": [],
+    "kind": "digital",
+    "locked": false,
+    "motors": [
+      0,
+      0
+    ],
+    "sticks": [
+      128,
+      128,
+      128,
+      128
+    ]
+  },
+  "report": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/report.json",
+  "reproduce": {
+    "arguments": {
+      "frames": 13041,
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "replay": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders/input.json",
+      "save_state": true
+    },
+    "note": "Replays the person's input from the handoff start; ends in the same state when emulation is deterministic (verify=true checks).",
+    "tool": "run"
+  },
+  "request": "Ladder moves on the assault course. From the house, run out to the course and try these, as many times and in as many places as you like:\n1. Out-of-reach climb: walk right up to a climbable wall whose climbable part starts above Lara's head, then hold Action and Up so she jumps up and grabs it (rather than climbing on from the floor). Also do it once at a wall she CAN reach, for comparison.\n2. Swing-in: do a running or standing jump and grab (hold Action) a ledge or climbable wall at a spot where there is empty space under the edge, so Lara's legs swing in under her as she catches. Try a climbable wall like this too if there is one.\n3. Walk (hold the Walk button) at a slant into a wall so Lara brushes along it at her side, a few times on both sides.\n4. On a climbable wall, climb sideways right up to where the climbable part ends, and up and down near its top and bottom edges.\nThen finish however you like. Falls and mistakes are fine; just keep playing. In the note, list roughly which of 1-4 you managed, and anything that didn't work.",
+  "run_dir": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders",
+  "status": "done",
+  "summary": "The person says the request is done. Continue from state.bin.",
+  "verify": null,
+  "warnings": []
+}

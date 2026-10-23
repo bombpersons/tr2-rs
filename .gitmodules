@@ -1,0 +1,3 @@
+[submodule "recordings/states"]
+	path = recordings/states
+	url = https://github.com/bombpersons/tr2-rs-states.git

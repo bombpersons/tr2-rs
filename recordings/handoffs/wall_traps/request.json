@@ -1,0 +1,12 @@
+{
+  "request": "Great Wall traps run: play the Great Wall from the start through to the T-Rex. Please SET OFF the traps instead of dodging them perfectly: step on crumbling floor tiles and let them fall, let a couple of darts hit you, run past the spinning/sliding blades and the wall blades (getting nicked is fine), let a boulder roll at you (jump it if you can), walk slowly over spikes, ride the zipline, and shoot the crows. Use medipacks when needed but don't reload a save. At the end, let the T-Rex chase you a while; getting eaten is fine. Press F12 when you're done.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/use_wall_game/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_traps",
+  "verify": false,
+  "detach": true
+}

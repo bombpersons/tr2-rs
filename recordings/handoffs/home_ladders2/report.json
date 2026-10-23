@@ -1,0 +1,93 @@
+{
+  "build": {
+    "id": "src-995945bd2111bf0e-release",
+    "profile": "release",
+    "source_sha256": "995945bd2111bf0eac8b498f47b6769ed8780073843a4114e84a615eac973952",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.7"
+  },
+  "continue": {
+    "arguments": {
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue"
+    },
+    "tool": "run"
+  },
+  "files": {
+    "input.json": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/input.json",
+      "sha256": "7cb24b5bf457237446769a4107bbd7eba9de148672b9ee3eb5fa765435f78ac2"
+    },
+    "note.txt": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/note.txt",
+      "sha256": "9e48abf4edd8d2ca0cf459f73db82a48b86568ea1f7984f7c2394621a9027c4a"
+    },
+    "screen.png": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/screen.png"
+    },
+    "state.bin": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/state.bin",
+      "sha256": "7cb61e977db0bcda72efa8eae34d3bdfded3eb7912cf2604e668d979fbbf0199"
+    }
+  },
+  "frames": {
+    "end": 18551,
+    "reached": 131,
+    "start": 18420,
+    "unit": "vsync"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.7",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9
+  },
+  "input": {
+    "file": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/input.json",
+    "frame_origin": "handoff_start",
+    "note": "Complete pad states at run frames from the handoff start, in run --replay format.",
+    "recorded_events": 1
+  },
+  "note": "let's do this a little later. i'll be back in a bit",
+  "pad": {
+    "analog": false,
+    "buttons": [],
+    "kind": "digital",
+    "locked": false,
+    "motors": [
+      0,
+      0
+    ],
+    "sticks": [
+      128,
+      128,
+      128,
+      128
+    ]
+  },
+  "report": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/report.json",
+  "reproduce": {
+    "arguments": {
+      "frames": 131,
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "replay": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2/input.json",
+      "save_state": true
+    },
+    "note": "Replays the person's input from the handoff start; ends in the same state when emulation is deterministic (verify=true checks).",
+    "tool": "run"
+  },
+  "request": "Two things on the assault course. From the house, run out to the course:\n1. The tall blue criss-cross (lattice) climbing walls, like the one you jumped up and grabbed in your first lap. Run straight at one holding Up and Action (grab), and DON'T press Jump: keep holding until Lara hops up and grabs it by herself. Climb off and do it a few more times: once more from a run, once from a walk (hold Walk + Up + Action), and once standing a step back from the wall (Up + Action). Try a different lattice wall too if you can.\n2. Walking along walls: hold the Walk button the whole time, plus Up, and steer a little with Left or Right, so Lara walks into a plain wall at a shallow slant and scrapes along it. Do this several times, with the wall on her left and on her right, on dry ground (not in the pool).\nThen finish however you like. Falls and mistakes are fine; just keep playing. In the note, say roughly what you managed.",
+  "run_dir": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_ladders2",
+  "status": "done",
+  "summary": "The person says the request is done. Continue from state.bin.",
+  "verify": null,
+  "warnings": []
+}

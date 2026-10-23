@@ -1,0 +1,97 @@
+{
+  "build": {
+    "id": "src-91243ee76ebb2f20-release",
+    "profile": "release",
+    "source_sha256": "91243ee76ebb2f20c2af78afdd63125a2e845444db97aef4303580732af65491",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.10"
+  },
+  "continue": {
+    "arguments": {
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue"
+    },
+    "tool": "run"
+  },
+  "files": {
+    "input.json": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/input.json",
+      "sha256": "1063e7205756b2a8ff6899703e8fea4373aa0b91cb74444218dda6770583b31a"
+    },
+    "memcard1.mcd": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/memcard1.mcd",
+      "sha256": "ac0dbcb89e54bcddf7c698fb6fe52cb0ca71977dba2d28e521d6ed556c7a11b5"
+    },
+    "note.txt": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/note.txt",
+      "sha256": "88b02851f38207e26c7f0a31300ff11d05e7cccbfe2003caeb3083c6e58ad062"
+    },
+    "screen.png": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/screen.png"
+    },
+    "state.bin": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/state.bin",
+      "sha256": "c93d176a934aa52e9e3d7e9f1877a30e5f38c195dec624d854a477248467e67c"
+    }
+  },
+  "frames": {
+    "end": 92128,
+    "reached": 72028,
+    "start": 20100,
+    "unit": "vsync"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.10",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/card_wall/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9
+  },
+  "input": {
+    "file": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/input.json",
+    "frame_origin": "handoff_start",
+    "note": "Complete pad states at run frames from the handoff start, in run --replay format.",
+    "recorded_events": 2748
+  },
+  "note": "Okay, I played through the first level.",
+  "pad": {
+    "analog": false,
+    "buttons": [],
+    "kind": "digital",
+    "locked": false,
+    "motors": [
+      0,
+      0
+    ],
+    "sticks": [
+      128,
+      128,
+      128,
+      128
+    ]
+  },
+  "report": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/report.json",
+  "reproduce": {
+    "arguments": {
+      "frames": 72028,
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/card_wall/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "replay": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level/input.json",
+      "save_state": true
+    },
+    "note": "Replays the person's input from the handoff start; ends in the same state when emulation is deterministic (verify=true checks).",
+    "tool": "run"
+  },
+  "request": "The Great Wall, whole level: Lara is standing at the level's start. Please play the whole level through to its end, until the level-complete statistics screen has shown and the next level (Venice) starts loading. Play naturally: pick up everything you normally would, fight the enemies, use the zipline, and so on. Please don't save to the memory card or open the passport's Load/Save (the port has no card screens); the inventory ring is fine (medipacks etc). Quick save/load (F5/F7) is fine, it's cut out of the replay. Press F12 when the next level starts loading.",
+  "run_dir": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level",
+  "status": "done",
+  "summary": "The person says the request is done. Continue from state.bin.",
+  "verify": null,
+  "warnings": []
+}

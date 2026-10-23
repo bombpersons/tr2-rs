@@ -1,0 +1,12 @@
+{
+  "request": "Offshore Rig timed button: you start in the Opera House with the Relay Box just placed. Finish the Opera House (level-skip cheat works) and play into the Offshore Rig. Find the wall button that opens a door only for a short time (you'd have to race through before it shuts). Stand right in front of the button, facing it, guns away. Do NOT press it. Press F12.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/rec_opera_puzzle_hole/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/rig_timed_switch",
+  "verify": false,
+  "detach": true
+}

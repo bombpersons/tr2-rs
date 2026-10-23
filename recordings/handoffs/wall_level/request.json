@@ -1,0 +1,12 @@
+{
+  "request": "The Great Wall, whole level: Lara is standing at the level's start. Please play the whole level through to its end, until the level-complete statistics screen has shown and the next level (Venice) starts loading. Play naturally: pick up everything you normally would, fight the enemies, use the zipline, and so on. Please don't save to the memory card or open the passport's Load/Save (the port has no card screens); the inventory ring is fine (medipacks etc). Quick save/load (F5/F7) is fine, it's cut out of the replay. Press F12 when the next level starts loading.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/card_wall/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/wall_level",
+  "verify": false,
+  "detach": true
+}

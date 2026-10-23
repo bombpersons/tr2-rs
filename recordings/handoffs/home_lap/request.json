@@ -1,0 +1,12 @@
+{
+  "request": "Lara's Home: walk out of the house to the assault course in the garden and play one full lap of it, from the start line through every obstacle (jumps, grabs, climbs, shimmies, the pool) to the finish. Take it at a normal pace; small mistakes are fine, but avoid dying or reloading. When you cross the finish, stand still for a couple of seconds, then end the handoff. In the note, please mention roughly when the lap started and anything unusual (falls, retries).",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_lap",
+  "verify": true,
+  "detach": true
+}

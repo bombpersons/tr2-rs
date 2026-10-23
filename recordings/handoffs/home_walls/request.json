@@ -1,0 +1,12 @@
+{
+  "request": "Two things on the assault course. From the house, run out to the course:\n1. The tall blue criss-cross (lattice) climbing walls, like the one you jumped up and grabbed in your first lap. Run straight at one holding Up and Action (grab), and DON'T press Jump: keep holding until Lara hops up and grabs it by herself. Climb off and do it a few more times: once more from a run, once from a walk (hold Walk + Up + Action), and once standing a step back from the wall (Up + Action). Try a different lattice wall too if you can.\n2. Walking along walls: hold the Walk button the whole time, plus Up, and steer a little with Left or Right, so Lara walks into a plain wall at a shallow slant and scrapes along it. Do this several times, with the wall on her left and on her right, on dry ground (not in the pool).\nThen finish however you like. Falls and mistakes are fine; just keep playing. In the note, say roughly what you managed.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/contact_home/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/home_walls",
+  "verify": false,
+  "detach": true
+}

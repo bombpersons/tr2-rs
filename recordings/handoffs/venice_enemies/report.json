@@ -1,0 +1,89 @@
+{
+  "build": {
+    "id": "src-74805a2fd038122d-release",
+    "profile": "release",
+    "source_sha256": "74805a2fd038122dd7585ef41b975c6498b528d2233457265827c3b19c2225e3",
+    "target": "x86_64-unknown-linux-gnu",
+    "version": "0.3.5"
+  },
+  "continue": {
+    "arguments": {
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue"
+    },
+    "tool": "run"
+  },
+  "files": {
+    "input.json": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/input.json",
+      "sha256": "8c0b0fc22b4685c59081b76fe479ea84dfae980497fed46ea7f0fde99a29212b"
+    },
+    "screen.png": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/screen.png"
+    },
+    "state.bin": {
+      "path": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/state.bin",
+      "sha256": "258cef3d1279a0999b853ff209fd8a70a5b346ae4f1e00903afbd42ad1bc3481"
+    }
+  },
+  "frames": {
+    "end": 47704,
+    "reached": 29264,
+    "start": 18440,
+    "unit": "vsync"
+  },
+  "identity": {
+    "backend": "psx-core",
+    "backend_version": "0.3.5",
+    "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+    "bios_sha256": "11052b6499e466bbf0a709b1f9cb6834a9418e66680387912451e971cf8a1fef",
+    "from_state": "/home/bombpersons/projects/tr2-rs/.psx/use_wall_game/state.bin",
+    "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+    "media_identity": {
+      "kind": "disc",
+      "sha256": "75dd58f02acae0cd559a3f971c3c631fe194fc3ec36daac2de05724e206a3ac6"
+    },
+    "state_format": 9
+  },
+  "input": {
+    "file": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/input.json",
+    "frame_origin": "handoff_start",
+    "note": "Complete pad states at run frames from the handoff start, in run --replay format.",
+    "recorded_events": 1281
+  },
+  "note": "I killed dogs, the men with the clubs, the men with the pistols and a rat at the end. I also drove the boat if that's helpful.",
+  "pad": {
+    "analog": false,
+    "buttons": [],
+    "kind": "digital",
+    "locked": false,
+    "motors": [
+      0,
+      0
+    ],
+    "sticks": [
+      128,
+      128,
+      128,
+      128
+    ]
+  },
+  "report": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/report.json",
+  "reproduce": {
+    "arguments": {
+      "frames": 29264,
+      "from_state": "/home/bombpersons/projects/tr2-rs/.psx/use_wall_game/state.bin",
+      "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+      "replay": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies/input.json",
+      "save_state": true
+    },
+    "note": "Replays the person's input from the handoff start; ends in the same state when emulation is deterministic (verify=true checks).",
+    "tool": "run"
+  },
+  "request": "Venice enemies. Skip the Great Wall with the level-skip cheat: put the guns away, hold Walk and sidestep left, right, left, step back, step forward; let go of Walk, turn three full circles, then jump forward and press Circle in mid-air. Venice starts with Lara by the motorboat. Leave the boat where it is and play on foot. Fight every enemy you meet: the dogs, the rats in the water and the men (with guns, clubs or knives). For each kind, let it attack you for a few seconds before you shoot it dead with the pistols. Use medipacks if you need them. Keep going until you have met dogs, rats and at least two different-looking men. Then let one of them kill Lara, and press F12 once she is dead. Try to keep it under about 6 minutes of play.",
+  "run_dir": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_enemies",
+  "status": "done",
+  "summary": "The person says the request is done. Continue from state.bin.",
+  "verify": null,
+  "warnings": []
+}

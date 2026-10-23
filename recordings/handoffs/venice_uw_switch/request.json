@@ -1,0 +1,12 @@
+{
+  "request": "Venice underwater switch: play through the Great Wall (level-skip cheat: guns away, hold walk + sidestep L,R,L, step back, step forward; release walk, turn 3 full circles, jump forward + Circle mid-air). In Venice, swim to the underwater wall switch (room 37; it opens door 42). Tread water about one body length in front of it, facing it, guns away. Do NOT pull it. Press F12.",
+  "media": "/home/bombpersons/projects/tr2-rs/rom/Tomb Raider II - Starring Lara Croft (USA) (Rev 3).cue",
+  "bios": "/home/bombpersons/projects/tr2-rs/bios/scph5501.bin",
+  "from_state": "/home/bombpersons/projects/tr2-rs/.psx/use_wall_game/state.bin",
+  "memcard1": null,
+  "memcard2": null,
+  "pad": null,
+  "out": "/home/bombpersons/projects/tr2-rs/.psx/handoffs/venice_uw_switch",
+  "verify": false,
+  "detach": true
+}
