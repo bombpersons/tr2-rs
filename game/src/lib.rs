@@ -29,6 +29,7 @@ pub mod items;
 pub mod player;
 pub mod presentation;
 pub mod rat;
+pub mod requester;
 pub mod save;
 pub mod sky;
 pub mod spider;

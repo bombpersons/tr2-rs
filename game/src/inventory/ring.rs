@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use super::{Inventory, ItemTable, item};
+use crate::requester::{Answer, Requester};
 
 /// The input word's bits the ring reads (`0x8008AAD4`).
 pub mod input {
@@ -32,8 +33,9 @@ pub mod input {
     pub const DESELECT: u32 = 0x200000;
 }
 
-/// Why the ring was opened (Display_Inventory's argument). The title (1),
-/// save (3), load (4) and death (5) passports are not ported.
+/// Why the ring was opened (Display_Inventory's argument). The save (3)
+/// and load (4) passports, which nothing in the game asks for, are not
+/// ported.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
 pub enum RingMode {
     /// Select in play (0): the main ring, or the options when it is empty.
@@ -42,6 +44,62 @@ pub enum RingMode {
     /// Action at a keyhole or puzzle hole (2): only the keys ring, which
     /// cannot be left for another.
     Keys,
+    /// The title screen (1): the options ring with Lara's Home, over the
+    /// title picture, tilted (`0x80034A3C`), with no heading. It does not
+    /// close; choosing the passport's New Game or Lara's Home leaves it.
+    Title,
+    /// Game over (5): the options ring headed GAME OVER, its passport
+    /// opened at once (`0x80031ABC`) and not put back.
+    Death,
+}
+
+/// What the passport was closed on (`0x80089034`, its page, and
+/// `0x80089038`, the load list's choice), as Display_Inventory's callers
+/// read it (`0x8006D534` at the title, `0x8006DB80` in play).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Passport {
+    /// A line of the load list, by its place in [`Ring::loads`].
+    Load(usize),
+    /// The title's second page.
+    NewGame,
+    /// The second page in play: saved, and play goes on.
+    Save,
+    /// The second page at game over.
+    RestartLevel,
+    /// The third page.
+    ExitToTitle,
+}
+
+/// The passport's load list as the save gives it: its heading, lines and
+/// the line chosen at first, and the line shown alone when nothing is saved
+/// ("No save games!", PlayStation string 12, which the original's list
+/// reads when the card holds no levels; the port has no card screens).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct LoadList {
+    pub heading: String,
+    pub lines: Vec<String>,
+    pub selected: usize,
+    pub empty: String,
+}
+
+/// A passport page's label (`0x800706F8`): its name between the arrows of
+/// the ways it turns.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PageLabel {
+    /// The game string it names.
+    pub string: usize,
+    pub left: bool,
+    pub right: bool,
+}
+
+impl PageLabel {
+    /// The label's line, centred 24 above the bottom.
+    pub fn text(&self, name: &str) -> String {
+        use crate::text::symbol;
+        let left = if self.left { format!("{}   ", symbol::LEFT) } else { "   ".into() };
+        let right = if self.right { symbol::RIGHT } else { ' ' };
+        format!("{left}{name}   {right}")
+    }
 }
 
 /// Which items the ring shows (`ring+0x4`).
@@ -123,10 +181,12 @@ pub struct ItemPose {
     pub meshes: i32,
 }
 
-/// What the ring left chosen when it closed (`0x80089032`).
+/// What the ring left chosen when it closed (`0x80089032`), and the
+/// passport's page when that was the passport.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RingExit {
     pub chosen: Option<u16>,
+    pub passport: Option<Passport>,
 }
 
 /// The open ring: Display_Inventory's ring and motion structs and the
@@ -167,6 +227,20 @@ pub struct Ring {
     pub chosen: Option<u16>,
     /// Sounds started this frame.
     pub sounds: Vec<u16>,
+    /// The load list, from the save on disk, for the passport's first page.
+    #[reflect(ignore)]
+    pub loads: LoadList,
+    /// The load list while it is open (`0x80089DB8`).
+    #[reflect(ignore)]
+    pub requester: Option<Requester>,
+    /// The passport page's label (`0x80089DB4`), while one shows.
+    #[reflect(ignore)]
+    pub page_label: Option<PageLabel>,
+    #[reflect(ignore)]
+    pub passport: Option<Passport>,
+    /// Whether the death ring's passport has been opened (a local of
+    /// Display_Inventory).
+    opened: bool,
 }
 
 /// An item's pose state, by object.
@@ -178,18 +252,26 @@ const ROTATE_STEPS: i16 = 24;
 impl Ring {
     /// Builds the rings and opens one (Construct_Inventory `0x800325E8` and
     /// RingInit `0x800349E8`). `poses` keeps each item's state between
-    /// openings; `keys_current` is the keys ring's remembered item.
+    /// openings; `keys_current` is the keys ring's remembered item and
+    /// `options_current` the options ring's item in front (`0x80088BCA`:
+    /// Lara's Home at the first title after power-on, otherwise the
+    /// passport).
     pub fn open(
         mode: RingMode,
         inventory: &Inventory,
         table: &ItemTable,
         poses: &mut Poses,
         keys_current: i16,
+        options_current: i16,
     ) -> Self {
-        let main: Vec<u16> = inventory.main.iter().map(|s| s.item).collect();
+        let main: Vec<u16> =
+            if matches!(mode, RingMode::Title) { vec![] } else { inventory.main.iter().map(|s| s.item).collect() };
         let keys: Vec<u16> = inventory.keys.iter().map(|s| s.item).collect();
         // The options ring's own order (0x80088BCC); the title adds Lara's Home.
-        let options = vec![item::PASSPORT, item::SOUND, item::SCREEN_ADJUST, item::CONTROLS];
+        let mut options = vec![item::PASSPORT, item::SOUND, item::SCREEN_ADJUST, item::CONTROLS];
+        if mode == RingMode::Title {
+            options.push(item::LARAS_HOME);
+        }
         for (i, &object) in main.iter().chain(&options).enumerate() {
             let data = table.get(object);
             let pose = poses.entry(object).or_insert_with(|| ItemPose {
@@ -214,14 +296,16 @@ impl Ring {
             RingMode::Keys => (RingKind::Keys, 0),
             RingMode::Game if !main.is_empty() => (RingKind::Main, 0),
             RingMode::Game => (RingKind::Options, 0),
+            RingMode::Title | RingMode::Death => (RingKind::Options, options_current),
         };
         let mut ring = Self {
             mode,
             kind,
             lists: [main, options, keys],
-            currents: [0, 0, keys_current],
+            currents: [0, options_current, keys_current],
             radius: 0,
-            camera_pitch: 0,
+            // The title's ring is seen from above (RingInit).
+            camera_pitch: if mode == RingMode::Title { 0x400 } else { 0 },
             rotating: false,
             rot_count: 0,
             current,
@@ -240,6 +324,11 @@ impl Ring {
             pending: None,
             chosen: None,
             sounds: vec![],
+            loads: LoadList::default(),
+            requester: None,
+            page_label: None,
+            passport: None,
+            opened: false,
         };
         ring.count = ring.list().len() as i16;
         ring.angle_adder = (0x10000 / i32::from(ring.count.max(1))) as i16;
@@ -467,7 +556,7 @@ impl Ring {
         self.camera_z = i32::from(self.radius) + 598;
         self.spin_items(input, vsyncs, table, poses);
         self.pending = Some((input, db));
-        (self.motion.status == Status::Done).then_some(RingExit { chosen: self.chosen })
+        (self.motion.status == Status::Done).then_some(RingExit { chosen: self.chosen, passport: self.passport })
     }
 
     /// The front item turns to its chosen angle while chosen and spins while
@@ -508,6 +597,10 @@ impl Ring {
     fn run_status(&mut self, input: &mut u32, db: &mut u32, vsyncs: u32, table: &ItemTable, poses: &mut Poses) {
         use input::*;
         let other_rings = self.mode == RingMode::Game;
+        // Game over chooses the passport by itself, once (`0x80031ABC`).
+        if self.mode == RingMode::Death && !self.opened {
+            (*input, *db) = (0, SELECT);
+        }
         match self.motion.status {
             Status::Open => {
                 if *input & RIGHT != 0 && self.count >= 2 {
@@ -520,7 +613,8 @@ impl Ring {
                     self.sounds.push(108);
                     return;
                 }
-                if *db & (DESELECT | OPTION) != 0 {
+                // The title's ring stays open.
+                if *db & (DESELECT | OPTION) != 0 && self.mode != RingMode::Title {
                     self.sounds.push(112);
                     self.chosen = None;
                     self.currents[self.kind as usize] = self.current;
@@ -528,6 +622,7 @@ impl Ring {
                     (*input, *db) = (0, 0);
                 }
                 if *db & SELECT != 0 {
+                    self.opened = true;
                     self.currents[self.kind as usize] = self.current;
                     let object = self.current_item();
                     self.motion_setup(Status::Selecting, Status::Selected, 16);
@@ -598,14 +693,19 @@ impl Ring {
                     if busy {
                         return;
                     }
-                    item_options(pose, table.get(object), db, &mut self.sounds);
+                    if pose.object == item::PASSPORT_OPEN {
+                        self.passport_options(pose, table.get(object), input, db);
+                    } else {
+                        item_options(pose, db);
+                    }
                 }
                 if *db & DESELECT != 0 {
                     self.motion_setup(Status::ClosingItem, Status::Deselect, 0);
                     (*input, *db) = (0, 0);
                 }
                 if *db & SELECT != 0 {
-                    self.chosen = Some(object);
+                    // The item's object as shown: the open passport is 120.
+                    self.chosen = Some(poses.get(&object).map_or(object, |p| p.object));
                     self.currents[self.kind as usize] = self.current;
                     self.motion_setup(Status::ClosingItem, Status::Exiting, 0);
                     (*input, *db) = (0, 0);
@@ -693,9 +793,8 @@ fn meshes_for(pose: &ItemPose, data: Option<&super::ItemData>) -> i32 {
 /// passport turns its pages and closes on Triangle ([`passport_options`]);
 /// anything else closes again on Cross or Triangle. The statistics and the
 /// option pages are not ported; they wait for Triangle.
-fn item_options(pose: &mut ItemPose, data: Option<&super::ItemData>, db: &mut u32, sounds: &mut Vec<u16>) {
+fn item_options(pose: &mut ItemPose, db: &mut u32) {
     match pose.object {
-        item::PASSPORT_OPEN => passport_options(pose, data, db, sounds),
         item::STATISTICS | item::SCREEN_ADJUST | item::SOUND | item::CONTROLS => {}
         item::PISTOLS..=item::GRENADE_LAUNCHER
         | item::SMALL_MEDIPACK
@@ -714,46 +813,129 @@ fn item_options(pose: &mut ItemPose, data: Option<&super::ItemData>, db: &mut u3
     }
 }
 
-/// The open passport (`0x8006EB58`): its pages are five frames apart from
-/// the opening frame (load, save, exit). Left and Right turn a page (sound
-/// 115) within them; Triangle closes it, backwards to the first frame or,
-/// from the last page, on to the last. Choosing a page with Cross (the
-/// load and save requesters, leaving the game) is not ported, nor the
-/// turn past the load page when there are no saves.
-fn passport_options(pose: &mut ItemPose, data: Option<&super::ItemData>, db: &mut u32, sounds: &mut Vec<u16>) {
-    const PAGE: i16 = 5;
-    const TURN_SOUND: u16 = 115;
-    let Some(data) = data else { return };
-    // Between pages (still turning) is no page.
-    let from_open = pose.goal - data.open_frame;
-    let page = if from_open % PAGE == 0 { from_open / PAGE } else { -1 };
-    if *db & input::LEFT != 0 {
-        pose.direction = -1;
-        if pose.goal - PAGE < data.open_frame {
-            pose.goal = data.open_frame;
-        } else {
-            pose.goal -= PAGE;
-            sounds.push(TURN_SOUND);
+/// The passport's pages, five frames apart from its opening frame.
+const PAGE: i16 = 5;
+const TURN_SOUND: u16 = 115;
+
+impl Ring {
+    /// The open passport (`0x8006EB58`). Its pages: Load Game, then New
+    /// Game at the title, Save Game in play or Restart Level at game over,
+    /// then Exit to Title, which the title cannot turn to. Left and Right
+    /// turn a page (sound 115); Triangle closes it, backwards to the first
+    /// frame or, from the last page, on to the last, but not at game over.
+    /// Cross on Load Game opens the load list, which then takes the input
+    /// (Triangle leaves it); a line chosen there, or Cross on another page,
+    /// closes the passport with that page ([`Passport`]).
+    fn passport_options(&mut self, pose: &mut ItemPose, data: Option<&super::ItemData>, input: &mut u32, db: &mut u32) {
+        let Some(data) = data else { return };
+        // Between pages (still turning) is no page.
+        let from_open = pose.goal - data.open_frame;
+        let page = if from_open % PAGE == 0 { from_open / PAGE } else { -1 };
+        let title = self.mode == RingMode::Title;
+        let mut choice = None;
+        match page {
+            0 => {
+                if self.requester.is_none() {
+                    self.page_label = Some(PageLabel { string: 4, left: false, right: true });
+                }
+                if let Some(requester) = self.requester.as_mut() {
+                    match requester.input(*db) {
+                        // "No save games!" chooses nothing.
+                        Some(Answer::Chosen(line)) if line < self.loads_len() => {
+                            self.requester = None;
+                            choice = Some(Passport::Load(line));
+                        }
+                        Some(Answer::Cancelled) => self.requester = None,
+                        _ => {}
+                    }
+                    if choice.is_none() {
+                        (*input, *db) = (0, 0);
+                    }
+                } else if *db & input::SELECT != 0 {
+                    self.page_label = None;
+                    self.requester = Some(self.load_requester());
+                    (*input, *db) = (0, 0);
+                }
+            }
+            1 => {
+                let string = match self.mode {
+                    RingMode::Title => 6,
+                    RingMode::Death => 7,
+                    _ => 5,
+                };
+                self.page_label = Some(PageLabel { string, left: true, right: !title });
+                choice = Some(match self.mode {
+                    RingMode::Title => Passport::NewGame,
+                    RingMode::Death => Passport::RestartLevel,
+                    _ => Passport::Save,
+                });
+            }
+            2 => {
+                self.page_label = Some(PageLabel { string: if title { 10 } else { 8 }, left: true, right: false });
+                choice = Some(Passport::ExitToTitle);
+            }
+            _ => {}
         }
-        *db = 0;
-    }
-    if *db & input::RIGHT != 0 {
-        pose.direction = 1;
-        if pose.goal + PAGE > data.frames - 6 {
-            pose.goal = data.frames - 6;
-        } else {
-            pose.goal += PAGE;
-            sounds.push(TURN_SOUND);
-        }
-        *db = 0;
-    }
-    if *db & input::DESELECT != 0 {
-        if page == 2 {
-            pose.direction = 1;
-            pose.goal = data.frames - 1;
-        } else {
-            pose.goal = 0;
+        if *db & input::LEFT != 0 {
             pose.direction = -1;
+            if pose.goal - PAGE < data.open_frame {
+                pose.goal = data.open_frame;
+            } else {
+                pose.goal -= PAGE;
+                self.sounds.push(TURN_SOUND);
+                self.page_label = None;
+            }
+            (*input, *db) = (0, 0);
         }
+        // The title's New Game is its last page.
+        if *db & input::RIGHT != 0 && !(title && page == 1) {
+            pose.direction = 1;
+            if pose.goal + PAGE > data.frames - 6 {
+                pose.goal = data.frames - 6;
+            } else {
+                pose.goal += PAGE;
+                self.sounds.push(TURN_SOUND);
+                self.page_label = None;
+            }
+            (*input, *db) = (0, 0);
+        }
+        if *db & input::DESELECT != 0 {
+            if self.mode == RingMode::Death {
+                (*input, *db) = (0, 0);
+            } else {
+                close_passport(pose, data, page);
+                self.page_label = None;
+            }
+        }
+        if *db & input::SELECT != 0 {
+            self.passport = choice;
+            close_passport(pose, data, page);
+            self.page_label = None;
+        }
+    }
+
+    fn loads_len(&self) -> usize {
+        self.loads.lines.len()
+    }
+
+    /// The load list (`0x8006EE18`); with nothing saved, its line for an
+    /// empty list alone.
+    fn load_requester(&self) -> Requester {
+        let list = &self.loads;
+        let (items, selected) =
+            if list.lines.is_empty() { (vec![list.empty.clone()], 0) } else { (list.lines.clone(), list.selected) };
+        Requester::passport(list.heading.clone(), items, selected)
+    }
+}
+
+/// Closes the passport from `page` (`0x8006F2D8..0x8006F3E0`): backwards
+/// to its first frame, or from the last page on to its last.
+fn close_passport(pose: &mut ItemPose, data: &super::ItemData, page: i16) {
+    if page == 2 {
+        pose.direction = 1;
+        pose.goal = data.frames - 1;
+    } else {
+        pose.goal = 0;
+        pose.direction = -1;
     }
 }

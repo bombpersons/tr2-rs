@@ -3,7 +3,7 @@
 //! is the library in `src/lib.rs` (crate `game`).
 //!
 //! Extra flags: `--level NAME` starts in `assets/levels/NAME/` without the
-//! title screen (default: the title screen, then `wall`). `--level-file PATH`
+//! title (default: the title, `src/presentation.rs`). `--level-file PATH`
 //! (relative to `assets/`) loads that level from another file, such as the
 //! editor's play-test copy; its atlas, sky and audio stay the level's.
 //! `--disc PATH` imports from that disc image, `--skip-import` starts
@@ -32,7 +32,7 @@ fn main() {
             }
             app.insert_resource(game::display::view_settings())
                 .insert_resource(game::presentation::Session { title: level.is_none(), ..Default::default() })
-                .insert_resource(game::presentation::LevelRequest { name: level.unwrap_or_else(|| "wall".into()) })
+                .insert_resource(game::presentation::LevelRequest { name: level.unwrap_or_default() })
                 // Imports the game's data from the player's disc on first start.
                 .add_plugins(game::GamePlugins.set(game::disc::GameDataPlugin::from_args()))
                 // Mouse look and right-stick camera, on the controls menu's CAMERA page.

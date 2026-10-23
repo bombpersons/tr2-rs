@@ -36,7 +36,7 @@ pub const SERIALS: &[&str] = &["SLUS_004.37"];
 
 /// Bump whenever [`import`]'s output changes: players' older imports are
 /// redone on the next start.
-pub const VERSION: u32 = 3;
+pub const VERSION: u32 = 4;
 
 /// Converts the disc into `out` (an empty folder that becomes
 /// `game/assets/imported/`): `levels/<name>/` (level, atlas, sounds),

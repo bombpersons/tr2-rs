@@ -52,7 +52,7 @@ fn replay(name: &str) -> usize {
     for (n, frame) in recording.frames.iter().enumerate() {
         let sample = frame["sample"].as_u64().unwrap() as usize;
         if frame["open"].as_bool().unwrap() {
-            ring = Some(Ring::open(RingMode::Game, &inventory, &table, &mut poses, 0));
+            ring = Some(Ring::open(RingMode::Game, &inventory, &table, &mut poses, 0, 0));
         }
         let ring_now = ring.as_mut().expect("a frame of an open ring");
         let input = frame["input"].as_u64().unwrap() as u32;

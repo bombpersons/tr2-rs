@@ -24,7 +24,7 @@ use engine::{
 
 use crate::player::{PLAYER_HEIGHT, PLAYER_RADIUS, Player};
 
-use crate::presentation::{LEVELS, LevelRequest, Session};
+use crate::presentation::{LevelRequest, Session};
 
 mod usable;
 pub use usable::{KEYHOLE_BOUNDS, PICKUP_BOUNDS, SWITCH_BOUNDS, UsableItem, UseBounds, align, in_bounds};
@@ -406,6 +406,16 @@ pub struct InteractionProgress {
 #[derive(Resource, Default)]
 struct InteractionRuntime {
     level: String,
+    loads: u32,
+}
+
+/// Levels loaded so far: a level loaded again (restarted or loaded from a
+/// save) starts afresh like a new one.
+#[derive(Resource, Default)]
+pub struct LevelLoads(pub u32);
+
+fn count_loads(mut loaded: MessageReader<engine::render::LevelLoaded>, mut loads: ResMut<LevelLoads>) {
+    loads.0 += loaded.read().count() as u32;
 }
 
 pub struct InteractionsPlugin;
@@ -428,6 +438,9 @@ impl Plugin for InteractionsPlugin {
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
         app.add_message::<crate::player::GunHit>();
+        app.init_resource::<LevelLoads>()
+            .add_message::<engine::render::LevelLoaded>()
+            .add_systems(Update, count_loads.after(engine::render::LevelSystems::Load));
         app.init_resource::<InteractionProgress>().init_resource::<InteractionRuntime>().add_systems(
             FixedUpdate,
             (
@@ -452,6 +465,7 @@ impl Plugin for InteractionsPlugin {
 
 fn reset_level(
     world: Option<Res<WorldGeometry>>,
+    loads: Res<LevelLoads>,
     mut state: ResMut<InteractionRuntime>,
     mut progress: ResMut<InteractionProgress>,
     mut inv: ResMut<Inventory>,
@@ -459,8 +473,8 @@ fn reset_level(
     let Some(w) = world else {
         return;
     };
-    if state.level != w.data.name {
-        *state = InteractionRuntime { level: w.data.name.clone() };
+    if state.level != w.data.name || state.loads != loads.0 {
+        *state = InteractionRuntime { level: w.data.name.clone(), loads: loads.0 };
         *progress = default();
         inv.leave_level();
     }
@@ -470,6 +484,7 @@ fn reset_level(
 fn trigger_actions(
     mut actions: MessageReader<TriggerAction>,
     world: Option<Res<WorldGeometry>>,
+    strings: Option<Res<crate::inventory::GameStrings>>,
     mut progress: ResMut<InteractionProgress>,
     mut request: Option<ResMut<LevelRequest>>,
 ) {
@@ -478,11 +493,14 @@ fn trigger_actions(
             "end_level" => {
                 progress.level_complete = true;
                 progress.message = "Level complete".into();
-                if let (Some(request), Some(w)) = (request.as_deref_mut(), world.as_deref())
-                    && let Some(i) = LEVELS.iter().position(|v| v.0.eq_ignore_ascii_case(&w.data.name))
-                    && i < 17
+                // On to the gameflow's next level, if there is one.
+                if let (Some(request), Some(w), Some(strings)) =
+                    (request.as_deref_mut(), world.as_deref(), strings.as_deref())
+                    && let Some(level) = strings.level_number(&w.data.name)
+                    && level + 1 < strings.levels()
+                    && let Some(next) = strings.level_folder(level + 1)
                 {
-                    request.name = LEVELS[i + 1].0.into();
+                    request.name = next;
                 }
             }
             "music" => progress.requested_track = Some(action.argument),

@@ -50,8 +50,9 @@ table for puzzles, pickups and keys (`0x80033534..0x800336C0`).
 ## The ring
 
 Display_Inventory `0x80030F30(mode)`: 0 from Select in play, 2 from a
-keyhole or puzzle hole; 1 (title), 3/4 (save/load) and 5 (death) are not
-ported. Its ring and motion structs live on the stack (`0x801FFDB8`,
+keyhole or puzzle hole, 1 at the title and 5 at game over (see
+[save-evidence.md](save-evidence.md)); 3/4 (save/load), which nothing in
+the game asks for, are not ported. Its ring and motion structs live on the stack (`0x801FFDB8`,
 `0x801FFD80` from play); templates at `0x800890A8` and `0x80089074`.
 
 Per pass of its loop:
@@ -93,7 +94,8 @@ other vsync (`0x80032838`). Then DoInventoryOptions `0x8006EA54`: guns,
 medi packs, puzzles, keys and pickups confirm themselves; ammunition does
 nothing; flares and the rest close on Cross or Triangle. Confirming closes
 the item (status 11), deselects it (16 vsyncs) and closes the ring; the
-chosen item is `0x80089032`. UseItem `0x800432D4` then asks for the gun
+chosen item is `0x80089032`, the object it shows (120 for the open
+passport). UseItem `0x800432D4` then asks for the gun
 (`0x8008C4EE`) or heals 500/1000 when health is 1..999 (sound 116).
 
 KeyHoleCollision `0x80050F80` (and PuzzleHoleCollision `0x800512CC`):
@@ -120,7 +122,9 @@ move -0x200/-0x267/-0x267 per pass. All 63 vertices of the GPU capture
 columns running along the grid's 13-vertex rows;
 items sit at the ring's radius, tilt by `pt_xrot` and take their offset
 and turns; the camera looks at (0, -96, radius), plus the swap tilt; light
-from (-1536, 256, 1024). Text (`0x800331D4`, `0x800334DC`): heading at
+from (-1536, 256, 1024). The camera pitch tilts the view down for a
+positive pitch (the title's 0x400 puts its items where the original
+draws them; the sign was reversed before). Text (`0x800331D4`, `0x800334DC`): heading at
 y 26 centred (INVENTORY/OPTION/ITEMS), the font's up and down arrows `[`
 and `]` at (±20, 28) from the top corners and (±20, -15) from the bottom
 ones, the item name 16 above the bottom centred, "> Select" and "; Go
@@ -190,17 +194,14 @@ places each sprite's rectangle from the pen (the baseline). `game/src/text.rs`
 ports this; its test reproduces every glyph of the capture's heading,
 name, arrows and prompts.
 
-The port's own title, pause and death menus (which the original does not
-have in this form) also use the font through `ScreenLines`; their line
-positions are the port's choice, and the selection is marked with the
-grey right arrow (code 18). Before a level's font is loaded the template's
-text stands in.
+The pause and the passport's requesters use the font through
+`ScreenLines`, with their boxes ([save-evidence.md](save-evidence.md)).
+Before a level's font is loaded the template's text stands in.
 
-Not ported: the statistics, sound, screen adjust and controls pages and
-the passport's Cross actions and page labels (load and save requesters,
-leaving the game; the items open and wait for Triangle), the passport's
-turn past the load page when there are no saves, the title, save, load and
-death modes, demo and "controller removed" handling, flares and guns
+Not ported: the statistics, sound, screen adjust and controls pages (the
+template's controls menu stands in for the last), the save and load modes
+and the memory card's screens, demo and "controller removed" handling,
+flares and guns
 other than the pistols (choosing them does nothing), the stopwatch hands,
 the large button symbols (codes 0x7F..0x81), converting placed shotgun pickups to
 ammunition (`0x80037D78`), the level-start inventory from the gameflow

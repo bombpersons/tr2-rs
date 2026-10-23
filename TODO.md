@@ -288,16 +288,27 @@ it off. Record partial progress below without checking the parent item.
   back, item animations, the open passport's page turns, UseItem for the
   pistols and medi packs, the rippling backdrop. Four no-poke routes (one
   held out) compare 911 ring frames exactly, and the backdrop matches a GPU
-  capture; the text, and the port's title, pause and death menus, use
-  the original font
+  capture; the text uses the original font
   ([evidence](docs/inventory-evidence.md),
   [tests](game/tests/inventory.rs)); item names come from the imported
-  gameflow script. Remaining: the statistics, sound, screen and controls
-  pages and the passport's Cross actions and page labels; the title, save,
-  load and death modes; the stopwatch
+  gameflow script. The title and game over modes and the passport's pages
+  are a separate milestone below. Remaining: the statistics, sound, screen
+  and controls pages; the stopwatch
   hands; the items' light checked only by eye; the level-start
   inventory from the gameflow script (new games start with the Wall's
   observed inventory); placed shotgun pickups turning into ammunition.
+- [x] The title, saving, loading and game over: the title's ring (mode 1)
+  over its picture, game over's (mode 5) after Lara's death count, the
+  passport's pages and labels in each, the load list (levels reached from
+  their start and the saved position) in the original's requester and
+  boxes, New Game, Lara's Home, Save Game, Restart Level, Exit to Title, and
+  the pause with its "Exit to title?" questions. Three routes (title from
+  power-on, game over, one held out in play) compare 1156 ring frames
+  exactly; the requester's boxes match a GPU capture; the whole flow was
+  driven in the game. Saves are the port's file, as there is no memory
+  card. [Evidence](docs/save-evidence.md), [tests](game/tests/passport.rs).
+  The card's screens, "Story so far...", saved statistics and the title's
+  demo remain.
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
   elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,
@@ -618,3 +629,13 @@ it off. Record partial progress below without checking the parent item.
   independent. All 496 workspace tests pass; Clippy reports nothing in the
   changed files; the standalone smoke matches 67 poses. No engine, format,
   editor or template change. [Evidence](docs/side-jump-evidence.md).
+- 2026-10-23: The title, saving, loading and game over: Display_Inventory's
+  title and game over modes, the passport's pages, the load requester and
+  its boxes, the save (levels reached and the saved position, in the
+  player's config folder) and the pause's questions. Three new routes from
+  power-on with a memory card compare 1156 ring frames exactly. The ring
+  view's camera pitch had its sign reversed (seen only in ring swaps until
+  the title's tilted ring). The import now keeps the gameflow's demo level
+  count (`import::VERSION` 4), so levels are numbered and named from the
+  gameflow, which fixed Venice and Bartoli's Hideout being swapped in the
+  old level list. [Evidence](docs/save-evidence.md).

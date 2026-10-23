@@ -36,6 +36,8 @@ impl Plugin for InventoryPlugin {
             app.insert_resource(SimulationEnabled(true));
         }
         app.add_message::<SoundRequest>()
+            .add_message::<RingClosed>()
+            .init_resource::<crate::save::SavePath>()
             .init_resource::<Inventory>()
             .init_resource::<ItemTable>()
             .init_resource::<GameStrings>()
@@ -54,7 +56,7 @@ pub enum InventorySystems {
 
 /// The ring while it is open, and what Display_Inventory keeps between
 /// openings.
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct InventoryRing {
     pub ring: Option<Ring>,
     /// Each item's state on the ring, kept between openings.
@@ -66,6 +68,34 @@ pub struct InventoryRing {
     pub chosen: Option<u16>,
     /// The keys ring's item in front (`0x80088B36`), kept between openings.
     pub keys_current: i16,
+    /// Whether the title has yet to open its ring on Lara's Home, as at
+    /// power-on (`0x80088C04`, cleared by any other ring).
+    pub home_first: bool,
+    /// What each line of the open passport's load list loads.
+    pub loads: Vec<crate::save::LoadChoice>,
+}
+
+impl Default for InventoryRing {
+    fn default() -> Self {
+        Self {
+            ring: None,
+            poses: default(),
+            request: None,
+            chosen: None,
+            keys_current: 0,
+            home_first: true,
+            loads: vec![],
+        }
+    }
+}
+
+/// The ring has closed: why it opened, what it chose, and what the
+/// passport's load list chose to load.
+#[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RingClosed {
+    pub mode: RingMode,
+    pub exit: RingExit,
+    pub load: Option<crate::save::LoadChoice>,
 }
 
 impl InventoryRing {
@@ -105,19 +135,24 @@ pub fn input_word(pad: &ControllerState) -> u32 {
 }
 
 /// Opens the ring on Select in play (the main loop's check at `0x8001DAC8`,
-/// not while Lara dies) or for a keyhole's request, runs a frame of it each
-/// tick after that, and when it closes uses what it chose. The world waits
-/// from the tick it opens to the tick it closes, which then runs in full:
-/// the original's tick resumes after Display_Inventory returns. The ring
-/// does not open while something else (the pause menu) holds the world.
+/// not while Lara dies), for a keyhole's request, or for the title and game
+/// over ([`RingMode::Title`], [`RingMode::Death`], asked for by
+/// `presentation`); runs a frame of it each tick after that; and when it
+/// closes uses what it chose in play and sends [`RingClosed`]. The world
+/// waits from the tick it opens to the tick it closes, which then runs in
+/// full: the original's tick resumes after Display_Inventory returns. Play
+/// does not open the ring while something else (the pause) holds the world.
 #[allow(clippy::too_many_arguments)]
 fn run_ring(
     pad: Res<ControllerState>,
     mut state: ResMut<InventoryRing>,
     mut inventory: ResMut<Inventory>,
     table: Res<ItemTable>,
+    strings: Res<GameStrings>,
+    save_path: Res<crate::save::SavePath>,
     mut enabled: ResMut<SimulationEnabled>,
     mut sounds: MessageWriter<SoundRequest>,
+    mut closed: MessageWriter<RingClosed>,
     mut lara: Query<(&mut Player, &mut WeaponState)>,
 ) {
     let state = &mut *state;
@@ -135,20 +170,53 @@ fn run_ring(
             {
                 use_item(item, &mut inventory, &table, &mut player, &mut weapons, &mut sounds);
             }
+            let load = match exit.passport {
+                Some(ring::Passport::Load(line)) => state.loads.get(line).copied(),
+                _ => None,
+            };
+            closed.write(RingClosed { mode, exit, load });
         }
-    } else if enabled.0 {
-        let alive = lara.single().is_ok_and(|(p, _)| p.health > 0 && p.mode != PlayerMode::Dead);
-        let mode = state.request.take().or((pad.pressed(Button::Select) && alive).then_some(RingMode::Game));
-        if let Some(mode) = mode {
-            // Display_Inventory(2) with no keys returns at once, choosing nothing.
-            if mode == RingMode::Keys && inventory.keys.is_empty() {
-                state.chosen = None;
-            } else {
-                state.ring = Some(Ring::open(mode, &inventory, &table, &mut state.poses, state.keys_current));
-                enabled.0 = false;
-            }
-        }
+        return;
     }
+    let alive = lara.single().is_ok_and(|(p, _)| p.health > 0 && p.mode != PlayerMode::Dead);
+    let mode = match state.request.take() {
+        Some(mode @ (RingMode::Title | RingMode::Death)) => Some(mode),
+        Some(mode) if enabled.0 => Some(mode),
+        // A keyhole's request waits for the world.
+        Some(mode) => {
+            state.request = Some(mode);
+            None
+        }
+        None => (enabled.0 && pad.pressed(Button::Select) && alive).then_some(RingMode::Game),
+    };
+    let Some(mode) = mode else { return };
+    // Display_Inventory(2) with no keys returns at once, choosing nothing.
+    if mode == RingMode::Keys && inventory.keys.is_empty() {
+        state.chosen = None;
+        return;
+    }
+    let options_current = if mode == RingMode::Title && state.home_first { 4 } else { 0 };
+    if mode != RingMode::Title {
+        state.home_first = false;
+    }
+    let mut ring = Ring::open(mode, &inventory, &table, &mut state.poses, state.keys_current, options_current);
+    let save = save_path.load().unwrap_or_default();
+    let (loads, selected) = save.load_list(strings.levels());
+    ring.loads = ring::LoadList {
+        heading: strings.game(4).into(),
+        lines: loads
+            .iter()
+            .map(|load| match load {
+                crate::save::LoadChoice::Level(n) => strings.level_title(*n).to_owned(),
+                crate::save::LoadChoice::Position => strings.game(74).to_owned(),
+            })
+            .collect(),
+        selected,
+        empty: strings.psx(12).into(),
+    };
+    state.loads = loads;
+    state.ring = Some(ring);
+    enabled.0 = false;
 }
 
 /// What choosing an item in play does (UseItem `0x800432D4`): a gun is
@@ -522,6 +590,30 @@ impl GameStrings {
 
     pub fn psx(&self, index: usize) -> &str {
         self.0.psx_strings.get(index).map_or("", String::as_str)
+    }
+
+    /// A level's title by its number.
+    pub fn level_title(&self, level: usize) -> &str {
+        self.0.levels.get(level).map_or("", String::as_str)
+    }
+
+    /// A level's folder under `levels/` (its file's name, `wall` for
+    /// `data\wall.PSX`) by its number.
+    pub fn level_folder(&self, level: usize) -> Option<String> {
+        let file = self.0.level_files.get(level)?;
+        let stem = file.rsplit(['\\', '/']).next().unwrap_or(file);
+        Some(stem.split('.').next().unwrap_or(stem).to_ascii_lowercase())
+    }
+
+    /// A level's number from its folder: the first level from that file,
+    /// not a demo's copy.
+    pub fn level_number(&self, folder: &str) -> Option<usize> {
+        (0..self.levels()).find(|&n| self.level_folder(n).is_some_and(|f| f.eq_ignore_ascii_case(folder)))
+    }
+
+    /// How many levels the game has, Lara's Home first, without the demos'.
+    pub fn levels(&self) -> usize {
+        self.0.levels.len().saturating_sub(self.0.demo_levels)
     }
 }
 

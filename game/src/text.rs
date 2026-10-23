@@ -15,8 +15,13 @@
 //! [`ScreenText`] draws a line in the overlay with the active level's
 //! font: one atlas sprite per character, as the original draws one sprite
 //! primitive per character.
-use bevy::prelude::*;
+use bevy::{
+    asset::RenderAssetUsages,
+    mesh::{Indices, PrimitiveTopology},
+    prelude::*,
+};
 use engine::{
+    psx::{PsxBlend, PsxMaterial2d},
     render::{ActiveLevel, overlay::OverlayAnchor},
     world::{WorldGeometry, format::Sprite as LevelSprite},
 };
@@ -201,12 +206,156 @@ pub struct ScreenText {
     pub text: String,
     pub at: IVec2,
     pub align: Align,
+    /// A box drawn behind it.
+    pub boxed: Option<TextBox>,
 }
 
 impl ScreenText {
     pub fn new(text: impl Into<String>, at: IVec2, align: Align) -> Self {
-        Self { text: text.into(), at, align }
+        Self { text: text.into(), at, align, boxed: None }
     }
+
+    pub fn with_box(mut self, boxed: TextBox) -> Self {
+        self.boxed = Some(boxed);
+        self
+    }
+}
+
+/// A box behind a line: a background (T_AddBackground `0x8005CA5C`) and an
+/// outline (T_AddOutline `0x8005CB20`), centred under the line. Its width
+/// is the one asked for plus four, its height 16 unless asked for, and its
+/// top 15 above the baseline, as the GPU capture of the load requester
+/// (`validation/save/title_load_gpu`) draws them. The background is four
+/// half-transparent quarters meeting at a brighter centre; the outline,
+/// opaque, shades from corner to edge middle to corner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TextBox {
+    pub width: i32,
+    pub height: Option<i32>,
+    pub style: BoxStyle,
+}
+
+/// The original's background and outline colours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoxStyle {
+    /// A requester's whole panel (`0x800828AC`, `0x800828EC`): dark green,
+    /// edged grey, lit from the top left.
+    Panel,
+    /// A requester's heading (`0x80082910`, `0x80082950`): edged black.
+    Heading,
+    /// The chosen line (`0x800829D8`, `0x800829B4`): edged white above and
+    /// below, green at the ends.
+    Selected,
+}
+
+impl BoxStyle {
+    /// The background's edge and centre colours.
+    fn fill(self) -> ([u8; 3], [u8; 3]) {
+        match self {
+            BoxStyle::Panel => ([0, 32, 0], [0, 96, 0]),
+            BoxStyle::Heading => ([0; 3], [16, 128, 56]),
+            BoxStyle::Selected => ([0; 3], [28, 120, 64]),
+        }
+    }
+
+    /// The outline's colours at the top left, top middle, top right, right
+    /// middle, bottom right, bottom middle, bottom left and left middle.
+    fn outline(self) -> [[u8; 3]; 8] {
+        const GREEN: [u8; 3] = [56, 240, 128];
+        match self {
+            BoxStyle::Panel => [[96; 3], [128; 3], [32; 3], [0; 3], [0; 3], [32; 3], [64; 3], [64; 3]],
+            BoxStyle::Heading => [[0; 3]; 8],
+            BoxStyle::Selected => [[0; 3], [255; 3], [0; 3], GREEN, [0; 3], [255; 3], [0; 3], GREEN],
+        }
+    }
+
+    /// How far behind its line it draws: the panel behind everything.
+    fn depth(self) -> f32 {
+        match self {
+            BoxStyle::Panel => 0.3,
+            BoxStyle::Heading | BoxStyle::Selected => 0.1,
+        }
+    }
+}
+
+impl TextBox {
+    /// Its pixels, from the left end of the line's baseline: left, top,
+    /// width and height (the outline's last column and row are at left +
+    /// width and top + height).
+    pub fn rect(&self, line_width: i32) -> IRect {
+        let width = self.width + 4;
+        let left = line_width / 2 - width / 2;
+        let top = -15;
+        IRect::new(left, top, left + width, top + self.height.unwrap_or(16))
+    }
+
+    /// The background's four quarters (drawn half transparent), each a
+    /// quad of the original's pixel corners and their colours.
+    pub fn background(&self, line_width: i32) -> Vec<Quad> {
+        let r = self.rect(line_width);
+        let (edge, centre) = self.style.fill();
+        let (mx, my) = (r.center().x, r.center().y);
+        let [l, t, ri, b] = [r.min.x, r.min.y, r.max.x, r.max.y];
+        [
+            ([[l, t], [mx, t], [l, my], [mx, my]], 3),
+            ([[mx, t], [ri, t], [mx, my], [ri, my]], 2),
+            ([[l, my], [mx, my], [l, b], [mx, b]], 1),
+            ([[mx, my], [ri, my], [mx, b], [ri, b]], 0),
+        ]
+        .map(|(corners, centre_at)| {
+            let mut colours = [edge; 4];
+            colours[centre_at] = centre;
+            Quad { corners, colours }
+        })
+        .to_vec()
+    }
+
+    /// The outline's eight lines, each a pixel wide over the pixels between
+    /// its ends, shaded from end to end.
+    pub fn outline(&self, line_width: i32) -> Vec<Quad> {
+        let r = self.rect(line_width);
+        let (mx, my) = (r.center().x, r.center().y);
+        let [l, t, ri, b] = [r.min.x, r.min.y, r.max.x, r.max.y];
+        let points = [[l, t], [mx, t], [ri, t], [ri, my], [ri, b], [mx, b], [l, b], [l, my]];
+        let colours = self.style.outline();
+        (0..8)
+            .map(|i| {
+                let (a, z) = (points[i], points[(i + 1) % 8]);
+                let (ca, cz) = (colours[i], colours[(i + 1) % 8]);
+                let ([x0, y0], [x1, y1]) = ([a[0].min(z[0]), a[1].min(z[1])], [a[0].max(z[0]) + 1, a[1].max(z[1]) + 1]);
+                // The colour at the lower coordinate end first.
+                let (low, high) = if a[0] + a[1] <= z[0] + z[1] { (ca, cz) } else { (cz, ca) };
+                let colours = if y1 - y0 == 1 { [low, high, low, high] } else { [low, low, high, high] };
+                Quad { corners: [[x0, y0], [x1, y0], [x0, y1], [x1, y1]], colours }
+            })
+            .collect()
+    }
+}
+
+/// A gouraud quad in the original's pixels (y down), corners in the GPU's
+/// order: top left, top right, bottom left, bottom right.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Quad {
+    pub corners: [[i32; 2]; 4],
+    pub colours: [[u8; 3]; 4],
+}
+
+/// Quads as one mesh in a line's frame (y up), triangles 0 1 2 and 1 2 3
+/// as the GPU splits a quad.
+fn quads_mesh(quads: &[Quad]) -> Mesh {
+    let (mut positions, mut colours, mut indices) = (vec![], vec![], vec![]);
+    for quad in quads {
+        let start = positions.len() as u32;
+        for ([x, y], c) in quad.corners.into_iter().zip(quad.colours) {
+            positions.push([x as f32, -y as f32, 0.0]);
+            colours.push(Color::srgb_u8(c[0], c[1], c[2]).to_linear().to_f32_array());
+        }
+        indices.extend([0, 2, 1, 1, 2, 3].map(|i| start + i));
+    }
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+        .with_inserted_indices(Indices::U32(indices))
 }
 
 /// A set of lines shown together: replace them all at once (with
@@ -248,7 +397,7 @@ pub struct TextPlugin;
 
 impl Plugin for TextPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (load_font, show_lines, draw_text).chain());
+        app.init_resource::<BoxMaterials>().add_systems(Update, (load_font, show_lines, draw_text).chain());
     }
 }
 
@@ -272,9 +421,25 @@ fn load_font(
     });
 }
 
-/// One sprite of a line.
+/// One sprite of a line, or its box.
 #[derive(Component)]
 struct Character;
+
+/// The boxes' materials: the background half transparent, the outline opaque.
+#[derive(Resource)]
+struct BoxMaterials {
+    background: Handle<PsxMaterial2d>,
+    outline: Handle<PsxMaterial2d>,
+}
+
+impl FromWorld for BoxMaterials {
+    fn from_world(world: &mut World) -> Self {
+        // Headless apps have no 2D materials plugin; the store alone will do.
+        let mut materials = world.get_resource_or_init::<Assets<PsxMaterial2d>>();
+        let mut add = |blend| materials.add(PsxMaterial2d { blend, ..default() });
+        Self { background: add(PsxBlend::Half), outline: add(PsxBlend::Opaque) }
+    }
+}
 
 /// Lays out lines that are new or changed, or all of them for a new font.
 fn draw_text(
@@ -282,6 +447,8 @@ fn draw_text(
     font: Option<Res<OriginalFont>>,
     lines: Query<(Entity, Ref<ScreenText>, Option<&Children>)>,
     characters: Query<(), With<Character>>,
+    box_materials: Res<BoxMaterials>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let Some(font) = font else { return };
     for (entity, line, children) in &lines {
@@ -293,7 +460,28 @@ fn draw_text(
                 commands.entity(child).despawn();
             }
         }
-        commands.entity(entity).insert(line.align.anchor(line.at, width(&line.text)));
+        let line_width = width(&line.text);
+        commands.entity(entity).insert(line.align.anchor(line.at, line_width));
+        if let Some(boxed) = line.boxed {
+            let depth = -boxed.style.depth();
+            for (quads, material) in [
+                (boxed.background(line_width), &box_materials.background),
+                (boxed.outline(line_width), &box_materials.outline),
+            ] {
+                commands.spawn((
+                    Character,
+                    Mesh2d(meshes.add(quads_mesh(&quads))),
+                    MeshMaterial2d(material.clone()),
+                    // The outline over its background.
+                    Transform::from_xyz(
+                        0.0,
+                        0.0,
+                        if material == &box_materials.outline { depth + 0.01 } else { depth },
+                    ),
+                    ChildOf(entity),
+                ));
+            }
+        }
         for placed in layout(&line.text) {
             let Some(sprite) = font.glyphs.get(placed.glyph) else { continue };
             let [x, y, w, h] = sprite.atlas.map(|v| v as f32);
@@ -331,6 +519,43 @@ mod tests {
         assert_eq!(Align::BOTTOM_RIGHT.start(IVec2::new(-20, -15), width("]")), IVec2::new(336, 225));
         assert_eq!(Align::BOTTOM_RIGHT.start(IVec2::new(-25, -40), width("; Go Back")), IVec2::new(253, 200));
         assert_eq!(xs("; Go Back"), [0, 21, 33, 49, 61, 71, 81]);
+    }
+
+    /// The load requester's panel and chosen line as the GPU capture of the
+    /// title's load list draws them (`validation/save/title_load_gpu`,
+    /// commands 308..331): the panel's lower left quarter (316) and its
+    /// outline's left upper line (308); the chosen line's quarters
+    /// (328..331) and its top right line (326).
+    #[test]
+    fn boxes_draw_as_the_original_draws_them() {
+        let at = |q: &Quad, start: IVec2| {
+            q.corners.map(|[x, y]| [x + start.x, y + start.y]).into_iter().zip(q.colours).collect::<Vec<_>>()
+        };
+        let panel = TextBox { width: 296, height: Some(130), style: BoxStyle::Panel };
+        let start = Align::BOTTOM.start(IVec2::new(0, -174), width(" "));
+        let quarters = panel.background(width(" "));
+        let lower_left = at(&quarters[2], start);
+        let g = |v: u8| [0, v, 0];
+        assert_eq!(lower_left, [([34, 116], g(32)), ([184, 116], g(96)), ([34, 181], g(32)), ([184, 181], g(32))]);
+        // A line covers its end pixels: column 34, rows 51..=116, shaded
+        // from 96 at the top to 64.
+        let left_upper = at(&panel.outline(width(" "))[7], start);
+        assert_eq!(left_upper, [([34, 51], [96; 3]), ([35, 51], [96; 3]), ([34, 117], [64; 3]), ([35, 117], [64; 3])]);
+        let chosen = TextBox { width: 284, height: None, style: BoxStyle::Selected };
+        let text = "Current Position";
+        let start = Align::BOTTOM.start(IVec2::new(0, -126), width(text));
+        let centre = [28, 120, 64];
+        let quarters: Vec<_> = chosen.background(width(text)).iter().map(|q| at(q, start)).collect();
+        assert_eq!(quarters[0], [([40, 99], [0; 3]), ([184, 99], [0; 3]), ([40, 107], [0; 3]), ([184, 107], centre)]);
+        assert_eq!(
+            quarters[3],
+            [([184, 107], centre), ([328, 107], [0; 3]), ([184, 115], [0; 3]), ([328, 115], [0; 3])]
+        );
+        let top_right = at(&chosen.outline(width(text))[1], start);
+        assert_eq!(
+            top_right,
+            [([184, 99], [255; 3]), ([329, 99], [0; 3]), ([184, 100], [255; 3]), ([329, 100], [0; 3])]
+        );
     }
 
     /// The width counts twelve for the glyphs numbered like digit codes.

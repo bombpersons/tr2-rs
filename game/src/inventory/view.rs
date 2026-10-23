@@ -26,7 +26,7 @@ use engine::{
     world::{Level, Model, WorldGeometry, position},
 };
 
-use super::{GameStrings, Inventory, InventoryRing, InventorySystems, ItemTable, item, ring::RingKind};
+use super::{GameStrings, Inventory, InventoryRing, InventorySystems, ItemTable, RingMode, item, ring::RingKind};
 use crate::text::{Align, ScreenLines, ScreenText};
 
 /// Render layers of the ring's backdrop and items.
@@ -188,6 +188,8 @@ struct Backdrop {
 struct RingScene {
     kind: RingKind,
     level: String,
+    /// The title's, without the backdrop.
+    title: bool,
 }
 
 #[derive(Component)]
@@ -230,7 +232,9 @@ fn build_scene(
     let wanted = state.ring.as_ref().zip(level.as_deref());
     let current = scenes.iter().next();
     let stale = match (wanted, current) {
-        (Some((ring, level)), Some((_, scene))) => scene.kind != ring.kind || scene.level != level.name,
+        (Some((ring, level)), Some((_, scene))) => {
+            scene.kind != ring.kind || scene.level != level.name || scene.title != (ring.mode == RingMode::Title)
+        }
         (None, Some(_)) => true,
         _ => false,
     };
@@ -251,13 +255,19 @@ fn build_scene(
         .spawn((
             Transform::from_scale(LEVEL_TO_RENDER),
             Visibility::default(),
-            RingScene { kind: ring.kind, level: level.name.clone() },
+            RingScene { kind: ring.kind, level: level.name.clone(), title: ring.mode == RingMode::Title },
             Name::new("InventoryRing"),
         ))
         .id();
     // Two cameras with the play camera's projection: the backdrop's view
     // straight down, then the ring's.
+    // The title draws its picture behind the ring instead of the backdrop
+    // (`0x80032FD4`): `presentation`'s title camera.
+    let title = ring.mode == RingMode::Title;
     for (order, layer, name) in [(BACKDROP_ORDER, BACKDROP_LAYER, "Backdrop"), (RING_ORDER, RING_LAYER, "Ring")] {
+        if title && order == BACKDROP_ORDER {
+            continue;
+        }
         let mut camera = commands.spawn((
             Camera3d::default(),
             Camera {
@@ -273,7 +283,7 @@ fn build_scene(
             RenderLayers::layer(layer),
             Transform::default(),
             // Not under the root: a camera keeps an unmirrored transform.
-            RingScene { kind: ring.kind, level: level.name.clone() },
+            RingScene { kind: ring.kind, level: level.name.clone(), title: ring.mode == RingMode::Title },
             Name::new(format!("Inventory{name}Camera")),
         ));
         if order == BACKDROP_ORDER {
@@ -283,7 +293,8 @@ fn build_scene(
         }
     }
     let data = &world.data;
-    if let Some(model) = data.models.iter().find(|m| m.id == BACKDROP_OBJECT)
+    if !title
+        && let Some(model) = data.models.iter().find(|m| m.id == BACKDROP_OBJECT)
         && let Some(&mesh) = model.meshes.first()
     {
         commands.spawn((
@@ -365,7 +376,7 @@ fn pose_scene(
     let eye = position([0, ring.camera_y, ring.camera_z]);
     let target = position([0, -96, i32::from(ring.radius)]);
     let look = (target - eye).normalize_or(Vec3::NEG_Z);
-    let tilt = Quat::from_axis_angle(look.cross(Vec3::Y).normalize_or(Vec3::X), -turn(ring.camera_pitch));
+    let tilt = Quat::from_axis_angle(look.cross(Vec3::Y).normalize_or(Vec3::X), turn(ring.camera_pitch));
     let ring_view = Transform::from_translation(render_position(eye)).looking_to(render_position(tilt * look), Vec3::Y);
     if let Ok((projection, camera)) = game_camera.single() {
         for (mut transform, mut own_projection, mut own_camera, is_ring) in &mut cameras {
@@ -483,14 +494,20 @@ fn ring_text(
                 | Status::Deselect
                 | Status::ClosingItem
         );
+        let mode = ring.mode;
         if resting {
-            let heading = match ring.kind {
-                RingKind::Main => strings.game(0),
-                RingKind::Options => strings.game(1),
-                RingKind::Keys => strings.game(2),
+            // The title has no heading; game over's options ring is GAME OVER.
+            let heading = match (ring.kind, mode) {
+                (_, RingMode::Title) => None,
+                (RingKind::Options, RingMode::Death) => Some(strings.game(3)),
+                (RingKind::Main, _) => Some(strings.game(0)),
+                (RingKind::Options, _) => Some(strings.game(1)),
+                (RingKind::Keys, _) => Some(strings.game(2)),
             };
-            lines.push(ScreenText::new(heading, IVec2::new(0, 26), Align::TOP));
-            if ring.mode == super::RingMode::Game {
+            if let Some(heading) = heading {
+                lines.push(ScreenText::new(heading, IVec2::new(0, 26), Align::TOP));
+            }
+            if mode == RingMode::Game {
                 // `[` and `]` are the font's up and down arrows.
                 let up = ring.kind == RingKind::Options || (ring.kind == RingKind::Main && !inventory.keys.is_empty());
                 let down = ring.kind == RingKind::Keys || ring.kind == RingKind::Main;
@@ -503,15 +520,31 @@ fn ring_text(
                     lines.push(ScreenText::new("]", IVec2::new(-20, -15), Align::BOTTOM_RIGHT));
                 }
             }
-            // "> Select" and "; Go Back": `>` and `;` are the Cross and Triangle.
+            // "> Select" and "; Go Back": `>` and `;` are the Cross and
+            // Triangle. Game over has no Go Back, nor the title's ring
+            // until an item is chosen (`0x800317D0`, `0x800321D4`).
             lines.push(ScreenText::new(strings.psx(19), IVec2::new(25, -40), Align::BOTTOM_LEFT));
-            lines.push(ScreenText::new(strings.psx(20), IVec2::new(-25, -40), Align::BOTTOM_RIGHT));
+            let chosen = !matches!(status, Status::Open);
+            if mode != RingMode::Death && (mode != RingMode::Title || chosen) {
+                lines.push(ScreenText::new(strings.psx(20), IVec2::new(-25, -40), Align::BOTTOM_RIGHT));
+            }
+        }
+        // The open passport shows its page instead of its name, or its
+        // load list (`0x800706F8`, `0x800355C8`).
+        let passport_open =
+            ring.current_item().and_then(|o| state.poses.get(&o)).is_some_and(|p| p.object == item::PASSPORT_OPEN);
+        if let Some(label) = ring.page_label {
+            lines.push(ScreenText::new(label.text(strings.game(label.string)), IVec2::new(0, -24), Align::BOTTOM));
+        }
+        if let Some(requester) = &ring.requester {
+            lines.extend(requester.lines());
         }
         if resting
             && !ring.rotating
+            && !passport_open
             && let Some(object) = ring.current_item()
         {
-            let level_index = level.as_deref().map_or(0, |l| level_number(&strings, &l.name));
+            let level_index = level.as_deref().and_then(|l| strings.level_number(&l.name)).unwrap_or(0);
             if let Some(data) = table.get(object) {
                 lines.push(ScreenText::new(strings.item(&data.name, level_index), IVec2::new(0, -16), Align::BOTTOM));
             }
@@ -525,19 +558,6 @@ fn ring_text(
     } else {
         commands.spawn((RingText, ScreenLines(lines), Transform::from_xyz(0.0, 0.0, 5.0)));
     }
-}
-
-/// The level's number in the gameflow script, from its file name.
-fn level_number(strings: &GameStrings, name: &str) -> usize {
-    strings
-        .0
-        .level_files
-        .iter()
-        .position(|file| {
-            let stem = file.rsplit(['\\', '/']).next().unwrap_or(file);
-            stem.split('.').next().is_some_and(|s| s.eq_ignore_ascii_case(name))
-        })
-        .unwrap_or(0)
 }
 
 /// The count shown under an item (`0x80033708..0x80033A08`): rounds for a

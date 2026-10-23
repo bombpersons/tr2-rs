@@ -17,6 +17,10 @@ pub struct Gameflow {
     pub levels: Vec<String>,
     /// The level files, `data\wall.PSX`, by level number.
     pub level_files: Vec<String>,
+    /// How many of the last levels are only for demos (header +0x4A,
+    /// `0x8008C372` at run time): the game's own levels are the others.
+    #[serde(default)]
+    pub demo_levels: usize,
     /// The 89 game strings: ring headings, item names, statistics labels.
     pub game_strings: Vec<String>,
     /// The 80 PlayStation strings: options, memory card, button prompts.
@@ -102,7 +106,16 @@ pub fn decode(bytes: &[u8]) -> Result<Gameflow> {
     if r.at != bytes.len() {
         return Err(format!("{} bytes after the last table", bytes.len() - r.at));
     }
-    Ok(Gameflow { levels: level_names, level_files, game_strings, psx_strings, puzzles, pickups, keys })
+    Ok(Gameflow {
+        levels: level_names,
+        level_files,
+        demo_levels: demos,
+        game_strings,
+        psx_strings,
+        puzzles,
+        pickups,
+        keys,
+    })
 }
 
 #[cfg(test)]
