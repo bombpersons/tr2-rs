@@ -403,9 +403,16 @@ pub enum Command {
     EmptyHands,
     Kill,
     /// Play `sound` on `frame`.
-    Sound { frame: usize, sound: usize, environment: SoundEnvironment },
+    Sound {
+        frame: usize,
+        sound: usize,
+        environment: SoundEnvironment,
+    },
     /// Run game effect `effect` on `frame`.
-    Effect { frame: usize, effect: u16 },
+    Effect {
+        frame: usize,
+        effect: u16,
+    },
 }
 
 /// Where a clip's sound may play.

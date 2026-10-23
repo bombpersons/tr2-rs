@@ -247,7 +247,8 @@ mod tests {
     #[test]
     fn a_wider_screen_widens_the_off_screen_rejection_by_its_margin() {
         // Corners right of the original's 384-pixel projection window.
-        let corners = [400.0, 410.0, 405.0].map(|x| Projected { screen: Vec2::new(x, 100.0), depth: 1000.0, error: false });
+        let corners =
+            [400.0, 410.0, 405.0].map(|x| Projected { screen: Vec2::new(x, 100.0), depth: 1000.0, error: false });
         assert!(outside(&corners, &view()), "rejected on the original's screen");
         assert!(!outside(&corners, &RoomView { margin: Vec2::new(29.0, 0.0), ..view() }), "drawn on a 426-wide screen");
         let left = corners.map(|p| Projected { screen: Vec2::new(-p.screen.x + 384.0 - 30.0, 100.0), ..p });

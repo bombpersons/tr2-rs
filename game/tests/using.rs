@@ -31,8 +31,9 @@ fn app(level: &str, lara: Player) -> (App, Entity) {
 
 /// As [`app`], with the level changed first (flipped, say).
 fn app_with(level: &str, lara: Player, edit: impl FnOnce(Level) -> Level) -> (App, Entity) {
-    let data: Level =
-        edit(serde_json::from_slice(&std::fs::read(format!("assets/imported/levels/{level}/level.json")).unwrap()).unwrap());
+    let data: Level = edit(
+        serde_json::from_slice(&std::fs::read(format!("assets/imported/levels/{level}/level.json")).unwrap()).unwrap(),
+    );
     let clips = PlayerAnimations::from(&data);
     let world = WorldGeometry::new(data);
     let mut app = headless_app(game::tick_rate(game::REGION));

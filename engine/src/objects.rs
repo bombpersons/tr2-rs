@@ -133,7 +133,10 @@ impl ObjectType {
     }
 
     /// Run `hook` the first tick an object of this type exists.
-    pub fn on_init(mut self, hook: impl Fn(&mut EntityCommands, &WorldObject, Option<&WorldGeometry>) + Send + Sync + 'static) -> Self {
+    pub fn on_init(
+        mut self,
+        hook: impl Fn(&mut EntityCommands, &WorldObject, Option<&WorldGeometry>) + Send + Sync + 'static,
+    ) -> Self {
         self.init.push(Arc::new(hook));
         self
     }
@@ -292,7 +295,10 @@ impl Plugin for ObjectsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ObjectTypes>().init_resource::<ObjectDiagnostics>().add_systems(
             FixedUpdate,
-            initialize_objects.in_set(LifecycleSystems::Initialize).in_set(GameSystems::Game).run_if(simulation_enabled),
+            initialize_objects
+                .in_set(LifecycleSystems::Initialize)
+                .in_set(GameSystems::Game)
+                .run_if(simulation_enabled),
         );
     }
 }

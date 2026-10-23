@@ -86,7 +86,7 @@ impl Client {
         let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).unwrap();
         std::fs::write(path, &bytes).unwrap();
         let image = image::load_from_memory(&bytes).unwrap().to_rgba8();
-        assert!(matches!(image.dimensions(), (320, 240)|(368,240)));
+        assert!(matches!(image.dimensions(), (320, 240) | (368, 240)));
         image
     }
 }
@@ -196,7 +196,9 @@ fn headless_render_edit_step_and_query() {
     let mut state = Value::Null;
     for _ in 0..120 {
         state = client.state();
-        if state.is_object() { break; }
+        if state.is_object() {
+            break;
+        }
         std::thread::sleep(Duration::from_millis(100));
     }
     assert!(state.is_object(), "decoded Lara must load");
@@ -205,11 +207,11 @@ fn headless_render_edit_step_and_query() {
     let colors: std::collections::HashSet<_> = before.pixels().map(|p| p.0).collect();
     assert!(colors.len() > 64, "the extracted level should render, not an empty target");
     let original = client.state()["components"]["Player"]["position"].clone();
-    let edit = client.call("game_set_component",json!({"name":"Player","component":"Player","fields":{"yaw":0.5}}));
+    let edit = client.call("game_set_component", json!({"name":"Player","component":"Player","fields":{"yaw":0.5}}));
     assert_eq!(edit["structuredContent"]["after"]["yaw"], 0.5);
-    let stepped=client.call("game_step",json!({"frames":12,"buttons":["up"]}));
-    assert_eq!(stepped["structuredContent"]["frame"],13);
-    assert_ne!(client.state()["components"]["Player"]["position"],original);
+    let stepped = client.call("game_step", json!({"frames":12,"buttons":["up"]}));
+    assert_eq!(stepped["structuredContent"]["frame"], 13);
+    assert_ne!(client.state()["components"]["Player"]["position"], original);
     client.screenshot(output.join("after-step.png"));
-    std::fs::write(output.join("status.json"),serde_json::to_vec_pretty(&status).unwrap()).unwrap();
+    std::fs::write(output.join("status.json"), serde_json::to_vec_pretty(&status).unwrap()).unwrap();
 }

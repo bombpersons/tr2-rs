@@ -7,8 +7,12 @@ use engine::world::{Level, WorldGeometry, format::FORMAT_VERSION, position};
 #[test]
 fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/imported/levels");
-    let mut dirs: Vec<_> =
-        fs::read_dir(&root).unwrap().map(Result::unwrap).map(|entry| entry.path()).filter(|path| path.is_dir()).collect();
+    let mut dirs: Vec<_> = fs::read_dir(&root)
+        .unwrap()
+        .map(Result::unwrap)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
     dirs.sort();
     assert_eq!(dirs.len(), 25, "the supplied game contains 25 level/cutscene files");
     let mut floors_tested = 0;
@@ -25,8 +29,8 @@ fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
             _ => 0,
         };
         let path = dir.join("level.json");
-        let data: Level =
-            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        let data: Level = serde_json::from_slice(&fs::read(&path).unwrap())
+            .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
         let label = data.name.clone();
         assert_eq!(data.format, FORMAT_VERSION, "{label}: format version");
         engine::editor::validate_level(&data).unwrap_or_else(|error| panic!("{label}: editor: {error}"));

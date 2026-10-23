@@ -11,13 +11,13 @@ use bevy::{
 };
 pub use pcm::{PcmAudio, PcmLoader};
 
-use crate::render::LevelRequest;
 use crate::animation::ObjectAnimationCue;
 use crate::objects::WorldObject;
+use crate::render::LevelRequest;
 use crate::schedule::{WorldSystems, simulation_enabled};
 use crate::shell::GameSystems;
-use crate::world::{Animation, Command, WorldGeometry};
 pub use crate::world::format::SoundEnvironment;
+use crate::world::{Animation, Command, WorldGeometry};
 
 /// Play the level's sound `0`.
 #[derive(Message)]
@@ -39,8 +39,11 @@ pub fn animation_sounds(clip: &Animation, previous: f32, current: f32) -> Vec<(u
         .filter_map(|command| match *command {
             Command::Sound { frame, sound, environment } => {
                 let frame = frame as f32 - clip.frame_start as f32;
-                let crossed =
-                    if current >= previous { frame > previous && frame <= current } else { frame > previous || frame <= current };
+                let crossed = if current >= previous {
+                    frame > previous && frame <= current
+                } else {
+                    frame > previous || frame <= current
+                };
                 crossed.then_some((sound, environment))
             }
             _ => None,
@@ -122,7 +125,13 @@ impl Plugin for AudioPlugin {
             .add_message::<SoundRequest>()
             .add_message::<MusicRequest>()
             .add_message::<ObjectAnimationCue>()
-            .add_systems(FixedUpdate, object_animation_sounds.in_set(WorldSystems::Effects).in_set(GameSystems::Game).run_if(simulation_enabled))
+            .add_systems(
+                FixedUpdate,
+                object_animation_sounds
+                    .in_set(WorldSystems::Effects)
+                    .in_set(GameSystems::Game)
+                    .run_if(simulation_enabled),
+            )
             .add_systems(Update, (sound_requests, music_requests));
     }
 }

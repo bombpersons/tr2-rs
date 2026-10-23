@@ -8,7 +8,8 @@ use engine::{
 };
 
 fn compare_projection(reference: &str) {
-    let level: Level = serde_json::from_slice(&std::fs::read("assets/imported/levels/assault/level.json").unwrap()).unwrap();
+    let level: Level =
+        serde_json::from_slice(&std::fs::read("assets/imported/levels/assault/level.json").unwrap()).unwrap();
     let reference: serde_json::Value = serde_json::from_str(reference).unwrap();
     let model = level.models.iter().find(|m| m.id == reference["model"].as_u64().unwrap() as u16).unwrap();
     let rotation = model_pose(&level, model, model.animations[0], 0.0)[0].rotation;

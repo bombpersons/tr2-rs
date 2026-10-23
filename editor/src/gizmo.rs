@@ -241,7 +241,10 @@ fn drag_edits(drag: &Drag, ray: Ray3d, snap: bool) -> Vec<(String, Value)> {
                 offset = (offset / SNAP_UNITS).round() * SNAP_UNITS;
             }
             for &(index, p, _) in &drag.start {
-                edits.push((format!("/placements/{index}/position/{axis}"), Value::from((p[axis] + offset).round() as i64)));
+                edits.push((
+                    format!("/placements/{index}/position/{axis}"),
+                    Value::from((p[axis] + offset).round() as i64),
+                ));
             }
         }
         Handle::Ring => {

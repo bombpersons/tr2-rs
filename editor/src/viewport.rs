@@ -47,10 +47,7 @@ impl Plugin for ViewportPlugin {
         app.init_resource::<ViewportFocus>()
             .init_resource::<VirtualPointer>()
             .init_resource::<EguiWantsInput>()
-            .add_systems(
-                Update,
-                (focus, camera).chain().after(engine::render::LevelSystems::Visibility),
-            )
+            .add_systems(Update, (focus, camera).chain().after(engine::render::LevelSystems::Visibility))
             .add_systems(
                 PostUpdate,
                 (
@@ -66,11 +63,7 @@ impl Plugin for ViewportPlugin {
     }
 }
 
-pub(super) fn focus(
-    mut focus: ResMut<ViewportFocus>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    egui: Res<EguiWantsInput>,
-) {
+pub(super) fn focus(mut focus: ResMut<ViewportFocus>, mouse: Res<ButtonInput<MouseButton>>, egui: Res<EguiWantsInput>) {
     if mouse.any_just_pressed([MouseButton::Left, MouseButton::Right, MouseButton::Middle]) {
         focus.active = !egui.wants_any_pointer_input();
     }

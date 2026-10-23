@@ -13,7 +13,8 @@ fn item_lighting_matches_original_home_and_wall_calculations() {
     for case in references["cases"].as_array().unwrap() {
         let name = case["level"].as_str().unwrap();
         let level: Level =
-            serde_json::from_slice(&std::fs::read(format!("assets/imported/levels/{name}/level.json")).unwrap()).unwrap();
+            serde_json::from_slice(&std::fs::read(format!("assets/imported/levels/{name}/level.json")).unwrap())
+                .unwrap();
         let point = IVec3::new(
             case["point"][0].as_i64().unwrap() as i32,
             case["point"][1].as_i64().unwrap() as i32,

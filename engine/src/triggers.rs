@@ -176,7 +176,10 @@ fn dispatch_triggers(
         for (i, action) in trigger.actions.iter().enumerate() {
             // The first action of a switch, key or pickup trigger names the
             // object that fires it; it does not activate itself.
-            if i == 0 && matches!(kind, TriggerKind::Switch | TriggerKind::Key | TriggerKind::Pickup) && action.action == ACTIVATE {
+            if i == 0
+                && matches!(kind, TriggerKind::Switch | TriggerKind::Key | TriggerKind::Pickup)
+                && action.action == ACTIVATE
+            {
                 continue;
             }
             let argument = action.argument;
@@ -237,10 +240,7 @@ impl Plugin for TriggersPlugin {
             .configure_sets(FixedUpdate, TriggerSystems::Dispatch.in_set(InteractionSystems::Triggers))
             .add_systems(
                 FixedUpdate,
-                (
-                    reset_level.in_set(LifecycleSystems::Reset),
-                    dispatch_triggers.in_set(TriggerSystems::Dispatch),
-                )
+                (reset_level.in_set(LifecycleSystems::Reset), dispatch_triggers.in_set(TriggerSystems::Dispatch))
                     .in_set(GameSystems::Game)
                     .run_if(simulation_enabled),
             );

@@ -15,12 +15,12 @@
 use bevy::prelude::*;
 use engine::{
     EnginePlugin,
+    animation::AnimationGoal,
     controller::ControllerState,
+    launcher::{self, Game},
     objects::{AppObjectTypes, ObjectType, SpawnContext, WorldObject},
     prelude::*,
-    launcher::{self, Game},
     render::LevelRequest,
-    animation::AnimationGoal,
     schedule::ItemSystems,
     triggers::{AppTriggerActions, TriggerAction, TriggerSystems},
     world::{WorldGeometry, angle, position},
@@ -41,9 +41,12 @@ impl Plugin for SandboxPlugin {
     fn build(&self, app: &mut App) {
         engine::add_once(app, engine::EngineRulesPlugin);
         app.register_object_type(WALKER, ObjectType::new("walker").on_spawn(spawn_walker))
-            .register_object_type(PILLAR, ObjectType::new("pillar").on_init(|entity, _, _| {
-                entity.insert((Pillar::default(), AnimationGoal::default()));
-            }))
+            .register_object_type(
+                PILLAR,
+                ObjectType::new("pillar").on_init(|entity, _, _| {
+                    entity.insert((Pillar::default(), AnimationGoal::default()));
+                }),
+            )
             .register_trigger_action("chime")
             .init_resource::<Chimes>()
             .add_systems(
@@ -155,8 +158,8 @@ fn main() {
 mod tests {
     use super::*;
     use engine::{
-        camera::CameraState,
         animation::ObjectAnimation,
+        camera::CameraState,
         controller::Button,
         objects::WorldObject,
         testing::{TickApp, headless_app},
@@ -172,7 +175,14 @@ mod tests {
             .world_mut()
             .spawn((Walker, Avatar { position: position([2560, 0, 2560]), grounded: true, alive: true, ..default() }))
             .id();
-        let pillar = app.world_mut().spawn((WorldObject::new(1, PILLAR, 0, 0), Transform::from_translation(position([4608, 0, 4608])), ObjectAnimation { animation: 0, frame: 0.0 })).id();
+        let pillar = app
+            .world_mut()
+            .spawn((
+                WorldObject::new(1, PILLAR, 0, 0),
+                Transform::from_translation(position([4608, 0, 4608])),
+                ObjectAnimation { animation: 0, frame: 0.0 },
+            ))
+            .id();
         (app, walker, pillar)
     }
 
@@ -204,7 +214,11 @@ mod tests {
         app.run_ticks(39, &[]);
         assert!(app.world().get::<WorldObject>(pillar).unwrap().active);
         assert!(app.world().get::<Pillar>(pillar).unwrap().raised > 0.99);
-        assert_eq!(app.world().get::<ObjectAnimation>(pillar).unwrap().animation, 2, "authored motion has reached its hold clip");
+        assert_eq!(
+            app.world().get::<ObjectAnimation>(pillar).unwrap().animation,
+            2,
+            "authored motion has reached its hold clip"
+        );
         let chimes = app.world().resource::<Chimes>();
         assert_eq!((chimes.count, chimes.last), (1, 3), "a one-shot trigger");
     }

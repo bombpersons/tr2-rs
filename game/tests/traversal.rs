@@ -13,7 +13,8 @@ fn compare_case(csv: &str, metadata: &str) {
     let original = Trajectory::parse_psx_samples(csv, alignment).unwrap();
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
     let replay = Replay::parse(&metadata["input"].to_string()).unwrap();
-    let data: Level = serde_json::from_slice(&std::fs::read("assets/imported/levels/assault/level.json").unwrap()).unwrap();
+    let data: Level =
+        serde_json::from_slice(&std::fs::read("assets/imported/levels/assault/level.json").unwrap()).unwrap();
     let clips = PlayerAnimations::from(&data);
     let starts: Vec<_> = clips.clips.iter().map(|c| c.frame_start).collect();
     let states: Vec<_> = clips.clips.iter().map(|c| c.state).collect();

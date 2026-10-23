@@ -185,7 +185,10 @@ fn animation(level: &raw::Level, index: usize) -> Result<native::Animation> {
         if let Some(p) = a.poses.get(k)
             && p.bounds != key
         {
-            return Err(format!("animation {index} key {k}: pose bounds {:?} differ from frame data {key:?}", p.bounds));
+            return Err(format!(
+                "animation {index} key {k}: pose bounds {:?} differ from frame data {key:?}",
+                p.bounds
+            ));
         }
         bounds.push(key);
     }
@@ -280,7 +283,12 @@ pub fn level(raw: &raw::Level) -> Result<native::Level> {
             static_placements: r
                 .static_placements
                 .iter()
-                .map(|s| native::StaticPlacement { mesh_id: s.mesh_id, position: s.position, rotation: s.rotation, shade: s.light })
+                .map(|s| native::StaticPlacement {
+                    mesh_id: s.mesh_id,
+                    position: s.position,
+                    rotation: s.rotation,
+                    shade: s.light,
+                })
                 .collect(),
             ambient: native::Ambient { shade: r.ambient[0], shade2: r.ambient[1], mode: r.ambient[2] },
             lights: r
@@ -366,7 +374,14 @@ pub fn level(raw: &raw::Level) -> Result<native::Level> {
         static_meshes: raw
             .static_meshes
             .iter()
-            .map(|s| Ok(native::StaticMesh { id: s.id, mesh: mesh_of(s.mesh)?, collision_box: s.collision_box, flags: s.flags }))
+            .map(|s| {
+                Ok(native::StaticMesh {
+                    id: s.id,
+                    mesh: mesh_of(s.mesh)?,
+                    collision_box: s.collision_box,
+                    flags: s.flags,
+                })
+            })
             .collect::<Result<_>>()?,
         animations: (0..raw.animations.len()).map(|i| animation(raw, i)).collect::<Result<_>>()?,
         placements,
@@ -388,7 +403,11 @@ pub fn level(raw: &raw::Level) -> Result<native::Level> {
         overlaps: raw.overlaps.clone(),
         zones: raw.zones.clone(),
         sound_map: raw.sound_map.iter().map(|&s| usize::try_from(s).ok()).collect(),
-        sounds: raw.sound_info.iter().map(|s| native::Sound { sample: usize::from(s[0]), volume: s[1], range: s[2], flags: s[3] }).collect(),
+        sounds: raw
+            .sound_info
+            .iter()
+            .map(|s| native::Sound { sample: usize::from(s[0]), volume: s[1], range: s[2], flags: s[3] })
+            .collect(),
     })
 }
 
