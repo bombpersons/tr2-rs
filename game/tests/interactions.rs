@@ -102,7 +102,7 @@ fn pause_blocks_pickups_and_trigger_activation() {
 #[cfg(feature = "baked-assets")]
 #[test]
 fn real_wall_start_camera_operand_is_never_an_object_activation() {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let room = &data.rooms[35];
     let triggers = &data.floor_info(&room.sectors[2 * room.z_sectors + 1]).triggers;
     assert_eq!(triggers.len(), 1);
@@ -234,7 +234,7 @@ fn registered_attendant_is_a_creature_with_its_own_collision() {
 #[cfg(feature = "baked-assets")]
 #[test]
 fn wall_doors_and_blocks_block_the_original_boxes() {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let world = engine::world::WorldGeometry::new(data);
     let flags = game::interactions::initial_box_flags(&world);
     let blocked: Vec<usize> =

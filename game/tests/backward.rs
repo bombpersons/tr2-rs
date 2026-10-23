@@ -12,7 +12,7 @@ use game::player::{AnimationState, Motion, Player, PlayerAnimations, PlayerRules
 fn compare_case(csv: &str, metadata: &str, position_tolerance: f64) {
     let original = Trajectory::parse_psx_samples(csv, Alignment::new(2, 0)).unwrap();
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
-    let data: Level = serde_json::from_slice(&std::fs::read("assets/levels/assault/level.json").unwrap()).unwrap();
+    let data: Level = serde_json::from_slice(&std::fs::read("assets/imported/levels/assault/level.json").unwrap()).unwrap();
     let clips = PlayerAnimations::from(&data);
     let starts: Vec<_> = clips.clips.iter().map(|c| c.frame_start).collect();
     let states: Vec<_> = clips.clips.iter().map(|c| c.state).collect();

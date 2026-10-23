@@ -1,8 +1,8 @@
 # Working in the game
 
 `game/` is this title on top of `engine/`: per-type controllers, action
-handlers, HUD, menus, save format, level order, and the baked content in
-`assets/`. Reusable machinery belongs in `engine/` (read `engine/AGENTS.md`
+handlers, HUD, menus, save format, level order, and the import of the
+original's data from the player's disc (`src/disc.rs`). Reusable machinery belongs in `engine/` (read `engine/AGENTS.md`
 for the placement rules). Game-specific behaviour never goes in the template's
 crate `psx-bevy/`; when the game needs a template change, see `docs/template.md`.
 
@@ -45,15 +45,36 @@ the engine's launcher. So tests in `tests/` can use every game module.
 
 ```
 src/lib.rs            REGION, FIELDS_PER_TICK, SCREEN, TITLE, GamePlugins (EnginePlugin + the feature plugins)
-src/main.rs           engine::launcher::run(...): window, renderer, --flags
+src/main.rs           engine::launcher::run(...): window, renderer, --flags; turns on the disc import
+src/disc.rs           GameData state: import from the player's disc on first start, disc/progress screens
 src/<feature>/mod.rs  one plugin per feature: player, stage, enemies, camera, hud...
 src/<feature>/...     rules (components + systems, no rendering) apart from presentation
-assets/               baked content in the engine's formats (levels, tuning, textures)
+assets/               hand-made content in the engine's formats
+assets/imported/      content imported from the player's disc on first start (git-ignored)
 tests/<feature>.rs    headless tick tests against recorded trajectories
 tests/dev_mcp.rs      opt-in GPU/MCP checks of the real binary
 ```
 
-Evidence-recording scripts and importers live in the workspace's `tools/`.
+Evidence-recording scripts live in the workspace's `tools/`, the importers
+in `tools/import/`.
+
+### Data from the disc
+
+The game imports the original's data itself, on first start, from the
+player's disc image (`src/disc.rs`, running `import::import` from
+`tools/import`). Keep it that way as the port grows:
+
+- Importers convert disc files into engine formats under `assets/imported/`
+  and are the only code that reads the original's raw formats. Run them on
+  the disc through `import::DiscReader`, report progress, and bump
+  `import::VERSION` whenever their output changes so players re-import.
+- `assets/imported/` is an asset root (`src/main.rs`), so imported files load
+  by their usual paths (`levels/wall/level.json`). Tests read them from
+  `assets/imported/` behind the `baked-assets` feature.
+- Code that loads imported files waits for `disc::data_ready`.
+  `GameSystems::Game` and the engine's `LevelSystems::Load` already do.
+- Tests of the protocol use discs made with `import::test_disc::iso`
+  (`tests/disc.rs`); the real disc is not in the repository.
 
 - Start a new game by deleting `src/demo/` and `assets/demo/`, removing the
   demo from `GamePlugins` and `lib.rs`, and adding your own feature modules.

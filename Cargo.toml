@@ -5,7 +5,8 @@
 #   engine/        this game's engine family: no names, numbers or assets from
 #                  this game
 #   game/          this title: controllers, rules, HUD, menus, baked assets
-#   tools/import/  offline importers: extracted disc data -> engine formats
+#   tools/import/  importers: the player's disc -> engine formats, run by the
+#                  game on first start
 #   mods/example/  a mod: a small game built on game/ from hand-made assets
 #   vendor/        psx-media and psx-assets, vendored by the template
 [workspace]
@@ -25,6 +26,14 @@ publish = false
 [workspace.dependencies]
 psx-bevy = { path = "psx-bevy" }
 engine = { path = "engine" }
+# The importers (tools/import), a library the game runs on first start.
+import = { path = "tools/import" }
+# Disc images (CUE/BIN, ISO, CHD), ISO9660 and PS1 asset formats: the psx
+# toolkit's crates, vendored by the template (vendor/README.md). The game
+# imports from the player's disc itself (game/src/disc.rs, tools/import), so
+# players need neither the toolkit nor a separate export step.
+psx-media = { path = "vendor/psx-media" }
+psx-assets = { path = "vendor/psx-assets" }
 # The game as a library, for mods (crates built on it). `package` is the
 # game's package name; the code calls it `game`.
 game = { path = "game", package = "tomb-raider-ii" }
@@ -36,6 +45,8 @@ bevy = { version = "=0.20.0", default-features = false, features = [
   # developer MCP's `game_query` can read them without `register_type` calls.
   "reflect_auto_register",
   "bevy_audio",
+  # States: the game waits in GameData until its disc import is ready.
+  "bevy_state",
 ] }
 # Bevy 0.20 exposes native GLES on its renderer crate, not the facade features.
 bevy_render = { version = "=0.20.0", default-features = false, features = ["gles"] }

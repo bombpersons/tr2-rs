@@ -11,7 +11,7 @@ use game::player::{
 };
 
 fn compare_case(csv: &str, metadata: &str) {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let headers: Vec<_> = csv.lines().next().unwrap().split(',').collect();
     let rows: Vec<Vec<i32>> = csv.lines().skip(1).map(|l| l.split(',').map(|v| v.parse().unwrap()).collect()).collect();
     let at = |row: &[i32], key: &str| row[headers.iter().position(|&k| k == key).unwrap()];

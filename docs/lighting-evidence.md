@@ -14,8 +14,9 @@ renderer `0x800617b0` reads aligned words: xyz in the low 15 bits (x bits
 10-14, y 5-9, z 0-4), a 16-bit shade in the high half (traced loads such as
 `0x14520401`). The colour it draws is the shade's low byte (`lbu 6(slot)`),
 replicated to RGB by `0x80062090`, minus `(depth - 12288) >> 5` beyond depth
-12288. `tools/extract_tr2.py` now asserts the duplicate count (all rooms of all
-25 levels) and stores the full 16-bit shade; positions are unchanged.
+12288. The level decoder (`tools/import/src/level_file.rs`, first
+`tools/extract_tr2.py`) checks the duplicate count (all rooms of all 25
+levels) and stores the full 16-bit shade; positions are unchanged.
 
 The port also passed encoded GPU multipliers to PsxMaterial as linear vertex
 colours, which the shader re-encodes, brightening dark vertices (0.15 drew as

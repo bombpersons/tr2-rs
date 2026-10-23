@@ -7,6 +7,8 @@ use engine::launcher::{self, Game};
 fn main() {
     // The game's assets, layered under this crate's own assets/ (which wins).
     engine::assets::add_root(example_mod::GAME_ASSETS);
+    // And what the game imported from the player's disc, if anything.
+    engine::assets::add_root(format!("{}/imported", example_mod::GAME_ASSETS));
     launcher::run(Game {
         name: env!("CARGO_PKG_NAME"),
         title: "Example mod: arrows to walk",

@@ -66,6 +66,7 @@ impl Plugin for PresentationPlugin {
         app.init_resource::<Session>()
             .insert_resource(SimulationEnabled(true))
             .add_systems(Startup, setup)
+            .add_systems(Update, show_title.run_if(crate::disc::data_ready).run_if(no_title))
             .add_systems(Update, (level_loaded, crate::save::restore).chain().after(LevelSystems::Load))
             .add_systems(
                 FixedUpdate,
@@ -83,31 +84,12 @@ impl Plugin for PresentationPlugin {
 /// (`ViewSettings::size`) and scale with the screen's height; a wider screen
 /// adds room at the sides, where edge elements follow through
 /// `OverlayAnchor`. At the original's size this is one unit per pixel.
-fn setup(
-    mut commands: Commands,
-    server: Res<AssetServer>,
-    view: Res<ViewSettings>,
-    session: Res<Session>,
-    mut music: MessageWriter<crate::audio::TrackRequest>,
-) {
-    if session.title {
-        music.write(crate::audio::TrackRequest(2));
-    }
+fn setup(mut commands: Commands, view: Res<ViewSettings>) {
     commands.spawn((
         Camera2d,
         Camera { order: 1, clear_color: ClearColorConfig::None, ..default() },
         overlay_projection(&view),
         PsxView,
-    ));
-    // The title fills the original's display; wider screens pillarbox it in black.
-    commands.spawn((
-        Sprite {
-            custom_size: Some(view.size.as_vec2()),
-            ..Sprite::from_image(server.load("screens/pixus_titleus.png"))
-        },
-        Transform::from_xyz(0.0, 0.0, 0.5),
-        TitleBackdrop,
-        children![(Sprite::from_color(Color::BLACK, Vec2::splat(8192.0)), Transform::from_xyz(0.0, 0.0, -0.25))],
     ));
     commands.spawn((
         Text2d::new("Loading..."),
@@ -127,6 +109,33 @@ fn setup(
             Transform::from_xyz(0.0, 0.0, 1.0),
             HealthBar
         )],
+    ));
+}
+
+fn no_title(title: Query<(), With<TitleBackdrop>>) -> bool {
+    title.is_empty()
+}
+
+/// The title picture and music, once the game's data is imported.
+fn show_title(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    view: Res<ViewSettings>,
+    session: Res<Session>,
+    mut music: MessageWriter<crate::audio::TrackRequest>,
+) {
+    if session.title {
+        music.write(crate::audio::TrackRequest(2));
+    }
+    // The title fills the original's display; wider screens pillarbox it in black.
+    commands.spawn((
+        Sprite {
+            custom_size: Some(view.size.as_vec2()),
+            ..Sprite::from_image(server.load("screens/pixus_titleus.png"))
+        },
+        Transform::from_xyz(0.0, 0.0, 0.5),
+        TitleBackdrop,
+        children![(Sprite::from_color(Color::BLACK, Vec2::splat(8192.0)), Transform::from_xyz(0.0, 0.0, -0.25))],
     ));
 }
 

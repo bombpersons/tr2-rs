@@ -241,7 +241,7 @@ Free-angle geometry is out of scope; it cannot carry collision.
   opens the level as Open does (`Editor::open`).
 - **Save As fix.** Save As starts copying `audio/` as well as the atlas.
   Play's export also copies `audio/` when the play folder lacks it. Without
-  this, a level outside `game/assets/levels` loses its sounds.
+  this, a level outside `game/assets/imported/levels` loses its sounds.
 - **Checks.**
   - Unit test: a new level from the sandbox set validates and has one open
     room of the asked size.
@@ -265,10 +265,10 @@ dropped into any level, and removed again with the assets only they used.
     her braid (2), pistols (1) and muzzle flash (240).
 - **Texture sets** are entries with only textures: a shipped level's room
   textures, cut out. Painting and New use them.
-- **Where the library comes from.** A new `tr2-import` mode, run by
-  `tools/bake_assets.sh`, cuts every model, static and room texture set out
-  of the baked disc levels. Like the baked levels, it is generated and
-  gitignored, never committed. The sandbox's hand-made walker and pillar
+- **Where the library comes from.** A new step of the disc import
+  (`tools/import`) cuts every model, static and room texture set out of the
+  imported levels. Like them, it is generated and gitignored, never
+  committed. The sandbox's hand-made walker and pillar
   are committed entries, so the library works without the disc.
 - **Variants.** The same type id can look different between levels (Lara's
   outfits). Entries are named by the level they came from ("Lara

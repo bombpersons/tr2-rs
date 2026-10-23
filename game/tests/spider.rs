@@ -113,7 +113,7 @@ fn compare_case(csv: &str, ticks: usize, shots: bool) {
         }
         original = window;
     }
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let world = WorldGeometry::new(data);
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins(InteractionsPlugin).insert_resource(world.clone());

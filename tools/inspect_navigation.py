@@ -32,7 +32,7 @@ def main():
     trace = (OUT / 'trace.txt').read_text()
     box_base = int(re.search(r'00015e5c .*?=>([0-9a-f]+)', trace)[1], 16)
     overlap_base = int(re.search(r'00015190 .*?=>([0-9a-f]+)', trace)[1], 16)
-    level = json.loads((ROOT / 'game/assets/levels/assault/level.json').read_text())
+    level = json.loads((ROOT / 'game/assets/imported/levels/assault/level.json').read_text())
     creature = pointer(0x17c8c8 + 0x30)
     lot = creature + 16
     step, drop, fly = read('3h', lot + 12)

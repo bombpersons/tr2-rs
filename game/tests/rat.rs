@@ -9,7 +9,7 @@ mod support;
 use game::rat::KIND;
 use support::creature_replay::CreatureReplay;
 
-const VENICE: &[u8] = include_bytes!("../assets/levels/boat/level.json");
+const VENICE: &[u8] = include_bytes!("../assets/imported/levels/boat/level.json");
 const SLOT_FIELDS: [&str; 8] =
     ["mood", "max_turn", "flags", "head", "target_x", "target_y", "target_z", "required_box"];
 

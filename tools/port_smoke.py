@@ -162,7 +162,7 @@ REFERENCES = {
 def align_reference(client, reference):
     yaw = reference['yaw'] * math.tau / 65536
     feet = convert(reference['position'])
-    level = json.loads((ROOT / f'game/assets/levels/{reference["level"]}/level.json').read_text())
+    level = json.loads((ROOT / f'game/assets/imported/levels/{reference["level"]}/level.json').read_text())
     clip_start = level['animations'][reference['animation']]['frame_start']
     edits = {}
     edits['player'] = client.edit('Player', 'Player', {'position': feet, 'yaw': yaw, 'room': reference['room'], 'health': 1000})

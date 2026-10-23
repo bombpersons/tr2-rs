@@ -18,6 +18,7 @@ mod contact;
 pub mod creature;
 pub mod club_man;
 pub mod crow;
+pub mod disc;
 pub mod dog;
 pub mod gunman;
 pub mod items;
@@ -76,6 +77,7 @@ impl PluginGroup for GamePlugins {
     fn build(self) -> PluginGroupBuilder {
         PluginGroupBuilder::start::<Self>()
             .add(engine::EnginePlugin)
+            .add(disc::GameDataPlugin::default())
             .add(player::PlayerRulesPlugin)
             .add(interactions::InteractionsPlugin)
             .add(presentation::PresentationPlugin)

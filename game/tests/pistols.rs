@@ -59,7 +59,7 @@ fn compare_case(csv: &str, metadata: &str) -> u64 {
     let original = Trajectory::parse_psx_samples(csv, alignment).unwrap();
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
     let replay = Replay::parse(&metadata["input"].to_string()).unwrap();
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let clips = PlayerAnimations::from(&data);
     let starts: Vec<_> = clips.clips.iter().map(|c| c.frame_start).collect();
     let states: Vec<_> = clips.clips.iter().map(|c| c.state).collect();
@@ -251,7 +251,7 @@ fn compare_tiger_case_until(csv: &str, metadata: &str, hp_ticks: usize) {
     let original = Trajectory::parse_psx_samples(csv, alignment).unwrap();
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
     let replay = Replay::parse(&metadata["input"].to_string()).unwrap();
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let clips = PlayerAnimations::from(&data);
     let starts: Vec<_> = clips.clips.iter().map(|c| c.frame_start).collect();
     let row = |name| original.get(0, name).unwrap();

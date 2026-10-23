@@ -9,7 +9,7 @@ mod support;
 use game::club_man::KIND;
 use support::creature_replay::CreatureReplay;
 
-const VENICE: &[u8] = include_bytes!("../assets/levels/boat/level.json");
+const VENICE: &[u8] = include_bytes!("../assets/imported/levels/boat/level.json");
 const SLOT_FIELDS: [&str; 9] =
     ["mood", "max_turn", "flags", "head", "neck", "target_x", "target_y", "target_z", "required_box"];
 

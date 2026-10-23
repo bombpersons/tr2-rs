@@ -18,7 +18,7 @@ mod support;
 use support::winston::{Pose, place};
 
 fn compare_case(csv: &str) {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins(WinstonRulesPlugin);
     let rows: Vec<Vec<i32>> = csv.lines().skip(1).map(|l| l.split(',').map(|v| v.parse().unwrap()).collect()).collect();

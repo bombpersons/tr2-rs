@@ -31,7 +31,7 @@ use game::{
 mod support;
 use support::winston::{Pose, place};
 
-const HOME: &[u8] = include_bytes!("../assets/levels/assault/level.json");
+const HOME: &[u8] = include_bytes!("../assets/imported/levels/assault/level.json");
 const LAP: &str = include_str!("data/original/home_lap.csv");
 /// The first row Lara stands still: she ran into the course, stopped
 /// against the first block and stands before vaulting it.

@@ -14,7 +14,7 @@ fn compare_case(csv: &str, metadata: &str) {
     let metadata: serde_json::Value = serde_json::from_str(metadata).unwrap();
     let replay = Replay::parse(&metadata["input"].to_string()).unwrap();
     let data: Level = serde_json::from_slice(
-        &std::fs::read(format!("assets/levels/{}/level.json", metadata["level"].as_str().unwrap())).unwrap(),
+        &std::fs::read(format!("assets/imported/levels/{}/level.json", metadata["level"].as_str().unwrap())).unwrap(),
     )
     .unwrap();
     let clips = PlayerAnimations::from(&data);

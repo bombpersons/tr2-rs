@@ -6,7 +6,7 @@ use engine::world::Level;
 use game::player::contract::{self, Feature};
 
 fn level(name: &str) -> Level {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/levels").join(name).join("level.json");
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/imported/levels").join(name).join("level.json");
     serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap()
 }
 

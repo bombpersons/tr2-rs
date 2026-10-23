@@ -320,7 +320,7 @@ fn original_wall_entry_falls_slides_and_turns_across_every_recorded_tick() {
     // goal2 landing dispatch, slope-axis heading and the slide-stop clip71.
     let original =
         Trajectory::parse_psx_samples(include_str!("data/original/wall_entry.csv"), Alignment::new(2, 0)).unwrap();
-    let data: Level = serde_json::from_slice(&std::fs::read("assets/levels/wall/level.json").unwrap()).unwrap();
+    let data: Level = serde_json::from_slice(&std::fs::read("assets/imported/levels/wall/level.json").unwrap()).unwrap();
     let clips = game::player::PlayerAnimations::from(&data);
     let starts: Vec<usize> = clips.clips.iter().map(|c| c.frame_start).collect();
     let (mut app, entity) = app();
@@ -386,7 +386,7 @@ fn heldout_wall_stop_release_and_retry_match_every_tick() {
 fn compare_wall_climb(csv: &str, forward_windows: &[(usize, usize)]) {
     use engine::testing::{Alignment, Trajectory};
     let original = Trajectory::parse_psx_samples(csv, Alignment::new(2, 1)).unwrap();
-    let data: Level = serde_json::from_slice(&std::fs::read("assets/levels/wall/level.json").unwrap()).unwrap();
+    let data: Level = serde_json::from_slice(&std::fs::read("assets/imported/levels/wall/level.json").unwrap()).unwrap();
     let clips = game::player::PlayerAnimations::from(&data);
     let starts: Vec<usize> = clips.clips.iter().map(|c| c.frame_start).collect();
     let (mut app, entity) = app();

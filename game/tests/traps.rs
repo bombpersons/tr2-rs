@@ -167,7 +167,7 @@ fn original_darts(original: &Trajectory, row: usize) -> [f64; 4] {
 /// Replay one recorded case and compare the traps it names.
 fn compare_case(csv: &str, items: &[usize]) {
     let original = Trajectory::parse_csv(csv).unwrap();
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let world = WorldGeometry::new(data);
     let starts: Vec<usize> = world.data.animations.iter().map(|c| c.frame_start).collect();
     let mut app = headless_app(game::tick_rate(game::REGION));
@@ -350,7 +350,7 @@ fn the_spiked_rollers_match_the_recording() {
 /// sets it off, and she drops through.
 #[test]
 fn standing_over_the_trapdoor_opens_it_and_drops_lara() {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let world = WorldGeometry::new(data);
     let placement = world.data.placements[14].clone();
     let mut app = headless_app(game::tick_rate(game::REGION));

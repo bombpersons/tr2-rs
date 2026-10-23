@@ -198,15 +198,27 @@ From psx `0.3.4+src-b72afc8e8efe891f-release` to
     game's own") with the per-object lighting and options-page paragraphs
     reapplied.
 - Seeded files: added the `vendor/` exclusion to the workspace, and the menu
-  view and `vendor/` guidance to `game/AGENTS.md` and `AGENTS.md`. Not
-  adopted yet:
-  - importing from the player's disc on first start (`game/src/disc.rs`, a
-    `GameData` state, `tools/import` as a library on the vendored crates).
-    This project still bakes with `tools/bake_assets.sh` (Python and psx);
+  view and `vendor/` guidance to `game/AGENTS.md` and `AGENTS.md`.
+- Adopted the import from the player's disc on first start, replacing
+  `tools/bake_assets.sh` and its Python extractors:
+  - `tools/import` is now the `import` library (and command) on the vendored
+    crates. It decodes `DATA/*.PSX` (`level_file.rs`, ported from
+    `tools/extract_tr2.py`), the `PIX*/*.RAW` screens (`screens.rs`, from
+    `extract_pix.py`) and copies the CD audio tracks (`music.rs`). From the
+    supplied disc it reproduces all 2,936 baked files, the WAV and level
+    files byte for byte and the PNGs pixel for pixel, in about 10 seconds.
+  - `game/src/disc.rs` is the template's, with `data_ready` (no
+    `GameData` state counts as ready) gating `GameSystems::Game`, the
+    engine's `LevelSystems::Load` and the title picture, and `rom/` folders
+    added to the disc search. Its screens are still the template's plain UI.
+  - Output goes to `game/assets/imported/`, an asset root of the game (and of
+    the mod), so load paths are unchanged; tests read it there.
+  - `tools/extract_tr2.py` stays as a research dump of raw tables.
+- Not adopted yet:
   - "One Bevy build" (`engine/` depending on `bevy_egui` so the game and
     editor resolve the same Bevy features);
-  - the seeded egui editor shell, `game/src/demo/` and the template's
-    `tools/import`, which this project's editor and importer replace.
+  - the seeded egui editor shell and `game/src/demo/`, which this project's
+    editor and game replace.
 
 ## Where the template's files live
 

@@ -22,7 +22,7 @@ fn collect(mut cues: MessageReader<ObjectAnimationCue>, mut sounds: ResMut<Sound
 }
 
 fn compare(csv: &str) -> Vec<(usize, i64, usize)> {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins(InteractionsPlugin)
         .insert_resource(WorldGeometry::new(data))

@@ -25,8 +25,8 @@ and support for mods.
 ## Status: a work in progress
 
 The game is not playable from start to finish yet. Every level loads and
-draws from its own baked data, but much of what happens in them is still to
-port. What is ported is checked tick for tick against recordings of the
+draws from the data it imports from your disc, but much of what happens in
+them is still to port. What is ported is checked tick for tick against recordings of the
 original.
 
 | Area | Status |
@@ -54,8 +54,9 @@ each ported behaviour is indexed in [docs/evidence.md](docs/evidence.md).
 
 The port is made with [psx](https://github.com/bombpersons/psx), a
 PlayStation reverse-engineering toolkit, which is what keeps it accurate:
-- It extracts the disc's levels, models, textures, sounds and music into
-  standalone files, so the port never reads the disc at run time.
+- Its disc and format crates (vendored in `vendor/`) let the game import
+  the levels, models, textures, sounds and music from the player's own disc
+  on first start, so the repository holds none of the original's data.
 - It runs the original in an emulator and records exactly what it does,
   tick by tick: any value in memory, every store to it and the code that
   wrote it. With `psx handoff`, a developer plays the original while it
@@ -70,20 +71,22 @@ PlayStation reverse-engineering toolkit, which is what keeps it accurate:
 
 ## Running it
 
-This repository has no game data. Bake the levels, textures, sounds and music
-from your own copy of the game (bin/cue) with psx on `PATH`, python3 with
-Pillow, and Rust 1.97.1+:
+This repository has no game data. On first start the game imports it from
+your own copy of the game (USA, `SLUS_004.37`): put the disc image (a `.cue`
+with its `.bin` files, a `.chd` or an `.iso`) in the repository's root or
+its `rom/` folder, or pass `--disc PATH`. The import takes about ten
+seconds and only happens once. Requires Rust 1.97.1+.
 
 ```sh
-tools/bake_assets.sh path/to/game.cue   # writes game/assets/ (gitignored)
-cargo run                               # the game
+cargo run                               # the game; imports from the disc on first start
 cargo run -- --level wall               # start at the Great Wall
+cargo run -p import -- path/to/game.cue # run the import by hand (game/assets/imported)
 cargo run -p example-mod                # the example mod
 cargo run -p editor                     # the level editor (docs/editor.md)
 cargo test --workspace --all-features   # tests, including the recordings
 ```
 
-F1 opens the controls menu and F2 the display menu. Without baked content,
+F1 opens the controls menu and F2 the display menu. Without imported data,
 the engine, editor, example mod and most tests still build and run.
 
 ## Layout
@@ -95,5 +98,7 @@ the engine, editor, example mod and most tests still build and run.
 | `editor/` | The level editor |
 | `mods/example/` | An example mod |
 | `psx-bevy/` | The psx template's crate: PS1 look, ticks, input, menus, testing, developer MCP ([README](psx-bevy/README.md)) |
-| `tools/` | Asset importers, recording scripts and smoke tests |
+| `tools/import/` | The importer: the disc's levels, screens and music into the engine's formats |
+| `tools/` | Recording scripts and smoke tests |
+| `vendor/` | The psx toolkit's disc and PS1 format crates, vendored by the template |
 | `docs/` | Evidence notes per feature, the engine model, Lara's asset contract |

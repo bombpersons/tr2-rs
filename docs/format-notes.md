@@ -1,10 +1,10 @@
 # Tomb Raider II PlayStation asset decoding
 
-The supplied disc is **Tomb Raider II: Starring Lara Croft, USA, revision 3**. The source files used here are the ISO-extracted `research/disc/DATA/*.PSX`, `PIX/*.RAW`, and `PIXUS/*.RAW`. Game runtime assets are written under `game/assets`; no BIN/CUE or extracted `.PSX` is needed at build or runtime.
+The supplied disc is **Tomb Raider II: Starring Lara Croft, USA, revision 3** (`SLUS_004.37`). The source files used here are the disc's `DATA/*.PSX`, `PIX/*.RAW`, `PIXUS/*.RAW` and its CD audio tracks. The game imports them on first start into `game/assets/imported`; nothing from the disc is needed at build time, and after the import the disc is not needed to run.
 
 ## Evidence and scope
 
-The decoder is an original Python implementation, cross-checked against the primary source [OpenLara `src/format.h`](https://github.com/XProger/OpenLara/blob/master/src/format.h), especially `loadTR2_PSX`, `readDataArrays`, `readRoom`, `initMesh`, and `readObjectTex`. Skeleton traversal and frame indexing were checked against [OpenLara `src/animation.h`](https://github.com/XProger/OpenLara/blob/master/src/animation.h). The headerless RNC2 image format was checked against [OpenLara `src/texture.h`](https://github.com/XProger/OpenLara/blob/master/src/texture.h), `LoadRNC`. These are format references; the Rust port does not embed OpenLara or emulate the PlayStation.
+The decoder was first an original Python implementation (`tools/extract_tr2.py`, `extract_pix.py`), now ported to Rust in `tools/import`, cross-checked against the primary source [OpenLara `src/format.h`](https://github.com/XProger/OpenLara/blob/master/src/format.h), especially `loadTR2_PSX`, `readDataArrays`, `readRoom`, `initMesh`, and `readObjectTex`. Skeleton traversal and frame indexing were checked against [OpenLara `src/animation.h`](https://github.com/XProger/OpenLara/blob/master/src/animation.h). The headerless RNC2 image format was checked against [OpenLara `src/texture.h`](https://github.com/XProger/OpenLara/blob/master/src/texture.h), `LoadRNC`. These are format references; the Rust port does not embed OpenLara or emulate the PlayStation.
 
 Observed: all 25 `.PSX` files decode into 2,548 rooms, 6,310 unique object meshes, 1,480 model definitions, 41,029 texture definitions, 2,706 entity placements, 9,691 animations, 178,552 decoded animation keyframes, and 2,789 mono WAV samples. There are 37 decoded screen PNGs. Counts include title, home, demos, and cutscene scenes; they are not counts of campaign stages or distinct assets across the entire disc.
 
@@ -15,16 +15,19 @@ Each level JSON records the SHA-256 and size of its own original extracted file.
 Run from the workspace root:
 
 ```sh
-tools/bake_assets.sh [path/to/game.cue]
+cargo run -p import -- path/to/game.cue           # everything, into game/assets/imported
+cargo run -p import -- path/to/game.cue --level wall   # one level
 ```
 
-It runs `psx extract --all` into `research/disc`, `tools/extract_tr2.py`
-(raw tables into `research/extracted/levels`), the `tr2-import` importer
-(engine format into `game/assets/levels`), `tools/extract_pix.py` and
-`tools/extract_cdda.py`. A bake from the supplied disc reproduces the
-current assets byte for byte.
+The game runs the same import itself on first start when the disc image is
+beside it (`game/src/disc.rs`). The importer (`tools/import`) reads the disc
+through the vendored `psx-media`: `level_file` decodes each `DATA/*.PSX`
+into raw tables, atlas and sounds, `convert` writes the engine format, and
+`screens` and `music` decode `PIX*/*.RAW` and copy the CD audio tracks.
 
-Pillow is the only nonstandard Python requirement. `--level WALL` limits extraction to one level; `--input` and `--output` select other directories. A single-level invocation replaces the output manifest with that invocation's results; run without `--level` to rebuild the complete manifest.
+`tools/extract_tr2.py` still dumps the raw tables as JSON for research
+(`research/extracted/levels`, from a `psx extract --all` of the disc); the
+importer's `level_file` is the canonical decoder.
 
 ## Level JSON contract (schema 1)
 

@@ -15,7 +15,7 @@ use game::player::weapons::{self, GunInput, GunWorld};
 use game::player::{Gun, GunStatus, WeaponState};
 
 fn wall() -> Level {
-    serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap()
+    serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap()
 }
 
 /// One LaraGun tick on open ground with nothing to aim at.

@@ -410,7 +410,7 @@ def record(name):
     # are watched too, and noted where they change.
     box_columns = []
     if creatures:
-        count = len(json.loads((ROOT / f'game/assets/levels/{run.level_file}/level.json').read_text())['boxes'])
+        count = len(json.loads((ROOT / f'game/assets/imported/levels/{run.level_file}/level.json').read_text())['boxes'])
         box_columns = [f'{run.boxes + k * 8 + 6:08x}:x16:box{k}' for k in range(count)]
     for watch in watches(columns + box_columns):
         command += ['--watch', watch]

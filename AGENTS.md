@@ -34,6 +34,9 @@ the start. Read the guide for the crate you are working in:
   on it from `engine/` and `game/`; edit it only as `psx-bevy/AGENTS.md`
   allows, and list every edit in `docs/template.md`. Its README documents
   the PS1 look, input, testing and the developer MCP.
+- `tools/import/`: the importers, run by the game on first start from the
+  player's disc (`game/src/disc.rs`); bump `import::VERSION` when their
+  output changes.
 - `vendor/`: the template's copies of the psx toolkit's `psx-media` and
   `psx-assets` crates (disc images, TIM/TMD/VAB). Don't edit them; fix
   upstream in psx.

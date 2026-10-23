@@ -3,7 +3,8 @@
 //! the level and facing the way the view looks.
 //!
 //! The document is written as `levels/<name>/editor-play.json` under the
-//! game's assets (beside the level's own files, which it never touches) and
+//! game's imported assets (beside the level's own files, which it never
+//! touches) and
 //! the game starts with `--level <name> --level-file` that copy, so the
 //! level keeps its atlas, sky, audio and place in the level order.
 use crate::Editor;
@@ -72,7 +73,8 @@ fn play(
     };
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
     let assets = match &request {
-        Play::Run => root.join("game/assets"),
+        // Beside the level the game imported from the disc (an asset root of the game's).
+        Play::Run => root.join("game/assets/imported"),
         Play::Export(folder) => folder.clone(),
     };
     let name = editor.doc.path().parent().and_then(Path::file_name).map(|n| n.to_string_lossy().to_string());

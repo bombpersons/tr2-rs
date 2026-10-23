@@ -1,14 +1,11 @@
-//! The extraction `tools/extract_tr2.py` writes: Tomb Raider II's level
-//! tables as JSON, still in the original's layout (word streams, offsets,
-//! packed flag words, sentinel values). Only the importer reads it.
-use serde::Deserialize;
+//! Tomb Raider II's level tables as `level_file` decodes them, still in the
+//! original's layout (word streams, offsets, packed flag words, sentinel
+//! values). Only `convert` reads them.
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Level {
     pub name: String,
-    #[serde(default)]
     pub source_sha256: String,
-    #[serde(default)]
     pub source_size: u64,
     pub rooms: Vec<Room>,
     pub floor_data: Vec<u16>,
@@ -22,27 +19,21 @@ pub struct Level {
     pub textures: Vec<Texture>,
     pub entities: Vec<Placement>,
     /// x, y, z, room, flags.
-    #[serde(default)]
     pub cameras: Vec<[i32; 5]>,
     pub sound_map: Vec<i16>,
     /// sample, volume, range, flags.
     pub sound_info: Vec<[u16; 4]>,
     /// z_min, z_max, x_min, x_max (sectors), floor, overlap index.
-    #[serde(default)]
     pub boxes: Vec<[i32; 6]>,
-    #[serde(default)]
     pub overlaps: Vec<u16>,
-    #[serde(default)]
     pub zones: Vec<Vec<i16>>,
     /// state, range count, first range.
-    #[serde(default)]
     pub animation_states: Vec<[usize; 3]>,
     /// first frame, last frame, animation, frame.
-    #[serde(default)]
     pub animation_ranges: Vec<[i32; 4]>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Room {
     pub id: usize,
     pub origin: [i32; 3],
@@ -57,26 +48,22 @@ pub struct Room {
     pub sectors: Vec<Sector>,
     pub static_placements: Vec<StaticPlacement>,
     /// Ambient shade, second ambient, light mode.
-    #[serde(default)]
     pub ambient: [i32; 3],
     /// x, y, z, intensity, intensity2, falloff, falloff2.
-    #[serde(default)]
     pub lights: Vec<[i64; 7]>,
     pub alternate: i32,
     pub flags: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Portal {
     pub room: usize,
-    #[serde(default)]
     pub normal: [i32; 3],
     pub vertices: Vec<[i32; 3]>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Sector {
-    #[serde(rename = "box", default = "no_box")]
     pub navigation_box: usize,
     pub floor_data: usize,
     pub below: usize,
@@ -85,21 +72,15 @@ pub struct Sector {
     pub ceiling: i32,
 }
 
-fn no_box() -> usize {
-    0xffff
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Texture {
     pub atlas_uv: [[f32; 2]; 4],
     pub attribute: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Mesh {
-    #[serde(default)]
     pub center: [i32; 3],
-    #[serde(default)]
     pub radius: i32,
     pub vertices: Vec<[i32; 4]>,
     pub quads: Vec<[usize; 5]>,
@@ -107,7 +88,7 @@ pub struct Mesh {
     pub normals: Vec<[i32; 4]>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Model {
     pub id: u16,
     pub mesh_count: usize,
@@ -115,26 +96,28 @@ pub struct Model {
     pub animation: usize,
     pub joints: Vec<Joint>,
     pub initial_pose: Option<Pose>,
-    #[serde(default)]
     pub animation_end: usize,
+    /// Index of the model's first node in the level's node words.
+    pub node_offset: usize,
+    /// Byte offset of the model's initial pose in the frame data.
+    pub frame_offset: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Joint {
     pub parent: i32,
     pub translation: [i32; 3],
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default)]
 pub struct Pose {
     pub root: [i32; 3],
     /// 1024 to a turn.
     pub angles: Vec<[u16; 3]>,
-    #[serde(default)]
     pub bounds: [i32; 6],
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct StaticMesh {
     pub id: u16,
     pub mesh: usize,
@@ -142,7 +125,7 @@ pub struct StaticMesh {
     pub flags: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct StaticPlacement {
     pub mesh_id: u16,
     pub position: [i32; 3],
@@ -150,7 +133,7 @@ pub struct StaticPlacement {
     pub light: i32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Placement {
     pub id: u16,
     pub room: usize,
@@ -159,11 +142,9 @@ pub struct Placement {
     pub flags: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default)]
 pub struct Animation {
-    #[serde(default)]
     pub state_count: usize,
-    #[serde(default)]
     pub state_offset: usize,
     /// Byte offset into `frame_data`.
     pub frame_offset: usize,

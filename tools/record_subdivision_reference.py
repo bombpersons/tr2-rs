@@ -19,7 +19,7 @@ def main():
     ram = (run / 'ram.bin').read_bytes()
     capture = json.loads(gpu)
     parent = next(c for c in capture['commands'] if c['index'] == 124)
-    level = json.loads((ROOT / 'game/assets/levels/wall/level.json').read_text())
+    level = json.loads((ROOT / 'game/assets/imported/levels/wall/level.json').read_text())
     raw = json.loads((ROOT / 'research/extracted/levels/wall/level.json').read_text())
     room = level['rooms'][35]
     face = room['quads'][60]

@@ -15,12 +15,15 @@ path = "src/lib.rs"
 [features]
 default = []
 dev-mcp = ["engine/dev-mcp"]
-# Tests that read content baked from the disc (game/assets/levels, ...).
-# Run tools/bake_assets.sh first; a clean clone builds and tests without it.
+# Tests that read content imported from the disc (game/assets/imported).
+# Run the game once with the disc beside it, or `cargo run -p import -- DISC`;
+# a clean clone builds and tests without it.
 baked-assets = []
 
 [dependencies]
 engine = { path = "../engine" }
+# The importers and disc reader (tools/import), run in the game on first start.
+import.workspace = true
 bevy.workspace = true
 serde.workspace = true
 serde_json.workspace = true

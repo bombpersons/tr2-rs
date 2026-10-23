@@ -17,7 +17,7 @@ mod support;
 use support::winston::{Pose, place};
 
 fn compare_case(csv: &str, metadata: &str) {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let headers: Vec<_> = csv.lines().next().unwrap().split(',').collect();
     let rows: Vec<Vec<i32>> = csv.lines().skip(1).map(|l| l.split(',').map(|v| v.parse().unwrap()).collect()).collect();
     let at = |row: &[i32], key: &str| row[headers.iter().position(|&h| h == key).unwrap()];
@@ -203,7 +203,7 @@ fn heldout_walking_release_preserves_collision_correction_through_recovery() {
 #[test]
 fn ordinary_skeletal_math_bounds_the_four_native_sphere_clouds() {
     use engine::animation::model_spheres;
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let native: serde_json::Value = serde_json::from_str(include_str!("data/original/winston_spheres.json")).unwrap();
     for case in native["cases"].as_array().unwrap() {
         let mut clouds = Vec::new();
@@ -316,7 +316,7 @@ fn heldout_late_backward_input_preserves_vertical_contact_recovery() {
 #[test]
 fn raised_corner_sphere_outputs_bound_the_mesh_mask_diagnostic() {
     use engine::animation::model_spheres;
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let native: serde_json::Value =
         serde_json::from_str(include_str!("data/original/winston_corner_spheres.json")).unwrap();
     for capture in native["captures"].as_array().unwrap() {

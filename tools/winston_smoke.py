@@ -18,7 +18,7 @@ def main():
     report = {'status': 'running', 'cases': {}}
     out = ROOT / 'validation/winston/smoke'
     out.mkdir(parents=True, exist_ok=True)
-    level = json.loads((ROOT / 'game/assets/levels/assault/level.json').read_text())
+    level = json.loads((ROOT / 'game/assets/imported/levels/assault/level.json').read_text())
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case', choices=CASES)
     args = parser.parse_args()

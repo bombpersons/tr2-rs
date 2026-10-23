@@ -91,7 +91,7 @@ fn letting_go_of_the_zip_line_matches_the_recording() {
 /// and compare it.
 fn compare_ride(csv: &str, last: Option<usize>) {
     let original = Trajectory::parse_csv(csv).unwrap();
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     let clips = PlayerAnimations::from(&data);
     let world = WorldGeometry::new(data);
     let starts: Vec<usize> = world.data.animations.iter().map(|c| c.frame_start).collect();

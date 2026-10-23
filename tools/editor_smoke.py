@@ -2,7 +2,7 @@
 """Exercise the real editor over the template MCP, with a disposable sandbox copy.
 
 Build first: cargo build -p editor --all-features
-Optional real content: --level game/assets/levels/wall/level.json
+Optional real content: --level game/assets/imported/levels/wall/level.json
 The original file is never edited. Evidence is kept in validation/editor-smoke.
 """
 import argparse

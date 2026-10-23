@@ -80,7 +80,7 @@ def main(captures=CAPTURES, prefix='backward_collision', min_colors=16):
                     })
                     client.edit('Player', 'Traversal', {'goal': int(first['goal'])})
                 tick = 0
-                level = json.loads((ROOT / f'game/assets/levels/{level_name}/level.json').read_text())
+                level = json.loads((ROOT / f'game/assets/imported/levels/{level_name}/level.json').read_text())
                 for field in fields:
                     while 2 * tick < field:
                         buttons = [b.lower() for event in inputs if event['frame'] <= 2 * tick < event['until']

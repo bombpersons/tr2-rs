@@ -6,7 +6,7 @@ use engine::world::{Level, WorldGeometry, format::FORMAT_VERSION, position};
 
 #[test]
 fn every_baked_level_deserializes_and_has_valid_geometry_and_collision() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/levels");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets/imported/levels");
     let mut dirs: Vec<_> =
         fs::read_dir(&root).unwrap().map(Result::unwrap).map(|entry| entry.path()).filter(|path| path.is_dir()).collect();
     dirs.sort();

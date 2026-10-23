@@ -18,7 +18,7 @@ use game::{
 fn wall() -> (App, Entity) {
     let mut app = headless_app(game::tick_rate(game::REGION));
     app.add_plugins((CameraRulesPlugin, InteractionsPlugin));
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     app.insert_resource(WorldGeometry::from(Arc::new(data)));
     let player = app.world_mut().spawn(Player::at(position([62976, 1542, 23040]), 0.0, 35)).id();
     (app, player)
@@ -55,7 +55,7 @@ fn fixed_eye_matches_held_out_right_capture_recorded_after_implementation() {
 #[test]
 fn authored_one_second_timer_matches_patched_original_operand() {
     let (mut app, _) = wall();
-    let mut data: Level = serde_json::from_slice(include_bytes!("../assets/levels/wall/level.json")).unwrap();
+    let mut data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/wall/level.json")).unwrap();
     // Same controlled source mutation as psx capture: both entrance camera
     // settings words (floor data 3396 and 3402, in triggers 3393 and 3399)
     // become 0x8001: one second, reusable, default speed.

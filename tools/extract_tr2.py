@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
-"""Decode TR2 PlayStation levels into standalone JSON/PNG assets.
-Format cross-checked against OpenLara src/format.h; no engine code copied.
+"""Dump TR2 PlayStation levels' raw tables as JSON, for research.
+
+The game imports levels itself (tools/import/src/level_file.rs, ported from
+this script); this dump is kept for recording tools that need the original's
+raw tables, such as record_subdivision_reference.py. Input is DATA/*.PSX from
+`psx extract --all`. Format cross-checked against OpenLara src/format.h
+before the project's reference restriction; no engine code copied.
 """
 from __future__ import annotations
 import argparse, hashlib, json, math, struct, traceback, wave

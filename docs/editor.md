@@ -18,13 +18,13 @@ keeps its ordinary scene rendering.
 
 ```sh
 cargo run -p editor
-cargo run -p editor -- --level game/assets/levels/wall/level.json --types game/data/object_types.json
+cargo run -p editor -- --level game/assets/imported/levels/wall/level.json --types game/data/object_types.json
 cargo run -p editor -- --software
 cargo run -p editor -- --ui-scale 0.9 --theme "tomb raider"
 ```
 
-The default opens the hand-authored engine sandbox; no disc, baked game data
-or game crate is needed. `--level` takes a file path. The atlas is `atlas.png`
+The default opens the hand-authored engine sandbox; no disc, imported game
+data or game crate is needed. `--level` takes a file path. The atlas is `atlas.png`
 next to the level file. `--types` optionally reads `{"types":[{"id":1,"name":"walker"}]}`
 metadata through the engine registry. Extra controller-specific fields in a
 game's type table are ignored. The editor never runs the registered controllers.
@@ -515,7 +515,7 @@ cargo test --workspace --all-features
 cargo clippy --workspace --all-targets --all-features
 cargo build -p editor --all-features
 python3 tools/editor_smoke.py
-python3 tools/editor_smoke.py --level game/assets/levels/wall/level.json --pose-placement 72 --pose-clip 334 --pose-steps 61
+python3 tools/editor_smoke.py --level game/assets/imported/levels/wall/level.json --pose-placement 72 --pose-clip 334 --pose-steps 61
 ```
 
 The smoke script copies the level and atlas under `validation/editor-smoke/`,

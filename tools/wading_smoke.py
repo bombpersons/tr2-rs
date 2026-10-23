@@ -28,7 +28,7 @@ def main():
     out = ROOT / 'validation/wading/smoke'
     out.mkdir(parents=True, exist_ok=True)
     report = {'status': 'running', 'cases': {}}
-    level = json.loads((ROOT / 'game/assets/levels/assault/level.json').read_text())
+    level = json.loads((ROOT / 'game/assets/imported/levels/assault/level.json').read_text())
     try:
         for name in args.case or CASES:
             rows = list(csv.DictReader((ROOT / f'game/tests/data/original/wading_{name}.csv').open()))

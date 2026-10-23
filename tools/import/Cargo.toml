@@ -1,12 +1,20 @@
+# Importers: the player's disc -> engine-native assets. A library the game
+# runs on first start (game/src/disc.rs) and a command for running it by
+# hand. The original's raw formats live only here. It writes the engine's
+# level format, so it depends on `engine` (and through it, Bevy) for those types.
 [package]
-name = "tr2-import"
-description = "Offline importer: Tomb Raider II level extractions -> the engine's native level format."
+name = "import"
+description = "Tomb Raider II's disc -> the engine's level format, screens and music."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-engine = { path = "../../engine" }
+engine.workspace = true
+psx-media.workspace = true
+psx-assets.workspace = true
+image.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"

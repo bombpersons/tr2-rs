@@ -90,7 +90,7 @@ impl CreatureReplay {
         slot_fields: &[&'static str],
         pre_initialised: impl Fn(&mut EntityWorldMut),
     ) -> Self {
-        let level = include_bytes!("../../assets/levels/wall/level.json");
+        let level = include_bytes!("../../assets/imported/levels/wall/level.json");
         Self::in_level(level, csv, kind, items, slot_fields, pre_initialised)
     }
 

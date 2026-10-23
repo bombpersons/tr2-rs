@@ -30,7 +30,7 @@ def main():
     out.mkdir(parents=True,exist_ok=True)
     report={'status':'running','cases':{}}
     report_file=out/(f'report-{args.case}.json' if args.case else 'report.json')
-    level=json.loads((ROOT/'game/assets/levels/assault/level.json').read_text())
+    level=json.loads((ROOT/'game/assets/imported/levels/assault/level.json').read_text())
     try:
         for name in [args.case] if args.case else cases:
             rows=list(csv.DictReader((ROOT/f'game/tests/data/original/{args.suite}_{name}.csv').open()))

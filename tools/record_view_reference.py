@@ -20,7 +20,7 @@ def main():
         matrix = struct.unpack_from('<12i', raw, 0x8aa60)
         eye = struct.unpack_from('<3i', raw, 0x8b258)
         target = struct.unpack_from('<3i', raw, 0x8b268)
-        data = json.loads((ROOT / f'game/assets/levels/{level}/level.json').read_text())
+        data = json.loads((ROOT / f'game/assets/imported/levels/{level}/level.json').read_text())
         points = {}
         for room in data['rooms']:
             for vertex in room['vertices']:

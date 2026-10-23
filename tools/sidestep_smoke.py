@@ -46,7 +46,7 @@ def main():
                 client.wait_loaded()
                 align_reference(client, reference)
                 tick = 0
-                level = json.loads((ROOT / 'game/assets/levels/assault/level.json').read_text())
+                level = json.loads((ROOT / 'game/assets/imported/levels/assault/level.json').read_text())
                 for field in fields:
                     while 2 * tick < field:
                         buttons = [b.lower() for event in inputs if event['frame'] <= 2 * tick < event['until']

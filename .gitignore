@@ -9,11 +9,10 @@
 /.aws/
 /psx-project.config.toml
 
-# Content baked from the disc (copyrighted): rebuild with tools/bake_assets.sh
-# from your own copy of the game. Never commit it.
-/game/assets/levels/
-/game/assets/music/
-/game/assets/screens/
+# Game data imported from the player's disc on first start (game/src/disc.rs).
+# It is copyrighted: never commit it.
+/game/assets/imported/
+/game/assets/imported.partial/
 
 # Builds, generated validation captures and transient Python files.
 **/target/

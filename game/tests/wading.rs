@@ -14,7 +14,7 @@ use game::player::{
 /// Replay native controller ticks without correcting state after row0.
 /// Compare complete gameplay samples; metadata declares whole-route camera coverage.
 fn compare_case(csv: &str, metadata: &str, last_field: i32) {
-    let data: Level = serde_json::from_slice(include_bytes!("../assets/levels/assault/level.json")).unwrap();
+    let data: Level = serde_json::from_slice(include_bytes!("../assets/imported/levels/assault/level.json")).unwrap();
     let headers: Vec<_> = csv.lines().next().unwrap().split(',').collect();
     let rows: Vec<Vec<i32>> = csv.lines().skip(1).map(|l| l.split(',').map(|v| v.parse().unwrap()).collect()).collect();
     let at = |row: &[i32], key: &str| row[headers.iter().position(|&k| k == key).unwrap()];

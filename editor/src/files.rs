@@ -73,7 +73,11 @@ pub fn libraries(current: &std::path::Path) -> Vec<(String, PathBuf)> {
         return levels;
     };
     let Ok(crates) = std::fs::read_dir(root) else { return levels };
-    let mut crates: Vec<_> = crates.filter_map(Result::ok).map(|entry| entry.path().join("assets/levels")).collect();
+    // Each crate's own levels, and those it imported from a disc.
+    let mut crates: Vec<_> = crates
+        .filter_map(Result::ok)
+        .flat_map(|entry| ["assets/levels", "assets/imported/levels"].map(|dir| entry.path().join(dir)))
+        .collect();
     crates.sort();
     for library in crates {
         let Ok(entries) = std::fs::read_dir(&library) else { continue };
