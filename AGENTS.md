@@ -30,10 +30,11 @@ the start. Read the guide for the crate you are working in:
 - `game/AGENTS.md`: turning reverse-engineering evidence into idiomatic Bevy
   code, keeping it extensible, mods (`mods/example`), tick rate, trajectory
   tests, verification.
-- `psx-bevy/`: the template's crate, updated by `psx template update`. Build
-  on it from `engine/` and `game/`; edit it only as `psx-bevy/AGENTS.md`
-  allows, and list every edit in `docs/template.md`. Its README documents
-  the PS1 look, input, testing and the developer MCP.
+- `psx-bevy/AGENTS.md`: the base the engine is built on (the PS1 look,
+  ticks, input, menus, testing, launcher). It is this project's copy:
+  change it to suit the game, and list each change in `docs/template.md` so
+  `psx template update` stays easy to merge. Its README documents the PS1
+  look, input, testing and the developer MCP.
 - `tools/import/`: the importers, run by the game on first start from the
   player's disc (`game/src/disc.rs`); bump `import::VERSION` when their
   output changes.

@@ -1,7 +1,7 @@
 # One workspace, one target directory, one lockfile:
 #
-#   psx-bevy/      the psx template's own crate. `psx template update` replaces
-#                  it; extend it from engine/ or game/ instead of editing it
+#   psx-bevy/      the PS1 look, ticks, input, menus, testing and launcher:
+#                  the base the engine builds on, yours to change for the game
 #   engine/        this game's engine family: no names, numbers or assets from
 #                  this game
 #   game/          this title: controllers, rules, HUD, menus, baked assets

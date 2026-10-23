@@ -14,20 +14,14 @@
 //!   screen (sprites included) is reduced to 15-bit colour after drawing.
 //! - [`PsxSceneRoot`] spawns a captured frame (`.psxscene` from the psx
 //!   toolkit) as ordinary sprites and meshes, for reference layouts.
-//! - Original `.tim` textures load as `Image`s and `.tmd` models as
-//!   [`PsxModel`]s (spawned with [`PsxModelRoot`]); see `assets.rs`.
-mod assets;
+//!
+//! Original files (TIM, TMD, ...) are not loaded here: convert them to
+//! ordinary formats (PNG, glTF, your own) in the game's importer.
 pub mod font;
-pub mod formats;
 mod material;
 mod material2d;
 mod scene;
 mod shaders;
-
-pub use assets::{
-    PsxModel, PsxModelObject, PsxModelObjectIndex, PsxModelPart, PsxModelRoot, TimLoader, TimSettings, TimTransparency,
-    TmdLoader, TmdSettings, rgba_image,
-};
 
 pub use material::{PsxBlend, PsxDepthBias, PsxDepthCue, PsxMaterial, PsxStp};
 pub use material2d::{PsxMaterial2d, PsxSprite, load_indices, psx_indices, psx_palette, rgb15};
@@ -52,6 +46,19 @@ use bevy::{
     shader::ShaderRef,
     sprite_render::{Material2d, Material2dKey, Material2dPipeline, Material2dPlugin},
 };
+
+/// An sRGB RGBA8 image with nearest sampling, as PS1 texels were drawn.
+pub fn rgba_image(width: u32, height: u32, rgba: Vec<u8>) -> Image {
+    let mut image = Image::new(
+        bevy::render::render_resource::Extent3d { width, height, depth_or_array_layers: 1 },
+        bevy::render::render_resource::TextureDimension::D2,
+        rgba,
+        TextureFormat::Rgba8UnormSrgb,
+        bevy::asset::RenderAssetUsages::default(),
+    );
+    image.sampler = bevy::image::ImageSampler::nearest();
+    image
+}
 
 /// Window-only layer used to show the screen texture; keep game entities off it.
 pub const DISPLAY_LAYER: usize = 31;
@@ -221,7 +228,6 @@ impl Plugin for PsxPlugin {
         (screen.image, screen.canvas) = (images.add(screen_target(size)), images.add(screen_target(size)));
 
         scene::plugin(app);
-        assets::plugin(app);
         shaders::plugin(app);
         app.add_plugins((
             MaterialPlugin::<PsxMaterial>::default(),
@@ -541,41 +547,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn custom_item_lighting_survives_scene_and_look_updates() {
-        let mut app = App::new();
-        app.init_resource::<PsxLook>()
-            .init_resource::<PsxLighting>()
-            .init_resource::<Assets<PsxMaterial>>()
-            .init_resource::<Assets<PsxMaterial2d>>()
-            .init_resource::<Assets<ScreenPassMaterial>>()
-            .add_systems(Update, apply_look);
-        let item_light = PsxLighting { ambient: Vec3::splat(0.75), ..default() };
-        let custom = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial {
-            use_scene_lighting: false,
-            lighting: item_light,
-            ..default()
-        });
-        let scene = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial::default());
-        app.update();
-        for intensity in [0.25, 1.5] {
-            app.world_mut().resource_mut::<PsxLighting>().ambient = Vec3::splat(intensity);
-            let dither = app.world().resource::<PsxLook>().dither;
-            app.world_mut().resource_mut::<PsxLook>().dither = !dither;
-            app.update();
-            let materials = app.world().resource::<Assets<PsxMaterial>>();
-            assert_eq!(materials.get(&custom).unwrap().lighting, item_light);
-            assert_eq!(materials.get(&custom).unwrap().look, *app.world().resource::<PsxLook>());
-            assert_eq!(materials.get(&scene).unwrap().lighting, *app.world().resource::<PsxLighting>());
-        }
-        app.world_mut().resource_mut::<Assets<PsxMaterial>>().get_mut(&custom).unwrap().use_scene_lighting = true;
-        app.update();
-        assert_eq!(
-            app.world().resource::<Assets<PsxMaterial>>().get(&custom).unwrap().lighting,
-            *app.world().resource::<PsxLighting>()
-        );
-    }
-
-    #[test]
     fn window_aspect_keeps_height_and_fills_the_window() {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
@@ -657,5 +628,40 @@ mod tests {
             assert!(fitted.x <= window.x + 0.001 && fitted.y <= window.y + 0.001);
             assert!((fitted.x / fitted.y - 320. / 240.).abs() < 0.0001);
         }
+    }
+
+    #[test]
+    fn custom_item_lighting_survives_scene_and_look_updates() {
+        let mut app = App::new();
+        app.init_resource::<PsxLook>()
+            .init_resource::<PsxLighting>()
+            .init_resource::<Assets<PsxMaterial>>()
+            .init_resource::<Assets<PsxMaterial2d>>()
+            .init_resource::<Assets<ScreenPassMaterial>>()
+            .add_systems(Update, apply_look);
+        let item_light = PsxLighting { ambient: Vec3::splat(0.75), ..default() };
+        let custom = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial {
+            use_scene_lighting: false,
+            lighting: item_light,
+            ..default()
+        });
+        let scene = app.world_mut().resource_mut::<Assets<PsxMaterial>>().add(PsxMaterial::default());
+        app.update();
+        for intensity in [0.25, 1.5] {
+            app.world_mut().resource_mut::<PsxLighting>().ambient = Vec3::splat(intensity);
+            let dither = app.world().resource::<PsxLook>().dither;
+            app.world_mut().resource_mut::<PsxLook>().dither = !dither;
+            app.update();
+            let materials = app.world().resource::<Assets<PsxMaterial>>();
+            assert_eq!(materials.get(&custom).unwrap().lighting, item_light);
+            assert_eq!(materials.get(&custom).unwrap().look, *app.world().resource::<PsxLook>());
+            assert_eq!(materials.get(&scene).unwrap().lighting, *app.world().resource::<PsxLighting>());
+        }
+        app.world_mut().resource_mut::<Assets<PsxMaterial>>().get_mut(&custom).unwrap().use_scene_lighting = true;
+        app.update();
+        assert_eq!(
+            app.world().resource::<Assets<PsxMaterial>>().get(&custom).unwrap().lighting,
+            *app.world().resource::<PsxLighting>()
+        );
     }
 }

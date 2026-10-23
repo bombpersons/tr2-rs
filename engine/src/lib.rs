@@ -20,7 +20,7 @@
 //! - [`config`]: RON tuning files for per-type design numbers.
 //! - [`editor`]: authoring transactions, exact no-op saves and level validation.
 //! - [`psx`], [`shell`], [`controller`], [`controls`], [`display`],
-//!   [`pointer`], [`settings`], [`launcher`], [`viewer`], [`model_viewer`],
+//!   [`pointer`], [`settings`], [`launcher`], [`viewer`],
 //!   [`testing`] and, with the `dev-mcp` feature, `dev_mcp`: the PS1 look,
 //!   logic ticks, pad and mouse input, rebinding, the display menu, player
 //!   settings files, the executable's command line, capture viewers, headless tests and the
@@ -45,9 +45,7 @@ pub mod world;
 pub use psx_bevy;
 #[cfg(feature = "dev-mcp")]
 pub use psx_bevy::dev_mcp;
-pub use psx_bevy::{
-    assets, controller, controls, display, launcher, model_viewer, pointer, psx, settings, shell, testing, viewer,
-};
+pub use psx_bevy::{assets, controller, controls, display, launcher, pointer, psx, settings, shell, testing, viewer};
 
 use bevy::prelude::*;
 

@@ -97,7 +97,7 @@ the engine, editor, example mod and most tests still build and run.
 | `game/` | Tomb Raider II: per-type controllers, Lara, creatures, traps, HUD, menus, baked assets, trajectory tests |
 | `editor/` | The level editor |
 | `mods/example/` | An example mod |
-| `psx-bevy/` | The psx template's crate: PS1 look, ticks, input, menus, testing, developer MCP ([README](psx-bevy/README.md)) |
+| `psx-bevy/` | The project's copy of the psx template's crate: PS1 look, ticks, input, menus, testing, developer MCP ([README](psx-bevy/README.md)) |
 | `tools/import/` | The importer: the disc's levels, screens and music into the engine's formats |
 | `tools/` | Recording scripts and smoke tests |
 | `vendor/` | The psx toolkit's disc and PS1 format crates, vendored by the template |

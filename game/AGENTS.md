@@ -3,8 +3,9 @@
 `game/` is this title on top of `engine/`: per-type controllers, action
 handlers, HUD, menus, save format, level order, and the import of the
 original's data from the player's disc (`src/disc.rs`). Reusable machinery belongs in `engine/` (read `engine/AGENTS.md`
-for the placement rules). Game-specific behaviour never goes in the template's
-crate `psx-bevy/`; when the game needs a template change, see `docs/template.md`.
+for the placement rules). Both are built on `psx-bevy/`, the project's copy
+of the PS1 look, ticks, input and menus: change it when the original works
+differently (`psx-bevy/AGENTS.md`), and list the change in `docs/template.md`.
 
 The goal is a Rust/Bevy version of a game that reads like a modern, first-time
 implementation of it: something a person could pick up later and change with
@@ -33,9 +34,9 @@ comes from `engine::psx`; everything else is normal Bevy code.
 - Keep gameplay in `FixedUpdate` / `GameSystems::Game`, reading
   `ControllerState`. That is the boundary the developer MCP and the tests step.
 - Keep game assets in `game/assets/`. Do not commit original disc or BIOS data.
-  Original `.tim` textures and `.tmd` models (from `psx assets extract`) load
-  directly: `asset_server.load("x.tim")` is an `Image`, a `.tmd` is a
-  `PsxModel` spawned with `PsxModelRoot` (`psx-bevy/README.md`, "Original assets").
+  The original's files (TIM, TMD, archives) are converted by `tools/import`
+  into ordinary formats (PNG, glTF or the engine's own) that load like any
+  Bevy asset; the game never parses them itself.
 - Read `psx-bevy/README.md` for MCP startup, screenshot targets and input lifetime.
 
 ## Project layout

@@ -6,7 +6,7 @@ template commit `53b1eac` (merged from `99dae8d`).
 
 It now uses the template's workspace layout and is tracked by
 `.psx-template.toml`, written by `psx template adopt`. The current template build is
-psx `0.3.8+src-0b26c73b885b1004-release`. Package `tomb-raider-ii`, region
+psx `0.3.10+src-91243ee76ebb2f20-release`. Package `tomb-raider-ii`, region
 NTSC, 2 fields per tick.
 
 ## Updating
@@ -16,15 +16,15 @@ psx template update --dry-run
 psx template update
 ```
 
-`psx-bevy/` is owned by the template: unedited files are replaced, and edited
-ones get a `<file>.psx-new` beside them. Seeded files (everything else) are
+`psx-bevy/` is the project's copy of the template's crate: unedited files are
+replaced, and edited ones get a `<file>.psx-new` beside them. Seeded files (everything else) are
 reported as diffs to merge by hand. Ours have diverged on purpose: `engine/` is reshaped to
 `docs/engine-model.md` and `game/` is this title.
 
 ## Editing psx-bevy
 
-Editing `psx-bevy/` is allowed. The goal is only that later template updates
-stay easy to merge:
+`psx-bevy/` is ours to change when the original renders, ticks or reads input
+differently. The goal is only that later template updates stay easy to merge:
 
 - First try building on it from `engine/` or `game/` (wrap, re-export, add
   plugins in the launcher's `add` closure). Edit the template when that
@@ -54,17 +54,6 @@ explicit lighting owner. Scheduling an engine system after the template's
 private material-sync system would be fragile and would mutate every affected
 material twice each frame. On template updates, retain the option, default,
 conditional sync and test unless upstream provides equivalent support.
-
-- `psx-bevy/src/psx/mod.rs`: `resize_screen` marks the `Projection` of every
-  camera it retargets as changed (asserted in `screen_targets_follow_set_size`).
-  Bevy recomputes a camera's target size only on a projection change, a new
-  camera or an image asset event, not on a `RenderTarget` change. A camera
-  whose projection also changed that frame (the engine fits the level view
-  to the new screen) took the new size a frame before the HUD and menu
-  cameras on the same canvas. Bevy shares one depth texture per target, so
-  the frame failed wgpu validation ("Attachments have differing sizes") and
-  the game exited when Aspect was switched to match window. Upstream
-  candidate: any game that changes a projection on resize hits it.
 
 - `psx-bevy/src/controls/options.rs` (new), `controls/mod.rs`,
   `controls/view.rs`, `controls/tests.rs`, `README.md`: a second controls-menu
@@ -219,6 +208,37 @@ From psx `0.3.4+src-b72afc8e8efe891f-release` to
     editor resolve the same Bevy features);
   - the seeded egui editor shell and `game/src/demo/`, which this project's
     editor and game replace.
+
+## Update 2026-10-23 (0.3.10)
+
+From psx `0.3.8+src-0b26c73b885b1004-release` to
+`0.3.10+src-91243ee76ebb2f20-release`. (An earlier 0.3.10 build moved
+psx-bevy to a git dependency; this build brings it back as the project's
+copy, so it was not adopted.)
+
+- Template changes: psx-bevy no longer loads TIM/TMD files (`psx::formats`,
+  the `TimLoader`/`TmdLoader` assets and the `--model` viewer are gone;
+  `rgba_image` moved to `psx/mod.rs`); originals are converted by the
+  importer, as this project already did. `resize_screen` now marks retargeted
+  cameras' projections as changed upstream, so our local fix for it is
+  dropped. psx-bevy states its own pinned dependencies and gained its
+  licence files; `vendor/` took the toolkit's bug fixes (a shared `le.rs`).
+  `rustfmt.toml` sets `style_edition = "2024"`.
+- Conflicts: `material.rs` and the controls files differed from the new
+  template only by our edits (and one line the template wraps), so ours were
+  kept; `psx/mod.rs` took the new version with the `use_scene_lighting` sync
+  and its test reapplied; `README.md` took the new version with the
+  per-object lighting and options-page paragraphs reapplied.
+- `engine` no longer re-exports `model_viewer`.
+- Seeded files: the guidance that psx-bevy is the project's copy went into
+  `AGENTS.md`, `engine/AGENTS.md`, `game/AGENTS.md` and `README.md`. The
+  template's `disc.rs` and `tests/disc.rs` have nothing this project's lack.
+- Not adopted yet: the template's editor, which now has an MCP server
+  (reading, undoable editing and testing tools over stdio or loopback HTTP,
+  Tools > Agents), and "One Bevy build" (`engine/` depending on `bevy_egui`,
+  rmcp, tokio-util and axum so the game and editor share one Bevy build).
+  This project's editor is its own (3D view, rooms, play), so the MCP would
+  be ported into it rather than copied.
 
 ## Where the template's files live
 
