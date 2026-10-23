@@ -344,6 +344,12 @@ pub fn level(raw: &raw::Level) -> Result<native::Level> {
         rooms,
         floor_infos: infos,
         textures: raw.textures.iter().map(|t| native::Texture { uv: t.atlas_uv, attribute: t.attribute }).collect(),
+        sprites: raw.sprites.iter().map(|s| native::Sprite { atlas: s.atlas, rect: s.rect }).collect(),
+        sprite_sequences: raw
+            .sprite_sequences
+            .iter()
+            .map(|s| native::SpriteSequence { id: s.id, first: s.first, count: s.count })
+            .collect(),
         meshes: raw
             .meshes
             .iter()

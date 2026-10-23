@@ -37,7 +37,7 @@ original.
 | Pistols | ✅ Ported |
 | Shotgun, Uzis, harpoon, grenades, M16, flares | ❌ Not yet |
 | Pickups, switches, keys, puzzle holes, doors, triggers | ✅ Ported |
-| Inventory ring | ❌ Not yet |
+| Inventory ring | 🟡 Partly ported: the ring, keys and medi packs; option pages not yet |
 | Lara's Home: assault course, Winston | ✅ Ported |
 | The Great Wall: traps, zip-line, crows, tiger, spiders, T-Rexes | ✅ Ported |
 | Venice: dogs, rats, gunmen, club men | ✅ Ported |

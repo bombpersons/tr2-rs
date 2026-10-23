@@ -52,23 +52,28 @@ fn an_unrelated_room_cannot_supply_a_key() {
     app.world_mut().spawn(Player::default());
     app.world_mut().spawn(WorldObject::new(5, 193, 1, 0));
     app.run_tick(&[Button::Cross]);
-    assert_eq!(app.world().resource::<Inventory>().items.get(&193), None);
+    let table = game::inventory::ItemTable::default();
+    assert_eq!(app.world().resource::<Inventory>().count(&table, 193), 0);
 }
 #[test]
 fn healing_consumes_the_correct_size_and_never_revives() {
+    use game::inventory::{ItemTable, item};
+    let table = ItemTable::default();
     let mut inventory = Inventory::default();
-    inventory.add(149);
-    inventory.add(150);
+    inventory.add(&table, 149);
+    inventory.add(&table, 150);
     let mut p = Player::default();
     p.health = 100;
-    assert!(inventory.use_medipack(false, &mut p));
+    assert!(inventory.use_medipack(&table, item::SMALL_MEDIPACK, &mut p));
     assert_eq!(p.health, 600);
-    assert!(inventory.use_medipack(true, &mut p));
+    assert!(!inventory.use_medipack(&table, item::SMALL_MEDIPACK, &mut p), "none left");
+    assert!(inventory.use_medipack(&table, item::LARGE_MEDIPACK, &mut p));
     assert_eq!(p.health, 1000);
-    inventory.add(150);
+    inventory.add(&table, 150);
+    assert!(!inventory.use_medipack(&table, item::LARGE_MEDIPACK, &mut p), "full health");
     p.damage(1000);
-    assert!(!inventory.use_medipack(true, &mut p));
-    assert_eq!(inventory.large_medipacks, 1);
+    assert!(!inventory.use_medipack(&table, item::LARGE_MEDIPACK, &mut p), "dead");
+    assert_eq!(inventory.count(&table, 150), 1);
 }
 #[test]
 fn each_gun_hit_takes_its_damage_and_a_kill_is_counted_once() {

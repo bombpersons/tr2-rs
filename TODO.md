@@ -277,11 +277,27 @@ it off. Record partial progress below without checking the parent item.
   too, and so does the Opera House Relay Box puzzle hole (Lara stands 327
   in front, not 362 as at keyholes). The Offshore Rig's timed cell button
   and door match too, now that a trigger's timer is held by the object and
-  counted by its control (`WorldObject::trigger_active`). Still to record:
-  the inventory ring.
-  Not ported: the inventory ring at keyholes (the matching key is used
-  directly), flares, flipping in play, type 92's own clip and trigger,
+  counted by its control (`WorldObject::trigger_active`). Keyholes and
+  puzzle holes now choose from the keys ring.
+  Not ported: flares, flipping in play, type 92's own clip and trigger,
   Venice's door hold, the object-collision room list.
+- [ ] Inventory ring: what Lara carries (Inv_AddItem `0x80033A70` and
+  friends: the main and keys rings, ammunition converted into guns,
+  flares in sixes) and Display_Inventory `0x80030F30`'s ring in play and
+  at keyholes: opening, turning, swapping rings, choosing and putting
+  back, item animations, the open passport's page turns, UseItem for the
+  pistols and medi packs, the rippling backdrop. Four no-poke routes (one
+  held out) compare 911 ring frames exactly, and the backdrop matches a GPU
+  capture; the text, and the port's title, pause and death menus, use
+  the original font
+  ([evidence](docs/inventory-evidence.md),
+  [tests](game/tests/inventory.rs)); item names come from the imported
+  gameflow script. Remaining: the statistics, sound, screen and controls
+  pages and the passport's Cross actions and page labels; the title, save,
+  load and death modes; the stopwatch
+  hands; the items' light checked only by eye; the level-start
+  inventory from the gameflow script (new games start with the Wall's
+  observed inventory); placed shotgun pickups turning into ammunition.
 - [ ] State camera requests: Lara's state handlers set camera angle/elevation
   offsets (`0x8008B29C`/`0x8008B2A0`) and flags 1 every tick: slide
   elevation -8190, and the handlers at `0x8003982C`, `0x8003988C`,

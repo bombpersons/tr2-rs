@@ -31,6 +31,24 @@ pub struct Level {
     pub animation_states: Vec<[usize; 3]>,
     /// first frame, last frame, animation, frame.
     pub animation_ranges: Vec<[i32; 4]>,
+    pub sprites: Vec<Sprite>,
+    pub sprite_sequences: Vec<SpriteSequence>,
+}
+
+/// A sprite: x, y, width and height in the atlas; left, top, right and
+/// bottom from where it is drawn.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Sprite {
+    pub atlas: [u32; 4],
+    pub rect: [i32; 4],
+}
+
+/// An object type drawn as `count` sprites from `first`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SpriteSequence {
+    pub id: u16,
+    pub first: usize,
+    pub count: usize,
 }
 
 #[derive(Debug, Default)]

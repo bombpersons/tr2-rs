@@ -10,7 +10,7 @@
 //! bounds: OpenLara format.h. Tiger health/radius/damage/state IDs: enemy.h.
 //! Navigation and attack hitboxes remain a bounded approximation: no nav-box
 //! path search, mesh-sphere attack masks, bosses, vehicles, or humanoid gun AI.
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use bevy::prelude::*;
 pub use engine::objects::{CODE_BITS, WorldObject};
@@ -93,7 +93,8 @@ fn default_switch_clips() -> [usize; 2] {
     [crate::player::contract::clip::SWITCH_OFF, crate::player::contract::clip::SWITCH_ON]
 }
 
-/// Consumes the inventory item `key` when used ([`usable`]).
+/// Takes the inventory item the placed object `key` becomes, chosen on the
+/// keys ring ([`usable`]).
 #[derive(Component, serde::Deserialize, Debug, Clone)]
 pub struct Keyhole {
     pub key: u16,
@@ -387,53 +388,7 @@ fn block_level_boxes(world: Option<Res<WorldGeometry>>, mut flags: ResMut<engine
     }
 }
 
-/// Counts of original pickup objects; ammo is stored as pickup packs, not pellets.
-#[derive(Resource, Reflect, Default, Debug, serde::Serialize, serde::Deserialize)]
-#[reflect(Resource)]
-pub struct Inventory {
-    pub items: BTreeMap<u16, u32>,
-    pub small_medipacks: u32,
-    pub large_medipacks: u32,
-    pub secret_mask: u8,
-}
-
-impl Inventory {
-    pub fn add(&mut self, kind: u16) {
-        *self.items.entry(kind).or_default() += 1;
-        match kind {
-            149 => self.small_medipacks += 1,
-            150 => self.large_medipacks += 1,
-            190..=192 => self.secret_mask |= 1 << (kind - 190),
-            _ => {}
-        }
-    }
-    pub fn consume(&mut self, kind: u16) -> bool {
-        let Some(n) = self.items.get_mut(&kind) else {
-            return false;
-        };
-        if *n == 0 {
-            return false;
-        }
-        *n -= 1;
-        true
-    }
-    pub fn use_medipack(&mut self, large: bool, player: &mut Player) -> bool {
-        if player.health <= 0 || player.health >= 1000 {
-            return false;
-        }
-        let kind = if large { 150 } else { 149 };
-        if !self.consume(kind) {
-            return false;
-        }
-        if large {
-            self.large_medipacks -= 1;
-        } else {
-            self.small_medipacks -= 1;
-        }
-        player.health = (player.health + if large { 1000 } else { 500 }).min(1000);
-        true
-    }
-}
+pub use crate::inventory::Inventory;
 
 #[derive(Resource, Reflect, Default, Debug)]
 #[reflect(Resource)]
@@ -469,31 +424,29 @@ impl Plugin for InteractionsPlugin {
         engine::add_once(app, crate::gunman::GunmanRulesPlugin);
         engine::add_once(app, crate::club_man::ClubManRulesPlugin);
         engine::add_once(app, crate::traps::TrapsPlugin);
+        engine::add_once(app, crate::inventory::InventoryPlugin);
         register_object_types(app);
         app.register_trigger_action("end_level").register_trigger_action("music").register_trigger_action("secret");
         app.add_message::<crate::player::GunHit>();
-        app.init_resource::<Inventory>()
-            .init_resource::<InteractionProgress>()
-            .init_resource::<InteractionRuntime>()
-            .add_systems(
-                FixedUpdate,
-                (
-                    reset_level.in_set(LifecycleSystems::Reset),
-                    block_level_boxes.in_set(LifecycleSystems::Initialize),
-                    (usable::collide, usable::use_keys).chain().in_set(InteractionSystems::Use),
-                    usable::control.in_set(ItemSystems::Control),
-                    usable::ready_sources.in_set(InteractionSystems::Triggers).before(TriggerSystems::Dispatch),
-                    usable::sources_fired.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
-                    trigger_actions.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
-                    resolve_objects.in_set(InteractionSystems::Resolve),
-                    collide_doors.in_set(InteractionSystems::Resolve),
-                    creatures.in_set(ItemSystems::Control),
-                    control_doors.in_set(ItemSystems::Control),
-                    combat.in_set(InteractionSystems::Combat).after(crate::player::PlayerSystems::Weapons),
-                    sync_session.in_set(InteractionSystems::Report),
-                )
-                    .run_if(simulation_enabled),
-            );
+        app.init_resource::<InteractionProgress>().init_resource::<InteractionRuntime>().add_systems(
+            FixedUpdate,
+            (
+                reset_level.in_set(LifecycleSystems::Reset),
+                block_level_boxes.in_set(LifecycleSystems::Initialize),
+                (usable::collide, usable::use_keys).chain().in_set(InteractionSystems::Use),
+                usable::control.in_set(ItemSystems::Control),
+                usable::ready_sources.in_set(InteractionSystems::Triggers).before(TriggerSystems::Dispatch),
+                usable::sources_fired.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
+                trigger_actions.in_set(InteractionSystems::Triggers).after(TriggerSystems::Dispatch),
+                resolve_objects.in_set(InteractionSystems::Resolve),
+                collide_doors.in_set(InteractionSystems::Resolve),
+                creatures.in_set(ItemSystems::Control),
+                control_doors.in_set(ItemSystems::Control),
+                combat.in_set(InteractionSystems::Combat).after(crate::player::PlayerSystems::Weapons),
+                sync_session.in_set(InteractionSystems::Report),
+            )
+                .run_if(simulation_enabled),
+        );
     }
 }
 
@@ -509,9 +462,7 @@ fn reset_level(
     if state.level != w.data.name {
         *state = InteractionRuntime { level: w.data.name.clone() };
         *progress = default();
-        // Keys/puzzles/secrets belong to a level; weapons, ammo and healing carry.
-        inv.items.retain(|&kind, _| !(174..=177).contains(&kind) && !(190..=206).contains(&kind));
-        inv.secret_mask = 0;
+        inv.leave_level();
     }
 }
 
@@ -756,7 +707,7 @@ fn collide_doors(
     }
 }
 
-fn sync_session(progress: Res<InteractionProgress>, inv: Res<Inventory>, mut session: Option<ResMut<Session>>) {
+fn sync_session(progress: Res<InteractionProgress>, mut session: Option<ResMut<Session>>) {
     if let Some(session) = session.as_deref_mut() {
         session.pickups = progress.pickups;
         session.kills = progress.kills;
@@ -764,7 +715,6 @@ fn sync_session(progress: Res<InteractionProgress>, inv: Res<Inventory>, mut ses
         if !progress.message.is_empty() {
             session.message = progress.message.clone();
         }
-        session.medipacks = inv.small_medipacks + inv.large_medipacks;
     }
 }
 

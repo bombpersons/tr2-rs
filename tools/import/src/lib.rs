@@ -6,13 +6,14 @@
 //! The original's raw formats live only here: [`level_file`] decodes each
 //! `DATA/*.PSX` into raw tables, [`convert`] re-expresses them exactly in the
 //! engine's level format, [`screens`] decodes the RNC-compressed pictures
-//! and [`music`] copies the CD audio tracks. Each output records where it
-//! came from (`source` in `level.json`, `manifest.json` beside the screens
-//! and music).
+//! and [`music`] copies the CD audio tracks; [`gameflow`] reads the names and
+//! strings the game shows. Each output records where it came from (`source`
+//! in `level.json`, `manifest.json` beside the screens and music).
 pub use psx_assets;
 pub use psx_media;
 
 pub mod convert;
+pub mod gameflow;
 pub mod level_file;
 pub mod music;
 pub mod raw;
@@ -35,14 +36,15 @@ pub const SERIALS: &[&str] = &["SLUS_004.37"];
 
 /// Bump whenever [`import`]'s output changes: players' older imports are
 /// redone on the next start.
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 3;
 
 /// Converts the disc into `out` (an empty folder that becomes
 /// `game/assets/imported/`): `levels/<name>/` (level, atlas, sounds),
-/// `screens/` and `music/`.
+/// `screens/`, `music/` and `gameflow.json`.
 pub fn import(disc: &DiscReader, out: &Path, progress: &ImportProgress) -> Result<(), String> {
     import_levels(disc, &out.join("levels"), None, &progress.part(0.0, 0.7))?;
     import_screens(disc, &out.join("screens"), &progress.part(0.7, 0.72))?;
+    import_gameflow(disc, out)?;
     music::import(disc, &out.join("music"), &progress.part(0.72, 1.0))
 }
 
@@ -127,6 +129,13 @@ pub fn import_screens(disc: &DiscReader, out: &Path, progress: &ImportProgress) 
         });
     }
     write(&out.join("manifest.json"), serde_json::to_string_pretty(&manifest).unwrap() + "\n")
+}
+
+/// The gameflow script's strings as `gameflow.json`.
+pub fn import_gameflow(disc: &DiscReader, out: &Path) -> Result<(), String> {
+    let bytes = disc.read(gameflow::PATH)?;
+    let flow = gameflow::decode(&bytes).map_err(|e| format!("{}: {e}", gameflow::PATH))?;
+    write(&out.join("gameflow.json"), serde_json::to_string_pretty(&flow).unwrap() + "\n")
 }
 
 fn stem(path: &str) -> &str {

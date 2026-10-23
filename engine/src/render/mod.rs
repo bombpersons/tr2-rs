@@ -395,6 +395,28 @@ pub fn static_lit_mesh(m: &crate::world::ObjectMesh, textures: &[Texture], light
     b.finish()
 }
 
+/// An object mesh with each vertex placed and shaded by the caller:
+/// `vertices` in the original's units and `grey` the GPU colour (128
+/// neutral), one per vertex of `m`. For meshes the original moves and
+/// shades vertex by vertex as it draws them.
+pub fn shaded_object_mesh(
+    m: &crate::world::ObjectMesh,
+    textures: &[Texture],
+    vertices: &[[i32; 3]],
+    grey: &[u8],
+) -> Mesh {
+    let vs: Vec<_> = vertices.iter().map(|&v| position(v).to_array()).collect();
+    let shade: Vec<_> = grey.iter().map(|&g| f32::from(g) / lighting::NEUTRAL_SHADE).collect();
+    let mut b = MeshBuilder::new();
+    for f in &m.quads {
+        b.face(&f[..4], &textures[f[4]], &vs, &shade);
+    }
+    for f in &m.triangles {
+        b.face(&f[..3], &textures[f[3]], &vs, &shade);
+    }
+    b.finish()
+}
+
 /// Build an authored object mesh with its atlas UVs and vertex lighting.
 /// Model placement, posing and material choice belong to the caller.
 pub fn object_mesh(m: &crate::world::ObjectMesh, textures: &[Texture]) -> Mesh {

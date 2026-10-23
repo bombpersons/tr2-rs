@@ -241,6 +241,7 @@ pub(super) fn collide(
     pad: Res<ControllerState>,
     world: Option<Res<WorldGeometry>>,
     clips: Option<Res<PlayerAnimations>>,
+    table: Res<crate::inventory::ItemTable>,
     mut inventory: ResMut<Inventory>,
     mut progress: ResMut<InteractionProgress>,
     mut players: Query<(
@@ -283,10 +284,10 @@ pub(super) fn collide(
             let mut take = |object: &mut WorldObject, item: &mut UsableItem| {
                 item.status = ItemStatus::Invisible;
                 object.consumed = true;
-                inventory.add(object.kind);
+                inventory.add(&table, object.kind);
                 progress.pickups += 1;
                 if pickup.secret.is_some() {
-                    progress.secret_mask |= u32::from(inventory.secret_mask);
+                    progress.secret_mask |= u32::from(inventory.secrets);
                     progress.secrets = progress.secret_mask.count_ones();
                 }
                 progress.message = pickup.message.clone();
@@ -448,15 +449,19 @@ pub(super) fn control(
     }
 }
 
-/// KeyHoleCollision 0x80050F80 and PuzzleHoleCollision 0x800512CC, with the
-/// matching item chosen straight from the inventory. The original opens the
-/// inventory ring when Action is pressed without one (0x80030F30) and uses
-/// the item chosen there on the next tick; the ring is not ported.
-#[allow(clippy::type_complexity)]
+/// KeyHoleCollision 0x80050F80 and PuzzleHoleCollision 0x800512CC. Action
+/// in front of an unused hole with no item chosen asks for the keys ring
+/// (Display_Inventory(2)); the item it closes on is tested when it closes,
+/// and taken if it fits. The original runs the ring inside this tick and
+/// tests at once; here the tick finishes, the ring runs from the next, and
+/// the tick it closes on tests, so Lara's sampled states line up.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(super) fn use_keys(
     pad: Res<ControllerState>,
     world: Option<Res<WorldGeometry>>,
     clips: Option<Res<PlayerAnimations>>,
+    table: Res<crate::inventory::ItemTable>,
+    mut ring: ResMut<crate::inventory::InventoryRing>,
     mut inventory: ResMut<Inventory>,
     mut progress: ResMut<InteractionProgress>,
     mut players: Query<(&mut Player, &mut Motion, &mut engine::animation::AnimationState, &mut WeaponState)>,
@@ -483,13 +488,23 @@ pub(super) fn use_keys(
             }
             continue;
         }
-        if !pad.held(Button::Cross) || !ready(&player, &motion, &weapon, lara_state) {
+        if (ring.chosen.is_none() && !pad.held(Button::Cross)) || !ready(&player, &motion, &weapon, lara_state) {
             continue;
         }
         if !in_bounds(&KEYHOLE_BOUNDS, at, yaw, lara, binary_yaw(player.yaw)) {
             continue;
         }
-        if item.status != ItemStatus::Inactive || !inventory.consume(keyhole.key) {
+        if item.status != ItemStatus::Inactive {
+            progress.message = "A matching item is required".into();
+            continue;
+        }
+        if ring.chosen.is_none() && !inventory.keys.is_empty() {
+            ring.request = Some(crate::inventory::RingMode::Keys);
+            continue;
+        }
+        let fits = ring.chosen.is_some() && ring.chosen == table.item_for(keyhole.key);
+        ring.chosen = None;
+        if !fits || !inventory.remove(&table, keyhole.key) {
             progress.message = "A matching item is required".into();
             continue;
         }

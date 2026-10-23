@@ -51,5 +51,5 @@ pub(crate) fn restore(mut commands:Commands,pending:Option<Res<PendingRestore>>,
         if let Some(health)=saved.health {if let Some(mut enemy)=enemy {enemy.health=health;enemy.killed=health==0;}
             else if let Some(mut enemy)=Enemy::for_kind(object.kind){enemy.health=health;enemy.killed=health==0;commands.entity(entity).insert(enemy);}}
     }
-    session.paused=false;session.inventory=false;session.message="Game loaded".into();commands.remove_resource::<PendingRestore>();
+    session.paused=false;session.message="Game loaded".into();commands.remove_resource::<PendingRestore>();
 }

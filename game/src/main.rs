@@ -26,6 +26,10 @@ fn main() {
             if let (Some(name), Some(path)) = (level.clone(), args.value("--level-file")) {
                 app.insert_resource(engine::render::LevelFile { name, path });
             }
+            if let Some(name) = &level {
+                let table = game::inventory::ItemTable::default();
+                app.insert_resource(game::inventory::Inventory::start_at(&table, name));
+            }
             app.insert_resource(game::display::view_settings())
                 .insert_resource(game::presentation::Session { title: level.is_none(), ..Default::default() })
                 .insert_resource(game::presentation::LevelRequest { name: level.unwrap_or_else(|| "wall".into()) })

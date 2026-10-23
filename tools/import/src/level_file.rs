@@ -117,8 +117,15 @@ pub fn decode(name: &str, bytes: &[u8]) -> Result<LevelFile> {
     let cluts = r.counted(|r| r.u16s(16))?;
     r.skip(4)?;
     let textures = r.counted(texture)?;
-    let _sprites = r.counted(|r| r.bytes(16))?;
-    let _sprite_sequences = r.counted(|r| r.bytes(8))?;
+    let sprites = r.counted(sprite)?;
+    let sprite_sequences = r.counted(|r| {
+        let id = r.i32()?;
+        let length = r.i16()?;
+        let first = usize::from(r.u16()?);
+        let id = u16::try_from(id).map_err(|_| format!("sprite sequence of object {id}"))?;
+        // The file stores the length negated, as the object table's mesh count.
+        Ok(raw::SpriteSequence { id, first, count: usize::from(length.unsigned_abs()) })
+    })?;
     let cameras = r.counted(|r| Ok([r.i32()?, r.i32()?, r.i32()?, i32::from(r.i16()?), i32::from(r.u16()?)]))?;
     let _sound_sources = r.counted(|r| r.bytes(16))?;
     let boxes = r.counted(|r| {
@@ -154,7 +161,8 @@ pub fn decode(name: &str, bytes: &[u8]) -> Result<LevelFile> {
     unique.dedup();
     let meshes = unique.iter().map(|&o| mesh(mesh_data, o as usize)).collect::<Result<Vec<_>>>()?;
     let mesh_indices = mesh_offsets.iter().map(|o| unique.binary_search(o).unwrap()).collect();
-    let (atlas, atlas_uvs) = atlas(&textures, &tiles, &cluts)?;
+    let (atlas, atlas_uvs, sprite_rects) = atlas(&textures, &sprites, &tiles, &cluts)?;
+    let sprites = sprites.iter().zip(sprite_rects).map(|(s, atlas)| raw::Sprite { atlas, rect: s.rect }).collect();
     let textures =
         textures.iter().zip(atlas_uvs).map(|(t, atlas_uv)| raw::Texture { atlas_uv, attribute: t.attribute }).collect();
     animate(&mut models, &mut animations, &frame_data, &nodes)?;
@@ -189,6 +197,8 @@ pub fn decode(name: &str, bytes: &[u8]) -> Result<LevelFile> {
         zones,
         animation_states,
         animation_ranges,
+        sprites,
+        sprite_sequences,
     };
     validate(&level)?;
     Ok(LevelFile { level, atlas, samples })
@@ -400,6 +410,24 @@ struct Texture {
     attribute: u16,
 }
 
+/// A sprite's record: its rectangle from where it is drawn, its CLUT and
+/// tile, and its first and last texel (the runtime copy at `0x80089B08`
+/// is read the same way by the sprite drawer `0x800697CC`).
+struct SpriteRecord {
+    rect: [i32; 4],
+    clut: usize,
+    tile: usize,
+    uv: [[u8; 2]; 2],
+}
+
+fn sprite(r: &mut Reader) -> Result<SpriteRecord> {
+    let rect = r.i16s::<4>()?.map(i32::from);
+    let clut = usize::from(r.u16()?);
+    let tile = usize::from(r.u16()?);
+    let uv = [[r.u8()?, r.u8()?], [r.u8()?, r.u8()?]];
+    Ok(SpriteRecord { rect, clut, tile, uv })
+}
+
 fn texture(r: &mut Reader) -> Result<Texture> {
     let mut uv = [[0; 2]; 4];
     let mut words = [0; 4];
@@ -419,27 +447,41 @@ fn color(c: u16) -> Rgba<u8> {
 
 const ATLAS_WIDTH: u32 = 2048;
 
-/// Crops each texture's rectangle from its 4-bit tile through its CLUT, with
-/// a one-texel clamped border, and packs them in rows 2048 wide. Returns the
-/// atlas and each texture's corners in it (texel centres, 0..1).
-fn atlas(textures: &[Texture], tiles: &[&[u8]], cluts: &[Vec<u16>]) -> Result<(RgbaImage, Vec<[[f32; 2]; 4]>)> {
-    let mut images = Vec::with_capacity(textures.len());
+/// Crops each texture's and then each sprite's rectangle from its 4-bit
+/// tile through its CLUT, with a one-texel clamped border, and packs them in
+/// rows 2048 wide. Returns the atlas, each texture's corners in it (texel
+/// centres, 0..1) and each sprite's rectangle in it (pixels).
+#[allow(clippy::type_complexity)]
+fn atlas(
+    textures: &[Texture],
+    sprites: &[SpriteRecord],
+    tiles: &[&[u8]],
+    cluts: &[Vec<u16>],
+) -> Result<(RgbaImage, Vec<[[f32; 2]; 4]>, Vec<[u32; 4]>)> {
+    let crop = |tile: usize, clut: usize, min: [u32; 2], w: u32, h: u32, what: &str| {
+        let (Some(tile), Some(clut)) = (tiles.get(tile), cluts.get(clut)) else {
+            return Err(format!("{what} uses tile {tile} / CLUT {clut} of {} / {}", tiles.len(), cluts.len()));
+        };
+        Ok(RgbaImage::from_fn(w + 2, h + 2, |x, y| {
+            let x = min[0] + x.saturating_sub(1).min(w - 1);
+            let y = min[1] + y.saturating_sub(1).min(h - 1);
+            let byte = tile[((y * 256 + x) / 2) as usize];
+            color(clut[usize::from((byte >> (4 * (x % 2))) & 15)])
+        }))
+    };
+    let mut images = Vec::with_capacity(textures.len() + sprites.len());
     for t in textures {
         // A fourth corner of (0, 0) marks a triangle texture.
         let corners = if t.uv[3] == [0, 0] { &t.uv[..3] } else { &t.uv[..] };
         let min = [0, 1].map(|axis| corners.iter().map(|c| u32::from(c[axis])).min().unwrap());
         let max = [0, 1].map(|axis| corners.iter().map(|c| u32::from(c[axis])).max().unwrap());
         let (w, h) = (max[0] - min[0] + 1, max[1] - min[1] + 1);
-        let (Some(tile), Some(clut)) = (tiles.get(t.tile), cluts.get(t.clut)) else {
-            return Err(format!("texture uses tile {} / CLUT {} of {} / {}", t.tile, t.clut, tiles.len(), cluts.len()));
-        };
-        let image = RgbaImage::from_fn(w + 2, h + 2, |x, y| {
-            let x = min[0] + x.saturating_sub(1).min(w - 1);
-            let y = min[1] + y.saturating_sub(1).min(h - 1);
-            let byte = tile[((y * 256 + x) / 2) as usize];
-            color(clut[usize::from((byte >> (4 * (x % 2))) & 15)])
-        });
-        images.push((image, min));
+        images.push((crop(t.tile, t.clut, min, w, h, "texture")?, min));
+    }
+    for s in sprites {
+        let min = s.uv[0].map(u32::from);
+        let [w, h] = [0, 1].map(|axis| (u32::from(s.uv[1][axis]) + 1).saturating_sub(min[axis]).max(1));
+        images.push((crop(s.tile, s.clut, min, w, h, "sprite")?, min));
     }
     let mut positions = Vec::with_capacity(images.len());
     let (mut x, mut y, mut row) = (0, 0, 0);
@@ -454,17 +496,28 @@ fn atlas(textures: &[Texture], tiles: &[&[u8]], cluts: &[Vec<u16>]) -> Result<(R
     let bits = u32::BITS - (y + row).saturating_sub(1).leading_zeros();
     let height = 1u32 << bits.max(1);
     let mut atlas = RgbaImage::new(ATLAS_WIDTH, height);
-    let mut uvs = Vec::with_capacity(textures.len());
-    for ((t, (image, min)), &(x, y)) in textures.iter().zip(&images).zip(&positions) {
+    for ((image, _), &(x, y)) in images.iter().zip(&positions) {
         image::imageops::replace(&mut atlas, image, i64::from(x), i64::from(y));
-        uvs.push(t.uv.map(|[u, v]| {
-            let at = |origin: u32, texel: u8, min: u32, size: u32| {
-                ((f64::from(origin) + 1.0 + f64::from(texel) - f64::from(min) + 0.5) / f64::from(size)) as f32
-            };
-            [at(x, u, min[0], ATLAS_WIDTH), at(y, v, min[1], height)]
-        }));
     }
-    Ok((atlas, uvs))
+    let uvs = textures
+        .iter()
+        .zip(&images)
+        .zip(&positions)
+        .map(|((t, (_, min)), &(x, y))| {
+            t.uv.map(|[u, v]| {
+                let at = |origin: u32, texel: u8, min: u32, size: u32| {
+                    ((f64::from(origin) + 1.0 + f64::from(texel) - f64::from(min) + 0.5) / f64::from(size)) as f32
+                };
+                [at(x, u, min[0], ATLAS_WIDTH), at(y, v, min[1], height)]
+            })
+        })
+        .collect();
+    let rects = images[textures.len()..]
+        .iter()
+        .zip(&positions[textures.len()..])
+        .map(|((image, _), &(x, y))| [x + 1, y + 1, image.width() - 2, image.height() - 2])
+        .collect();
+    Ok((atlas, uvs, rects))
 }
 
 fn signed(word: u16) -> i32 {
@@ -579,6 +632,9 @@ fn adpcm(data: &[u8]) -> Result<Vec<i16>> {
 fn validate(l: &raw::Level) -> Result<()> {
     let (rooms, textures, meshes) = (l.rooms.len(), l.textures.len(), l.mesh_indices.len());
     let check = |ok: bool, what: String| if ok { Ok(()) } else { Err(what) };
+    for s in &l.sprite_sequences {
+        check(s.first + s.count <= l.sprites.len(), format!("sprite sequence of object {}", s.id))?;
+    }
     for room in &l.rooms {
         let id = room.id;
         check(room.alternate == -1 || (0..rooms as i32).contains(&room.alternate), format!("room {id}: alternate"))?;

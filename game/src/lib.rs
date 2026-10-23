@@ -5,7 +5,8 @@
 //! The engine draws levels, runs floor triggers, the camera and animation.
 //! This crate adds what is Tomb Raider II's own: Lara's controller
 //! ([`player`], [`braid`]), the object types and trigger actions
-//! ([`interactions`], `data/object_types.json`), sounds ([`audio`]), menus
+//! ([`interactions`], `data/object_types.json`), the inventory and its ring
+//! ([`inventory`]), sounds ([`audio`]), menus
 //! and HUD ([`presentation`]) and saves ([`save`]). Rules plugins stay free of
 //! rendering so they run in tests.
 //!
@@ -24,11 +25,13 @@ pub mod gunman;
 pub mod items;
 pub mod display;
 pub mod interactions;
+pub mod inventory;
 pub mod player;
 pub mod presentation;
 pub mod rat;
 pub mod save;
 pub mod sky;
+pub mod text;
 pub mod spider;
 pub mod subdivision;
 pub mod tiger;
@@ -81,6 +84,8 @@ impl PluginGroup for GamePlugins {
             .add(player::PlayerRulesPlugin)
             .add(interactions::InteractionsPlugin)
             .add(presentation::PresentationPlugin)
+            .add(text::TextPlugin)
+            .add(inventory::view::InventoryViewPlugin)
             .add(audio::GameAudioPlugin)
             .add(subdivision::SubdivisionPlugin)
             .add(sky::SkyPlugin)

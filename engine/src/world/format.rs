@@ -53,6 +53,13 @@ pub struct Level {
     /// Sound id -> index into `sounds`, or none.
     pub sound_map: Vec<Option<usize>>,
     pub sounds: Vec<Sound>,
+    /// Flat images drawn facing the camera or on the screen (pickups, the
+    /// font), each a rectangle of the atlas.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sprites: Vec<Sprite>,
+    /// Object types drawn as sprites, by type id.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sprite_sequences: Vec<SpriteSequence>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,6 +234,32 @@ pub struct CameraShot {
     pub once: bool,
     /// The eye closes 1/(8*speed+1) of the gap to the camera per tick.
     pub speed: u8,
+}
+
+/// A sprite: its rectangle in the atlas and where it draws from its point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sprite {
+    /// x, y, width and height in atlas pixels.
+    pub atlas: [u32; 4],
+    /// Left, top, right and bottom from the point it is drawn at: pixels on
+    /// the screen, units in the world.
+    pub rect: [i32; 4],
+}
+
+/// An object type's sprites: `count` of them from `first`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpriteSequence {
+    pub id: u16,
+    pub first: usize,
+    pub count: usize,
+}
+
+impl Level {
+    /// The sprites of object type `id`, if it is drawn as sprites.
+    pub fn sprite_sequence(&self, id: u16) -> Option<&[Sprite]> {
+        let sequence = self.sprite_sequences.iter().find(|s| s.id == id)?;
+        self.sprites.get(sequence.first..sequence.first + sequence.count)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -69,6 +69,42 @@ fn app_with(level: &str, lara: Player, edit: impl FnOnce(Level) -> Level) -> (Ap
     (app, lara)
 }
 
+/// How many of a placed object's item Lara carries.
+fn carried(app: &App, kind: u16) -> u16 {
+    app.world().resource::<Inventory>().count(&game::inventory::ItemTable::default(), kind)
+}
+
+/// Gives Lara a placed object's item.
+fn give(app: &mut App, kind: u16) {
+    app.world_mut().resource_mut::<Inventory>().add(&game::inventory::ItemTable::default(), kind);
+}
+
+/// Action at a hole asks for the keys ring (KeyHoleCollision calls
+/// Display_Inventory(2)); it opens on the next tick and, once it rests, a
+/// second Action chooses the item in front. Runs to the tick the ring
+/// closes on, the original's first after Display_Inventory returns.
+fn choose_on_keys_ring(app: &mut App) {
+    use game::inventory::{InventoryRing, ring::Status};
+    let ring = |app: &App| app.world().resource::<InventoryRing>().ring.as_ref().map(|r| r.motion.status);
+    app.run_tick(&[Button::Cross]);
+    app.run_tick(&[]);
+    assert!(ring(app).is_some(), "the keys ring opens");
+    for _ in 0..40 {
+        if ring(app) == Some(Status::Open) {
+            break;
+        }
+        app.run_tick(&[]);
+    }
+    app.run_tick(&[Button::Cross]);
+    for _ in 0..80 {
+        if ring(app).is_none() {
+            return;
+        }
+        app.run_tick(&[]);
+    }
+    panic!("the keys ring did not close: {:?}", ring(app));
+}
+
 fn object(app: &mut App, index: usize) -> Entity {
     app.world_mut().query::<(Entity, &WorldObject)>().iter(app.world()).find(|(_, o)| o.index == index).unwrap().0
 }
@@ -98,7 +134,8 @@ fn a_pickup_lands_in_the_hand_on_frame_42_and_counts_once() {
     app.run_ticks(30, &[Button::Cross]);
     assert_eq!(app.world().get::<Player>(lara).unwrap().mode, PlayerMode::Idle);
     assert_eq!(app.world().get::<WeaponState>(lara).unwrap().status, GunStatus::HandsFree);
-    assert_eq!(app.world().resource::<Inventory>().items.get(&192), Some(&1));
+    // A secret is a found-secret bit, not an item (Inv_AddItem 0x80034168).
+    assert_eq!(app.world().resource::<Inventory>().secrets, 0b100);
     assert_eq!(app.world().resource::<InteractionProgress>().pickups, 1);
     assert_eq!(app.world().resource::<InteractionProgress>().secrets, 1);
 }
@@ -281,8 +318,8 @@ fn running_into_a_closed_door_matches_the_recording() {
 /// `.psx/rec_wall_keyhole`: from the handoff checkpoint, Action opens the
 /// inventory and a second Action chooses key 193 (197 in the ring). The
 /// game's ticks stop while the ring is open; tick 0 here is the first one
-/// after it closes (run frame 149). The port has no ring yet and uses the
-/// key on the press.
+/// after it closes (run frame 149), here the tick the keys ring closes on
+/// ([`choose_on_keys_ring`]).
 #[test]
 fn the_first_wall_keyhole_matches_the_recording() {
     let lara = Player::at(position([30821, 0, 33213]), angle(49432), 0);
@@ -290,11 +327,14 @@ fn the_first_wall_keyhole_matches_the_recording() {
     // The level's first tick clears the keys Lara carried in; give her the
     // key after it.
     app.run_tick(&[]);
-    app.world_mut().resource_mut::<Inventory>().items.insert(193, 1);
+    give(&mut app, 193);
     let keyhole = object(&mut app, 1);
     let door = object(&mut app, 0);
+    choose_on_keys_ring(&mut app);
     for tick in 0..=168 {
-        app.run_tick(if tick == 0 { &[Button::Cross] } else { &[] });
+        if tick > 0 {
+            app.run_tick(&[]);
+        }
         let player = app.world().get::<Player>(lara).unwrap();
         let animation = app.world().get::<AnimationState>(lara).unwrap();
         let hands = app.world().get::<WeaponState>(lara).unwrap().status;
@@ -325,25 +365,27 @@ fn the_first_wall_keyhole_matches_the_recording() {
             _ => {}
         }
     }
-    assert_eq!(app.world().resource::<Inventory>().items.get(&193).copied().unwrap_or(0), 0);
+    assert_eq!(carried(&app, 193), 0);
 }
 
 /// Opera House's first puzzle hole (195, type 182) beside the lift, against
 /// `.psx/rec_opera_puzzle_hole`: from the handoff checkpoint Lara walks up
 /// to the wall, Action opens the inventory ring and a second Action chooses
 /// the Relay Box (174). Tick 0 here is the first after the ring closes
-/// (run frame 230). The port has no ring yet and uses the piece on the
-/// press.
+/// (run frame 230), here the tick the keys ring closes on.
 #[test]
 fn the_opera_puzzle_hole_matches_the_recording() {
     let lara = Player::at(position([78307, 2304, 43931]), angle(107), 183);
     let (mut app, lara) = app("opera", lara);
     app.world_mut().entity_mut(lara).insert(AnimationState::at_frame(clip::STAND_IDLE, 14.0));
     app.run_tick(&[]);
-    app.world_mut().resource_mut::<Inventory>().items.insert(174, 1);
+    give(&mut app, 174);
     let hole = object(&mut app, 195);
+    choose_on_keys_ring(&mut app);
     for tick in 0..=120 {
-        app.run_tick(if tick == 0 { &[Button::Cross] } else { &[] });
+        if tick > 0 {
+            app.run_tick(&[]);
+        }
         let player = app.world().get::<Player>(lara).unwrap();
         let animation = app.world().get::<AnimationState>(lara).unwrap();
         let hands = app.world().get::<WeaponState>(lara).unwrap().status;
@@ -368,7 +410,7 @@ fn the_opera_puzzle_hole_matches_the_recording() {
         assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
         assert_eq!(avatar.camera_speed, None, "tick {tick}");
     }
-    assert_eq!(app.world().resource::<Inventory>().items.get(&174).copied().unwrap_or(0), 0);
+    assert_eq!(carried(&app, 174), 0);
 }
 
 /// Wall's second key (15, type 194) at the top of the ladder, against
@@ -402,7 +444,7 @@ fn the_ladder_key_pickup_matches_the_recording() {
         assert_eq!(avatar.camera_angle, if requested { -23660 } else { 0 }, "tick {tick}");
         assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
     }
-    assert_eq!(app.world().resource::<Inventory>().items.get(&194), Some(&1));
+    assert_eq!(carried(&app, 194), 1);
 }
 
 /// Wall's first key (17, type 193) on the floor of a flooded corridor,
@@ -466,7 +508,7 @@ fn the_underwater_key_pickup_matches_the_recording() {
         assert_eq!(avatar.camera_angle, if requested { -23660 } else { 0 }, "tick {tick}");
         assert_eq!(avatar.camera_distance, requested.then_some(1024), "tick {tick}");
     }
-    assert_eq!(app.world().resource::<Inventory>().items.get(&193), Some(&1));
+    assert_eq!(carried(&app, 193), 1);
 }
 
 /// Venice's underwater switch (40, type 105, room 49), against
